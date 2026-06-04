@@ -1,0 +1,347 @@
+// apps/frontend/src/features/rfq/components/ActionPickers.tsx
+//
+// Modal pickers for RFQ actions that need structured payloads before calling applyTransition.
+//
+//   • assign_suppliers  (buyer)  → multi-select supplier user IDs
+//   • select_supplier   (buyer)  → pick quotation + rationale
+//   • submit_proforma   (supplier) → upload proforma file
+//   • issue_po          (buyer)  → confirm; PO number generated server-side
+//
+import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { UploadCloud } from "lucide-react";
+import { api } from "@/lib/api";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Modal } from "@/components/ui/Modal";
+import { Textarea } from "@/components/ui/Input";
+import { rfqApi, rfqAttachmentUrl } from "../lib/rfq.api";
+
+export const PICKER_ACTIONS = new Set<string>([
+  "assign_suppliers",
+  "select_supplier",
+  "submit_proforma",
+  "issue_po",
+]);
+
+export interface PickerProps {
+  workspaceId?: string;
+  open:        boolean;
+  onClose:     () => void;
+  onConfirm:   (payload: Record<string, unknown>) => void;
+  isPending?:  boolean;
+}
+
+// ─── Assign suppliers ─────────────────────────────────────────────────────────
+
+export function AssignSuppliersPicker({ open, onClose, onConfirm, isPending }: PickerProps) {
+  const [search, setSearch] = useState("");
+  const [ids, setIds] = useState<string[]>([]);
+  useEffect(() => { if (!open) { setIds([]); setSearch(""); } }, [open]);
+
+  const list = useQuery({
+    queryKey: ["admin-suppliers", search],
+    queryFn: () => rfqApi.lookupSuppliers(search),
+    enabled: open,
+  });
+
+  const toggle = (id: string) =>
+    setIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Assign suppliers"
+      description="Select suppliers to invite to this RFQ."
+      size="md"
+      testId="assign-suppliers-picker"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button
+            data-testid="assign-suppliers-confirm"
+            variant="primary"
+            disabled={ids.length === 0 || isPending}
+            loading={isPending}
+            onClick={() => onConfirm({ supplierUserIds: ids })}
+          >
+            Assign ({ids.length})
+          </Button>
+        </>
+      }
+    >
+      <Input
+        data-testid="assign-suppliers-search"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search suppliers…"
+        className="mb-3"
+      />
+      <div className="max-h-64 overflow-y-auto dmx-thin-scroll space-y-1">
+        {(list.data ?? []).map((s) => {
+          const selected = ids.includes(s.id);
+          return (
+            <button
+              key={s.id}
+              type="button"
+              data-testid={`supplier-option-${s.id}`}
+              onClick={() => toggle(s.id)}
+              className={`w-full text-left px-3 py-2 rounded-md text-sm border ${
+                selected ? "border-accent-900/30 bg-accent-50" : "border-transparent hover:bg-zinc-50"
+              }`}
+            >
+              <div className="font-medium">{s.displayName}</div>
+              <div className="text-xs text-zinc-500">{s.email}</div>
+            </button>
+          );
+        })}
+        {list.isLoading && <div className="text-xs text-zinc-500 px-2">Loading…</div>}
+      </div>
+    </Modal>
+  );
+}
+
+// ─── Select supplier ─────────────────────────────────────────────────────────
+
+export function SelectSupplierPicker({ workspaceId, open, onClose, onConfirm, isPending }: PickerProps) {
+  const [quotationId, setQuotationId] = useState("");
+  const [rationale, setRationale]     = useState("");
+  useEffect(() => { if (!open) { setQuotationId(""); setRationale(""); } }, [open]);
+
+  const list = useQuery({
+    queryKey: ["rfq-quotations", workspaceId],
+    queryFn: () => rfqApi.quotations(workspaceId!),
+    enabled: open && !!workspaceId,
+  });
+
+  const rows = list.data ?? [];
+  const selected = rows.find((q) => q.id === quotationId);
+  const canConfirm = quotationId && rationale.trim().length >= 15;
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Select supplier"
+      description="Choose the winning quotation and explain your decision."
+      size="lg"
+      testId="select-supplier-picker"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button
+            data-testid="select-supplier-confirm"
+            variant="primary"
+            disabled={!canConfirm || isPending}
+            loading={isPending}
+            onClick={() => onConfirm({
+              supplierUserId: selected?.supplierId,
+              quotationId,
+              rationale: rationale.trim(),
+            })}
+          >
+            Select supplier
+          </Button>
+        </>
+      }
+    >
+      <div className="max-h-56 overflow-y-auto dmx-thin-scroll space-y-2">
+        {rows.map((q) => (
+          <button
+            key={q.id}
+            type="button"
+            data-testid={`quotation-option-${q.id}`}
+            onClick={() => setQuotationId(q.id)}
+            className={`w-full text-left flex gap-3 p-3 rounded-lg border ${
+              quotationId === q.id ? "border-accent-900/40 bg-accent-50/50" : "border-zinc-100 hover:bg-zinc-50/50"
+            }`}
+          >
+            <span className="flex-1 min-w-0">
+              <div className="font-medium text-sm">{q.supplierName}</div>
+              <div className="text-sm text-zinc-700">
+                <span className="font-mono tabular-nums">
+                  {Number(q.total).toLocaleString()} {q.currency}
+                </span>
+              </div>
+              <div className="text-xs text-zinc-500">
+                {q.incoterm ?? "—"}
+                {q.leadTimeDays != null && ` · ${q.leadTimeDays} day lead`}
+                {q.sampleAvail != null && ` · Sample ${q.sampleAvail ? "yes" : "no"}`}
+              </div>
+            </span>
+          </button>
+        ))}
+        {!list.isLoading && !list.isError && rows.length === 0 && (
+          <div className="px-3 py-4 text-xs text-zinc-500">No quotations submitted yet.</div>
+        )}
+      </div>
+      <Textarea
+        data-testid="select-supplier-rationale"
+        value={rationale}
+        onChange={(e) => setRationale(e.target.value)}
+        placeholder="Min. 15 characters — why this supplier?"
+        rows={3}
+        className="mt-3"
+      />
+    </Modal>
+  );
+}
+
+// ─── Issue PO (server-generated PO number) ───────────────────────────────────
+
+export function IssuePoPicker({ open, onClose, onConfirm, isPending }: PickerProps) {
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Issue PO"
+      description="A unique purchase-order number will be generated automatically. The workspace will move to PO_ISSUED and an order workspace will be created."
+      size="md"
+      testId="issue-po-picker"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button
+            data-testid="issue-po-confirm"
+            variant="primary"
+            disabled={isPending}
+            loading={isPending}
+            onClick={() => onConfirm({})}
+          >
+            Issue PO
+          </Button>
+        </>
+      }
+    >
+      <p className="text-sm text-zinc-600">
+        Confirm to issue the purchase order. You do not need to enter a PO number — the system assigns one at issuance.
+      </p>
+    </Modal>
+  );
+}
+
+// ─── Submit proforma (supplier file upload) ───────────────────────────────────
+
+interface RfqAttachmentRow {
+  id: string;
+  fileName: string;
+  mimeType?: string;
+}
+
+export function SubmitProformaPicker({ workspaceId, open, onClose, onConfirm, isPending }: PickerProps) {
+  const [proformaFileUrl, setProformaFileUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setProformaFileUrl(null);
+      setUploading(false);
+    }
+  }, [open]);
+
+  const attachments = useQuery({
+    queryKey: ["rfq", workspaceId, "attachments"],
+    queryFn: () => rfqApi.attach(workspaceId!) as Promise<RfqAttachmentRow[]>,
+    enabled: open && !!workspaceId,
+  });
+
+  const pdfAttachments = useMemo(
+    () => (attachments.data ?? []).filter((a) => (a.mimeType ?? "").includes("pdf") || a.fileName.endsWith(".pdf")),
+    [attachments.data],
+  );
+
+  async function uploadFile(file: File) {
+    if (!workspaceId) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const { data } = await api.post<{ id: string }>(`/rfq/${workspaceId}/attachments`, fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setProformaFileUrl(rfqAttachmentUrl(workspaceId, data.id));
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Submit proforma"
+      description="Upload or select a proforma invoice PDF."
+      size="md"
+      testId="submit-proforma-picker"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button
+            data-testid="submit-proforma-confirm"
+            variant="primary"
+            disabled={!proformaFileUrl || isPending || uploading}
+            loading={isPending}
+            onClick={() => onConfirm({ proformaFileUrl: proformaFileUrl! })}
+          >
+            Submit proforma
+          </Button>
+        </>
+      }
+    >
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          const f = e.dataTransfer.files[0];
+          if (f) void uploadFile(f);
+        }}
+        className={`rounded-xl border border-dashed p-6 text-center text-sm transition-colors ${
+          dragOver ? "border-accent-900/30 bg-accent-50 text-accent-900" : "border-paper-200 text-zinc-500"
+        }`}
+      >
+        <UploadCloud className="h-6 w-6 mx-auto mb-2 text-accent-900" />
+        <p>Drag a PDF here or</p>
+        <label className="mt-2 inline-block">
+          <span className="text-accent-900 font-medium cursor-pointer hover:underline">browse</span>
+          <input
+            type="file"
+            accept="application/pdf,.pdf"
+            className="hidden"
+            data-testid="proforma-file-input"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void uploadFile(f);
+            }}
+          />
+        </label>
+        {uploading && <p className="text-xs mt-2 text-zinc-500">Uploading…</p>}
+        {proformaFileUrl && <p className="text-xs mt-2 text-emerald-700">File ready</p>}
+      </div>
+
+      {pdfAttachments.length > 0 && (
+        <div className="mt-4">
+          <p className="text-[11px] uppercase tracking-wider text-zinc-500 mb-2">Or use existing attachment</p>
+          <div className="space-y-1 max-h-32 overflow-y-auto">
+            {pdfAttachments.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                data-testid={`proforma-pick-${a.id}`}
+                onClick={() => workspaceId && setProformaFileUrl(rfqAttachmentUrl(workspaceId, a.id))}
+                className={`w-full text-left px-3 py-2 rounded-md text-sm border ${
+                  proformaFileUrl?.includes(a.id) ? "border-accent-900/30 bg-accent-50" : "border-zinc-100 hover:bg-zinc-50"
+                }`}
+              >
+                {a.fileName}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}

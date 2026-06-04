@@ -1,0 +1,37 @@
+{
+  "name": "@dmx/contracts",
+  "version": "0.2.0",
+  "private": true,
+  "description": "DeMaxtore shared contracts — FSM, Zod schemas, DTOs, socket events. Single source of truth for backend + frontend.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".":                   "./src/index.ts",
+    "./rfq.fsm":           "./src/rfq.fsm.ts",
+    "./rfq.next-actions":  "./src/rfq.next-actions.ts",
+    "./rfq.zod":           "./src/rfq.zod.ts",
+    "./commoditybid.fsm":  "./src/commoditybid.fsm.ts",
+    "./commoditybid.next-actions": "./src/commoditybid.next-actions.ts",
+    "./commoditybid.zod":  "./src/commoditybid.zod.ts",
+    "./order.fsm":         "./src/order.fsm.ts",
+    "./order.next-actions": "./src/order.next-actions.ts",
+    "./order.zod":         "./src/order.zod.ts",
+    "./auth":              "./src/auth.ts",
+    "./notifications":     "./src/notifications.ts",
+    "./socket-events":     "./src/socket-events.ts",
+    "./api":               "./src/api.ts"
+  },
+  "scripts": {
+    "build":     "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test":      "vitest run"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "vitest":     "^2.0.5"
+  }
+}
