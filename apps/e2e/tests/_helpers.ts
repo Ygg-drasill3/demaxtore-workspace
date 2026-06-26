@@ -1,9 +1,49 @@
 // apps/e2e/tests/_helpers.ts
+import { createHmac } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
 import { request, type APIRequestContext, type Page } from "@playwright/test";
 
-export const API_BASE = process.env.E2E_API_URL || "http://localhost:3001";
+const _cwd = process.cwd();
+const _rawApiBase = process.env.E2E_API_URL || "http://localhost:3001";
+/** Origin for API calls — strips a trailing `/api` so `${API_BASE}/api/...` is never doubled. */
+export const API_BASE = _rawApiBase.replace(/\/$/, "").replace(/\/api$/, "");
 export const FRONTEND_BASE = process.env.E2E_FRONTEND_URL || "http://localhost:3000";
-export const REPO_ROOT = process.env.E2E_REPO_ROOT || `${process.cwd()}/../..`;
+export const REPO_ROOT =
+  process.env.E2E_REPO_ROOT ??
+  (existsSync(`${_cwd}/apps/backend`) ? _cwd : `${_cwd}/../..`);
+
+/** Read a secret from process.env or apps/backend/.env (server-side E2E only). */
+function readBackendEnvVar(key: string): string | undefined {
+  const fromEnv = process.env[key];
+  if (fromEnv) return fromEnv;
+  const envPath = path.join(REPO_ROOT, "apps/backend/.env");
+  if (!existsSync(envPath)) return undefined;
+  for (const line of readFileSync(envPath, "utf8").split("\n")) {
+    if (line.startsWith(`${key}=`)) return line.slice(key.length + 1).trim();
+  }
+  return undefined;
+}
+
+/** Shared with backend webServer in playwright.config.ts for payment webhook E2E. */
+export const E2E_PAYMENT_WEBHOOK_SECRET =
+  readBackendEnvVar("PAYMENT_WEBHOOK_SECRET") ?? "e2e-payment-webhook-secret";
+
+/** Shared with backend E2E_TEST_SECRET — rate-limit bypass for Playwright (header only). */
+export const E2E_TEST_SECRET = readBackendEnvVar("E2E_TEST_SECRET") ?? "";
+
+/** Extra headers for API / fetch calls during E2E (never log this value). */
+export function e2eHeaders(extra?: Record<string, string>): Record<string, string> {
+  const headers: Record<string, string> = { ...extra };
+  if (E2E_TEST_SECRET.length >= 32) {
+    headers["x-e2e-test-secret"] = E2E_TEST_SECRET;
+  }
+  return headers;
+}
+
+export function authHeaders(token: string): Record<string, string> {
+  return e2eHeaders({ Authorization: `Bearer ${token}` });
+}
 
 /** Confirm workspace FSM action modal when it opens (order/shipment pages). */
 export async function confirmWorkspaceActionModal(page: Page): Promise<void> {
@@ -12,6 +52,30 @@ export async function confirmWorkspaceActionModal(page: Page): Promise<void> {
     await page.getByTestId("workspace-action-confirm").click();
     await modal.waitFor({ state: "hidden", timeout: 15_000 }).catch(() => {});
   }
+}
+
+/** Click an order/shipment workspace action (primary CTA or "More actions" drawer). */
+export async function clickWorkspaceAction(page: Page, testId: string): Promise<void> {
+  await page.getByTestId("order-loading").waitFor({ state: "detached", timeout: 15_000 }).catch(() => {});
+  await page.getByTestId("shipment-loading").waitFor({ state: "detached", timeout: 5_000 }).catch(() => {});
+
+  const btn = page.getByTestId(testId);
+  const directlyVisible = await btn.waitFor({ state: "visible", timeout: 5_000 }).then(() => true).catch(() => false);
+
+  if (directlyVisible) {
+    const backdrop = page.getByTestId("order-action-drawer-backdrop");
+    if (await backdrop.isVisible({ timeout: 200 }).catch(() => false)) {
+      await page.keyboard.press("Escape");
+      await backdrop.waitFor({ state: "detached", timeout: 3_000 }).catch(() => {});
+    }
+  } else {
+    const moreBtn = page.getByTestId("order-more-actions");
+    await moreBtn.click({ timeout: 8_000 });
+    await btn.waitFor({ state: "visible", timeout: 8_000 });
+    await page.waitForTimeout(300);
+  }
+
+  await btn.click({ timeout: 15_000 });
 }
 export const PW = "Passw0rd!";
 
@@ -56,7 +120,7 @@ export async function apiLogin(req: APIRequestContext, creds: Creds): Promise<st
 }
 
 export async function newRequest(): Promise<APIRequestContext> {
-  return await request.newContext();
+  return await request.newContext({ extraHTTPHeaders: e2eHeaders() });
 }
 
 /** Create a fresh RFQ as buyer + submit it. Returns workspace DTO. */
@@ -302,4 +366,81 @@ export async function bootstrapAcknowledgedPo(
     data: { payload: { status: "ACCEPTED" } },
   });
   return { rfqId, orderId, poId: po.purchaseOrder.id };
+}
+
+/** HMAC headers for a pre-serialized JSON webhook body (must match wire bytes). */
+export function signWebhookRawBody(
+  raw: string,
+  secret: string = E2E_PAYMENT_WEBHOOK_SECRET,
+): Record<string, string> {
+  const digest = createHmac("sha256", secret).update(raw).digest("hex");
+  return {
+    "Content-Type": "application/json",
+    "X-Demaxtore-Signature": `sha256=${digest}`,
+  };
+}
+
+/** POST payment webhook with HMAC over exact request body. */
+export async function postSignedPaymentWebhook(
+  req: APIRequestContext,
+  payload: Record<string, unknown>,
+  secret: string = E2E_PAYMENT_WEBHOOK_SECRET,
+) {
+  const raw = JSON.stringify(payload);
+  return req.post(`${API_BASE}/api/payments/webhook`, {
+    headers: { ...signWebhookRawBody(raw, secret), ...e2eHeaders() },
+    data: raw,
+  });
+}
+
+/** Read persisted access token from browser localStorage (dmx.auth zustand key). */
+export async function readAccessToken(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const raw = localStorage.getItem("dmx.auth");
+    if (!raw) return "";
+    try {
+      const parsed = JSON.parse(raw) as { state?: { accessToken?: string } };
+      return parsed.state?.accessToken ?? "";
+    } catch {
+      return "";
+    }
+  });
+}
+
+/**
+ * Advance an order through production completion → skip inspection → FREIGHT_REQUESTED.
+ * Requires production %100 before mark_production_completed (order FSM precondition).
+ */
+export async function advanceOrderToFreightRequested(
+  req: APIRequestContext,
+  orderId: string,
+  tokens: { supplier: string; buyer: string },
+  plannedCompletionDate?: string,
+): Promise<void> {
+  const future = plannedCompletionDate ?? new Date(Date.now() + 30 * 86400_000).toISOString();
+  const steps: Array<{ path: string; token: string; payload: Record<string, unknown> }> = [
+    { path: "supplier-confirm-order", token: tokens.supplier, payload: { plannedCompletionDate: future } },
+    { path: "start-production", token: tokens.supplier, payload: { plannedCompletionDate: future } },
+    {
+      path: "mark-production-completed",
+      token: tokens.supplier,
+      payload: { percentage: 100, label: "Production complete" },
+    },
+    { path: "skip-inspection", token: tokens.buyer, payload: {} },
+  ];
+  for (const step of steps) {
+    const res = await req.post(`${API_BASE}/api/orders/${orderId}/actions/${step.path}`, {
+      headers: e2eHeaders({ Authorization: `Bearer ${step.token}` }),
+      data: { payload: step.payload },
+    });
+    if (!res.ok()) {
+      throw new Error(`${step.path} failed: ${res.status()} ${await res.text()}`);
+    }
+  }
+  const order = await req.get(`${API_BASE}/api/orders/${orderId}`, {
+    headers: e2eHeaders({ Authorization: `Bearer ${tokens.buyer}` }),
+  }).then((r) => r.json()) as { state: string };
+  if (order.state !== "FREIGHT_REQUESTED") {
+    throw new Error(`expected FREIGHT_REQUESTED, got ${order.state}`);
+  }
 }
