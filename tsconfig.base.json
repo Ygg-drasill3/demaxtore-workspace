@@ -1,0 +1,23 @@
+// Root tsconfig — used only for editor path resolution at the monorepo root.
+// Each package has its own tsconfig.json with strict mode + path aliases.
+{
+  "compilerOptions": {
+    "target":     "ES2022",
+    "module":     "ESNext",
+    "moduleResolution": "Bundler",
+    "strict":     true,
+    "esModuleInterop": true,
+    "skipLibCheck":    true,
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "@dmx/contracts":   ["packages/contracts/src/index.ts"],
+      "@dmx/contracts/*": ["packages/contracts/src/*.ts"]
+    }
+  },
+  "include": [],
+  "references": [
+    { "path": "packages/contracts" },
+    { "path": "apps/frontend" }
+  ]
+}

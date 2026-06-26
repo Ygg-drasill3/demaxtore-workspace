@@ -82,6 +82,7 @@ chainlit.md
 apps/frontend/dist-backup-*/
 
 # QA / audit artifacts (local evidence only)
+qa-customer-acceptance/
 qa-customer-acceptance/**/screenshots/
 qa-customer-acceptance/**/buyer/
 qa-customer-acceptance/**/supplier/
@@ -96,6 +97,26 @@ qa-customer-acceptance/**/*.json
 
 # Stray temp scripts
 a.js
+auth_testing.md
+test_result.md
+package-lock.json
+
+# Non-monorepo / legacy trees (not part of reproducible workspace build)
+backend/
+deploy/
+faith/
+frontend/
+legacy/
+memory/
+test-results/
+test_reports/
+tests/
+tools/
+design_guidelines.json
+
+# Sprint documentation (local reports — not required for build)
+docs/
+!docs/backlog-test-infra-hardening.md
 
 # Data and databases
 agenthub/agents/youtube/db
