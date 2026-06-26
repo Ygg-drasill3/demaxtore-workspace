@@ -1,8 +1,10 @@
 import type { PaymentIntentStatus, CreatePaymentIntentPayload } from "@dmx/contracts/payments";
+import type { PaymentMilestoneKind } from "@dmx/contracts/payment-milestones";
 import type { PrismaClient } from "@prisma/client";
 import { AppError } from "../../utils/httpErrors.js";
 import { StubPaymentProvider } from "./providers/stub.provider.js";
 import type { PaymentProvider } from "./providers/types.js";
+import { PaymentMilestoneService } from "./payment-milestone.service.js";
 
 export class PaymentService {
   private readonly provider: PaymentProvider;
@@ -11,7 +13,7 @@ export class PaymentService {
     this.provider = provider ?? new StubPaymentProvider();
   }
 
-  async createIntent(orderId: string, payload: CreatePaymentIntentPayload) {
+  async createIntent(orderId: string, payload: CreatePaymentIntentPayload, actorUserId?: string) {
     const order = await this.db.workspace.findUnique({
       where: { id: orderId },
       include: { orderWorkspace: true },
@@ -29,8 +31,8 @@ export class PaymentService {
       data: {
         workspaceId: orderId,
         eventType: "payment.pending",
-        actorUserId: null,
-        payload: { intentId: intent.id, status: intent.status, amount: payload.amount },
+        actorUserId: actorUserId ?? null,
+        payload: { intentId: intent.id, status: intent.status, amount: payload.amount, orderId },
       },
     });
 
@@ -43,5 +45,18 @@ export class PaymentService {
 
   async handleWebhook(body: Record<string, unknown>): Promise<void> {
     await this.provider.handleWebhook(body);
+    const orderId = body.orderId ? String(body.orderId) : undefined;
+    const status = String(body.status ?? "");
+    const eventType = String(body.eventType ?? body.type ?? "");
+    if (!orderId) return;
+
+    const milestones = new PaymentMilestoneService(this.db);
+    if (status === "succeeded" || eventType === "payment.succeeded") {
+      const kind = (body.milestoneKind ?? "DEPOSIT_PAID") as PaymentMilestoneKind;
+      await milestones.satisfyMilestone(orderId, kind, String(body.eventId ?? body.intentId ?? ""));
+    }
+    if (eventType === "payment.disputed") {
+      await milestones.recordDispute(orderId, String(body.eventId ?? body.intentId ?? "") || undefined);
+    }
   }
 }

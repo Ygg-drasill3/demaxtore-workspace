@@ -9,8 +9,10 @@ import {
   RequestAmendmentPayload,
 } from "@dmx/contracts/purchase-order.zod";
 import { SocketEvents } from "@dmx/contracts/socket-events";
+import { AlertKey } from "@dmx/contracts/control-tower";
 import { socketBus } from "../../realtime/socket-bus.js";
 import { AppError } from "../../utils/httpErrors.js";
+import { upsertControlTowerAlert } from "../tracking/tracking-alerts.js";
 import { assertPoActionRole, canAccessPo, type AuthUser } from "./purchase-order.policy.js";
 import { notifyPoEvent } from "./purchase-order.notifications.js";
 import { autoAcknowledgePoOnSupplierConfirm } from "./purchase-order.sync.js";
@@ -174,6 +176,18 @@ export class PurchaseOrderService {
         message: `PO ${po.poNumber} ${input.status.toLowerCase()}`,
       });
     });
+
+    if (input.status === "REJECTED") {
+      await upsertControlTowerAlert(this.db, {
+        workspaceId: po.orderId,
+        alertKey: AlertKey.PO_REJECTED,
+        severity: "CRITICAL",
+        category: "ORDER",
+        workspaceType: "ORDER",
+        title: "PO rejected by supplier",
+        description: `PO ${po.poNumber} — rejected by supplier.`,
+      }, { allowTestWorkspace: true });
+    }
 
     this.emit(SocketEvents.PO_ACKNOWLEDGED, po.orderId, poId, { status: input.status });
   }

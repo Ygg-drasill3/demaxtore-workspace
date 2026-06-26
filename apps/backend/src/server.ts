@@ -1,6 +1,7 @@
 // apps/backend/src/server.ts
 // Process entrypoint. Boots Express + Socket.io on env.PORT.
 import http from "node:http";
+import * as Sentry from "@sentry/node";
 import { buildApp } from "./app.js";
 import { env } from "./config/env.js";
 import { logger } from "./config/logger.js";
@@ -14,8 +15,37 @@ import { startTrackingScheduler } from "./modules/tracking/tracking.scheduler.js
 import { prisma } from "./db/prisma.js";
 import { reconcileStaleRunningJobs } from "./modules/jobs/job-reconciler.js";
 import { closeSchedulerPool } from "./db/scheduler-lock.js";
+import { getRedisClient, closeRedis } from "./lib/redis.js";
+
+if (env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: env.SENTRY_DSN,
+    environment: env.NODE_ENV,
+    release: `demaxtore-backend@${env.APP_VERSION}`,
+    tracesSampleRate: env.NODE_ENV === "production" ? 0.1 : 0,
+  });
+}
+
+process.on("unhandledRejection", (reason) => {
+  logger.error({ reason }, "unhandledRejection");
+  if (env.SENTRY_DSN) Sentry.captureException(reason);
+});
+
+process.on("uncaughtException", (err) => {
+  logger.fatal({ err }, "uncaughtException");
+  if (env.SENTRY_DSN) Sentry.captureException(err);
+  process.exit(1);
+});
 
 async function main(): Promise<void> {
+  try {
+    await getRedisClient();
+    logger.info("✓ Redis connection ok");
+  } catch (e) {
+    logger.error({ err: e }, "✗ Redis connection failed — check REDIS_URL");
+    process.exit(1);
+  }
+
   // Probe DB at boot — fail fast if migrations weren't run.
   try {
     await prisma.$queryRaw`SELECT 1`;
@@ -36,10 +66,8 @@ async function main(): Promise<void> {
   server.requestTimeout = env.HTTP_REQUEST_TIMEOUT_MS;
   await initSocket(server);
 
-  // Light periodic cleanup of brute-force map.
   setInterval(pruneExpired, 5 * 60 * 1000).unref();
 
-  // Proforma SLA reminder worker (Sprint 2.9).
   startSlaWorker();
   startCommodityBidScheduler();
   startRfqScheduler();
@@ -57,9 +85,8 @@ async function main(): Promise<void> {
   const shutdown = async (signal: string): Promise<void> => {
     logger.info({ signal }, "Graceful shutdown initiated");
     server.close(() => {
-      void Promise.all([prisma.$disconnect(), closeSchedulerPool()]).finally(() => process.exit(0));
+      void Promise.all([prisma.$disconnect(), closeSchedulerPool(), closeRedis()]).finally(() => process.exit(0));
     });
-    // Hard exit after 10s
     setTimeout(() => process.exit(1), 10_000).unref();
   };
 

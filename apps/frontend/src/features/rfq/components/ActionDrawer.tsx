@@ -18,9 +18,11 @@ import {
   PICKER_ACTIONS, AssignSuppliersPicker, SelectSupplierPicker, SubmitProformaPicker, IssuePoPicker,
 } from "./ActionPickers";
 import { rfqScriptFor } from "../lib/rfq.scripts";
+import { toWorkspaceScriptRole } from "@dmx/contracts/workspace-scripts";
 import { focusRfqCommunication } from "../lib/focus-communication";
 import { toast } from "@/store/toast.store";
 import type { RfqAction } from "@dmx/contracts/rfq.fsm";
+import { useT } from "@/i18n/useT";
 
 interface Props {
   workspaceId:    string;
@@ -41,6 +43,7 @@ interface Props {
 const FOCUS_COMMUNICATION_ACTIONS: ReadonlySet<RfqAction> = new Set(["post_clarification"]);
 
 export function ActionDrawer(props: Props) {
+  const { t } = useT();
   const { workspaceId, open, onClose, state, actor, isOwner, isCounterparty,
           isSelectedSupplier, hasQuotationFromUser, helperText, onFocusCommunication } = props;
   const apply = useApplyRfqAction(workspaceId);
@@ -54,7 +57,7 @@ export function ActionDrawer(props: Props) {
   });
 
   // Exclude the state's primary action — it lives in the hero card, not here.
-  const scriptRole = actor.role === "SYSTEM" ? "ADMIN" : actor.role;
+  const scriptRole = toWorkspaceScriptRole(actor.role === "SYSTEM" ? "ADMIN" : actor.role) ?? "ADMIN";
   const primaryAction = rfqScriptFor(state, scriptRole)?.primaryAction ?? RFQ_SCRIPTS[state]?.primaryAction;
   const otherActions = allowed.filter((a) => a.action !== primaryAction);
 
@@ -75,7 +78,7 @@ export function ActionDrawer(props: Props) {
     }
     if (a.requiresReason) { setPending(a); setReason(""); return; }
     if (a.requiresConfirmation) {
-      const ok = window.confirm(`${a.label}\n\nThis action cannot be easily undone. Continue?`);
+      const ok = window.confirm(`${a.label}\n\n${t("rfq.drawer.confirmUndo")}`);
       if (!ok) return;
     }
     apply.mutate({ action: a.action }, { onSuccess: () => onClose() });
@@ -88,7 +91,7 @@ export function ActionDrawer(props: Props) {
       {
         onSuccess: () => {
           if (pickerAction?.action === "submit_proforma") {
-            toast.success("Proforma submitted", "The buyer can now review your invoice.");
+            toast.success(t("rfq.drawer.proformaSubmitted"), t("rfq.drawer.proformaSubmittedHint"));
           }
           setPickerAction(null);
           onClose();
@@ -112,16 +115,16 @@ export function ActionDrawer(props: Props) {
 
   return (
     <>
-      <Drawer open={open} onClose={onClose} title="Other actions" width="md" testId="action-drawer">
+      <Drawer open={open} onClose={onClose} title={t("rfq.drawer.title")} width="md" testId="action-drawer">
         <div className="px-5 py-4 space-y-5">
           {otherActions.length === 0 && (
             <p className="text-sm text-zinc-500" data-testid="action-drawer-empty">
-              No additional actions are available for you in this state.
+              {t("rfq.drawer.emptyState")}
             </p>
           )}
 
           {secondary.length > 0 && (
-            <Section title="Secondary">
+            <Section title={t("rfq.drawer.secondary")}>
               {secondary.map((a) => (
                 <ActionTile key={a.action} action={a} helper={helperText?.[a.action]} onClick={() => run(a)}
                             loading={apply.isPending && apply.variables?.action === a.action} />
@@ -130,7 +133,7 @@ export function ActionDrawer(props: Props) {
           )}
 
           {critical.length > 0 && (
-            <Section title="Critical" tone="danger">
+            <Section title={t("rfq.drawer.critical")} tone="danger">
               {critical.map((a) => (
                 <ActionTile key={a.action} action={a} helper={helperText?.[a.action]} onClick={() => run(a)}
                             loading={apply.isPending && apply.variables?.action === a.action} critical />
@@ -144,12 +147,12 @@ export function ActionDrawer(props: Props) {
         open={!!pending}
         onClose={() => setPending(null)}
         title={pending?.label ?? ""}
-        description="A short reason will be recorded in the workspace audit log."
+        description={t("rfq.drawer.reasonDescription")}
         size="md"
         testId="action-drawer-reason-modal"
         footer={
           <>
-            <Button variant="secondary" onClick={() => setPending(null)}>Cancel</Button>
+            <Button variant="secondary" onClick={() => setPending(null)}>{t("rfq.drawer.cancel")}</Button>
             <Button
               data-testid="action-drawer-reason-confirm"
               variant={pending?.variant === "destructive" ? "destructive" : "primary"}
@@ -157,7 +160,7 @@ export function ActionDrawer(props: Props) {
               disabled={reason.trim().length < 15}
               loading={apply.isPending}
             >
-              Confirm
+              {t("rfq.drawer.confirm")}
             </Button>
           </>
         }
@@ -166,11 +169,16 @@ export function ActionDrawer(props: Props) {
           data-testid="action-drawer-reason-textarea"
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          placeholder="Min. 15 characters — explain the reason for this action."
+          placeholder={t("rfq.drawer.reasonPlaceholder")}
           rows={4}
         />
         <div className="flex gap-1.5 mt-2 flex-wrap">
-          {["Wrong specs", "Wrong category", "Insufficient detail", "Other"].map((preset) => (
+          {[
+            t("rfq.drawer.rejectPreset.wrongSpecs"),
+            t("rfq.drawer.rejectPreset.wrongCategory"),
+            t("rfq.drawer.rejectPreset.insufficient"),
+            t("rfq.drawer.rejectPreset.other"),
+          ].map((preset) => (
             <button key={preset}
                     type="button"
                     onClick={() => setReason((r) => r ? r : preset + " — ")}

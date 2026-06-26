@@ -12,6 +12,7 @@ import { RfqService } from "../rfq/rfq.service.js";
 import { runCommodityBidSchedulerTick } from "./commoditybid.scheduler.js";
 import { canAccessCommodityBid, canViewSupplierIdentity } from "./commoditybid.policy.js";
 import { prisma } from "../../db.js";
+import { toActorRole } from "../../types/auth-user.js";
 import { AppError } from "../../utils/httpErrors.js";
 
 const service = new CommodityBidService(prisma);
@@ -63,7 +64,7 @@ export const commoditybidController = {
     await service.applyTransition({
       workspaceId: dto.id,
       action: "schedule_auction",
-      actor: { id: req.user!.id, email: req.user!.email, role: req.user!.role },
+      actor: { id: req.user!.id, email: req.user!.email, role: toActorRole(req.user!.role) },
       payload: {
         auctionStartsAt: input.auctionStartsAt,
         auctionDurationMinutes: input.auctionDurationMinutes,
@@ -234,7 +235,7 @@ export const commoditybidController = {
       const result = await service.applyTransition({
         workspaceId: ws.id,
         action,
-        actor: { id: req.user!.id, email: req.user!.email, role: req.user!.role },
+        actor: { id: req.user!.id, email: req.user!.email, role: toActorRole(req.user!.role) },
         payload: fullPayload,
         idempotencyKey: env.idempotencyKey,
         reason: env.reason,
@@ -256,7 +257,7 @@ export const commoditybidController = {
     const result = await service.applyTransition({
       workspaceId: ws.id,
       action: act,
-      actor: { id: req.user!.id, email: req.user!.email, role: req.user!.role },
+      actor: { id: req.user!.id, email: req.user!.email, role: toActorRole(req.user!.role) },
       payload: { ...body, lotId: req.params.lotId, currency },
     });
     res.json(result);
@@ -268,7 +269,7 @@ export const commoditybidController = {
     const result = await service.applyTransition({
       workspaceId: ws.id,
       action: "withdraw_bid_lot",
-      actor: { id: req.user!.id, email: req.user!.email, role: req.user!.role },
+      actor: { id: req.user!.id, email: req.user!.email, role: toActorRole(req.user!.role) },
       payload: { ...body, lotId: req.params.lotId },
     });
     res.json(result);

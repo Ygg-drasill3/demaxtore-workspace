@@ -1,0 +1,649 @@
+import type { Prisma, PrismaClient } from "@prisma/client";
+import { writeStoredFile } from "../../lib/file-storage.js";
+import type {
+  CommWorkspaceType,
+  CommunicationAction,
+  MessageSearchResult,
+  MessageVisibility,
+  WorkspaceConversation,
+  WorkspaceMessage,
+} from "@dmx/contracts/workspace-communication";
+import { TIMELINE_MESSAGE_TYPES } from "@dmx/contracts/workspace-communication";
+import {
+  CreateMessagePayload,
+  DeleteMessagePayload,
+  EditMessagePayload,
+  MarkReadPayload,
+  MessageSearchQuerySchema,
+} from "@dmx/contracts/workspace-communication.zod";
+import { SocketEvents } from "@dmx/contracts/socket-events";
+import { socketBus } from "../../realtime/socket-bus.js";
+import { AppError } from "../../utils/httpErrors.js";
+import {
+  assertCanCreateVisibility,
+  canViewMessage,
+  type VisibilityContext,
+} from "./communication.visibility.js";
+import {
+  buildVisibilityContext,
+  canAccessCommWorkspace,
+  resolveWorkspace,
+  type AuthUser,
+  type ResolvedWorkspace,
+} from "./communication.policy.js";
+import { notifyCommEvent } from "./communication.notifications.js";
+
+const ALLOWED_MIMES = new Set([
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+  "image/jpg",
+  "application/zip",
+  "application/x-zip-compressed",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/msword",
+]);
+
+const MAX_FILE_BYTES = 25 * 1024 * 1024;
+
+type MessageRow = Prisma.WorkspaceMessageGetPayload<{
+  include: {
+    mentions: true;
+    readReceipts: true;
+    attachments: true;
+  };
+}>;
+
+export class CommunicationService {
+  constructor(private readonly db: PrismaClient) {}
+
+  async getConversation(
+    workspaceType: CommWorkspaceType,
+    workspaceId: string,
+    actor: AuthUser,
+  ): Promise<WorkspaceConversation> {
+    if (!(await canAccessCommWorkspace(this.db, actor, workspaceType, workspaceId))) {
+      throw new AppError(403, "FORBIDDEN");
+    }
+    const resolved = await resolveWorkspace(this.db, workspaceType, workspaceId);
+    if (!resolved) throw new AppError(404, "WORKSPACE_NOT_FOUND");
+
+    const conv = await this.ensureConversation(resolved);
+    const ctx = await buildVisibilityContext(this.db, resolved);
+    const rows = await this.db.workspaceMessage.findMany({
+      where: { conversationId: conv.id, status: { not: "DELETED" } },
+      orderBy: { createdAt: "asc" },
+      include: { mentions: true, readReceipts: true, attachments: true },
+    });
+
+    const visible = rows.filter((m) => canViewMessage(actor, m.visibility as never, ctx));
+    const messages = await this.mapMessages(visible, actor, ctx);
+
+    const unreadCount = messages.filter((m) => !m.readByMe && m.authorUserId !== actor.id).length;
+    const mentionCount = messages.filter(
+      (m) => m.mentions.some((x) => x.userId === actor.id) && !m.readByMe,
+    ).length;
+
+    return {
+      id: conv.id,
+      workspaceType,
+      workspaceId,
+      auditWorkspaceId: resolved.auditWorkspaceId,
+      messages,
+      unreadCount,
+      mentionCount,
+    };
+  }
+
+  async searchMessages(
+    workspaceType: CommWorkspaceType,
+    workspaceId: string,
+    actor: AuthUser,
+    query: unknown,
+  ): Promise<MessageSearchResult> {
+    if (!(await canAccessCommWorkspace(this.db, actor, workspaceType, workspaceId))) {
+      throw new AppError(403, "FORBIDDEN");
+    }
+    const resolved = await resolveWorkspace(this.db, workspaceType, workspaceId);
+    if (!resolved) throw new AppError(404, "WORKSPACE_NOT_FOUND");
+    const q = MessageSearchQuerySchema.parse(query);
+    const conv = await this.ensureConversation(resolved);
+    const ctx = await buildVisibilityContext(this.db, resolved);
+
+    const where: Prisma.WorkspaceMessageWhereInput = {
+      conversationId: conv.id,
+      status: { not: "DELETED" },
+    };
+    if (q.authorUserId) where.authorUserId = q.authorUserId;
+    if (q.messageType) where.messageType = q.messageType;
+    if (q.visibility) where.visibility = q.visibility;
+    if (q.dateFrom || q.dateTo) {
+      where.createdAt = {};
+      if (q.dateFrom) where.createdAt.gte = new Date(q.dateFrom);
+      if (q.dateTo) where.createdAt.lte = new Date(q.dateTo);
+    }
+    if (q.hasAttachment) where.attachments = { some: {} };
+    if (q.mentionedMe) where.mentions = { some: { mentionedUserId: actor.id } };
+    if (q.q) where.body = { contains: q.q, mode: "insensitive" };
+
+    const rows = await this.db.workspaceMessage.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      take: q.limit,
+      skip: q.offset,
+      include: { mentions: true, readReceipts: true, attachments: true },
+    });
+
+    const visible = rows.filter((m) => canViewMessage(actor, m.visibility as never, ctx));
+    const items = await this.mapMessages(visible, actor, ctx);
+    return { items, total: items.length };
+  }
+
+  async applyCommunicationAction(
+    workspaceType: CommWorkspaceType,
+    workspaceId: string,
+    action: CommunicationAction,
+    actor: AuthUser,
+    payload: Record<string, unknown> = {},
+    ctx?: { ip?: string; userAgent?: string },
+  ): Promise<WorkspaceConversation> {
+    if (!(await canAccessCommWorkspace(this.db, actor, workspaceType, workspaceId))) {
+      throw new AppError(403, "FORBIDDEN");
+    }
+
+    switch (action) {
+      case "create_message":
+        await this.createMessage(workspaceType, workspaceId, actor, CreateMessagePayload.parse(payload), ctx);
+        break;
+      case "edit_message":
+        await this.editMessage(workspaceType, workspaceId, actor, EditMessagePayload.parse(payload), ctx);
+        break;
+      case "delete_message":
+        await this.deleteMessage(workspaceType, workspaceId, actor, DeleteMessagePayload.parse(payload), ctx);
+        break;
+      case "mark_read":
+        await this.markRead(workspaceType, workspaceId, actor, MarkReadPayload.parse(payload), ctx);
+        break;
+      default:
+        throw new AppError(400, "UNKNOWN_ACTION");
+    }
+
+    return this.getConversation(workspaceType, workspaceId, actor);
+  }
+
+  async uploadAttachment(
+    workspaceType: CommWorkspaceType,
+    workspaceId: string,
+    actor: AuthUser,
+    file: { originalName: string; mimeType: string; sizeBytes: number; buffer: Buffer },
+  ) {
+    if (!(await canAccessCommWorkspace(this.db, actor, workspaceType, workspaceId))) {
+      throw new AppError(403, "FORBIDDEN");
+    }
+    if (file.sizeBytes > MAX_FILE_BYTES) throw new AppError(400, "FILE_TOO_LARGE");
+    if (!ALLOWED_MIMES.has(file.mimeType)) throw new AppError(400, "UNSUPPORTED_MIME");
+
+    const resolved = await resolveWorkspace(this.db, workspaceType, workspaceId);
+    if (!resolved) throw new AppError(404, "WORKSPACE_NOT_FOUND");
+
+    const { storageKey } = await writeStoredFile(file.buffer, file.originalName);
+
+    const row = await this.db.workspaceMessageAttachment.create({
+      data: {
+        workspaceType,
+        workspaceId,
+        fileName: file.originalName,
+        storageKey,
+        mimeType: file.mimeType,
+        fileSizeBytes: file.sizeBytes,
+        uploadedById: actor.id,
+      },
+    });
+
+    return {
+      id: row.id,
+      fileName: row.fileName,
+      mimeType: row.mimeType,
+      fileSizeBytes: row.fileSizeBytes,
+      uploadedAt: row.createdAt.toISOString(),
+    };
+  }
+
+  private async createMessage(
+    workspaceType: CommWorkspaceType,
+    workspaceId: string,
+    actor: AuthUser,
+    input: CreateMessagePayload,
+    ctx?: { ip?: string; userAgent?: string },
+  ) {
+    const resolved = await resolveWorkspace(this.db, workspaceType, workspaceId);
+    if (!resolved) throw new AppError(404, "WORKSPACE_NOT_FOUND");
+
+    try {
+      assertCanCreateVisibility(actor, input.visibility, input.messageType);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "FORBIDDEN";
+      throw new AppError(403, msg);
+    }
+
+    const mentionIds = await this.resolveMentions(
+      input.body,
+      input.mentionedUserIds ?? [],
+      await buildVisibilityContext(this.db, resolved),
+    );
+
+    const messageId = await this.db.$transaction(async (tx) => {
+      const conv = await this.ensureConversationTx(tx, resolved);
+      const msg = await tx.workspaceMessage.create({
+        data: {
+          conversationId: conv.id,
+          authorUserId: actor.id,
+          messageType: input.messageType,
+          visibility: input.visibility,
+          body: input.body.trim(),
+          parentMessageId: input.parentMessageId ?? null,
+          status: "ACTIVE",
+        },
+      });
+
+      if (mentionIds.length) {
+        await tx.workspaceMention.createMany({
+          data: mentionIds.map((mentionedUserId) => ({
+            messageId: msg.id,
+            mentionedUserId,
+          })),
+          skipDuplicates: true,
+        });
+      }
+
+      if (input.attachmentIds?.length) {
+        await tx.workspaceMessageAttachment.updateMany({
+          where: {
+            id: { in: input.attachmentIds },
+            workspaceType,
+            workspaceId,
+            uploadedById: actor.id,
+            messageId: null,
+          },
+          data: { messageId: msg.id },
+        });
+      }
+
+      await this.audit(tx, resolved, actor, "communication.created", {
+        messageId: msg.id,
+        messageType: input.messageType,
+        visibility: input.visibility,
+      }, ctx);
+
+      if (TIMELINE_MESSAGE_TYPES.includes(input.messageType)) {
+        await this.timeline(tx, resolved.auditWorkspaceId, actor.id, `communication.${input.messageType.toLowerCase()}`, {
+          messageId: msg.id,
+          body: input.body.slice(0, 200),
+        });
+      }
+
+      const notifyIds = await this.notifyRecipients(
+        tx,
+        resolved,
+        input.visibility,
+        actor.id,
+        mentionIds,
+      );
+      const link = this.workspaceLink(workspaceType, workspaceId);
+      await notifyCommEvent(tx, {
+        userIds: notifyIds,
+        auditWorkspaceId: resolved.auditWorkspaceId,
+        eventType: input.messageType === "INTERNAL_NOTE"
+          ? "communication.internal_note"
+          : "communication.message.created",
+        title: "New workspace message",
+        message: input.body.slice(0, 120),
+        link,
+      });
+
+      for (const uid of mentionIds) {
+        if (uid === actor.id) continue;
+        await notifyCommEvent(tx, {
+          userIds: [uid],
+          auditWorkspaceId: resolved.auditWorkspaceId,
+          eventType: "communication.mentioned",
+          title: "You were mentioned",
+          message: input.body.slice(0, 120),
+          link,
+        });
+        await this.audit(tx, resolved, actor, "communication.mentioned", { messageId: msg.id, userId: uid }, ctx);
+      }
+
+      return msg.id;
+    });
+
+    socketBus.scheduleEmit(() => {
+      socketBus.emitToWorkspace(resolved.auditWorkspaceId, SocketEvents.COMMUNICATION_CREATED, {
+        workspaceType,
+        workspaceId,
+        messageId,
+      });
+      for (const uid of mentionIds) {
+        socketBus.emitToUser(uid, SocketEvents.COMMUNICATION_MENTIONED, {
+          workspaceType,
+          workspaceId,
+          messageId,
+        });
+      }
+    });
+  }
+
+  private async editMessage(
+    workspaceType: CommWorkspaceType,
+    workspaceId: string,
+    actor: AuthUser,
+    input: EditMessagePayload,
+    ctx?: { ip?: string; userAgent?: string },
+  ) {
+    const resolved = await resolveWorkspace(this.db, workspaceType, workspaceId);
+    if (!resolved) throw new AppError(404, "WORKSPACE_NOT_FOUND");
+    const msg = await this.loadMessageForActor(input.messageId, actor, resolved);
+
+    if (msg.authorUserId !== actor.id && actor.role !== "ADMIN") {
+      throw new AppError(403, "FORBIDDEN_NOT_AUTHOR");
+    }
+
+    await this.db.$transaction(async (tx) => {
+      await tx.workspaceMessage.update({
+        where: { id: msg.id },
+        data: { body: input.body.trim(), status: "EDITED", editedAt: new Date() },
+      });
+      await this.audit(tx, resolved, actor, "communication.edited", { messageId: msg.id }, ctx);
+    });
+
+    socketBus.scheduleEmit(() => {
+      socketBus.emitToWorkspace(resolved!.auditWorkspaceId, SocketEvents.COMMUNICATION_UPDATED, {
+        workspaceType,
+        workspaceId,
+        messageId: input.messageId,
+      });
+    });
+  }
+
+  private async deleteMessage(
+    workspaceType: CommWorkspaceType,
+    workspaceId: string,
+    actor: AuthUser,
+    input: DeleteMessagePayload,
+    ctx?: { ip?: string; userAgent?: string },
+  ) {
+    const resolved = await resolveWorkspace(this.db, workspaceType, workspaceId);
+    if (!resolved) throw new AppError(404, "WORKSPACE_NOT_FOUND");
+    const msg = await this.loadMessageForActor(input.messageId, actor, resolved);
+
+    if (msg.authorUserId !== actor.id && actor.role !== "ADMIN") {
+      throw new AppError(403, "FORBIDDEN_NOT_AUTHOR");
+    }
+
+    await this.db.$transaction(async (tx) => {
+      await tx.workspaceMessage.update({
+        where: { id: msg.id },
+        data: { status: "DELETED", body: "[deleted]" },
+      });
+      await this.audit(tx, resolved, actor, "communication.deleted", {
+        messageId: msg.id,
+        reason: input.reason,
+      }, ctx);
+    });
+
+    socketBus.scheduleEmit(() => {
+      socketBus.emitToWorkspace(resolved!.auditWorkspaceId, SocketEvents.COMMUNICATION_DELETED, {
+        workspaceType,
+        workspaceId,
+        messageId: input.messageId,
+      });
+    });
+  }
+
+  private async markRead(
+    workspaceType: CommWorkspaceType,
+    workspaceId: string,
+    actor: AuthUser,
+    input: MarkReadPayload,
+    ctx?: { ip?: string; userAgent?: string },
+  ) {
+    const resolved = await resolveWorkspace(this.db, workspaceType, workspaceId);
+    if (!resolved) throw new AppError(404, "WORKSPACE_NOT_FOUND");
+    const msg = await this.loadMessageForActor(input.messageId, actor, resolved);
+
+    await this.db.$transaction(async (tx) => {
+      await tx.workspaceReadReceipt.upsert({
+        where: { messageId_userId: { messageId: msg.id, userId: actor.id } },
+        create: { messageId: msg.id, userId: actor.id },
+        update: { readAt: new Date() },
+      });
+      await this.audit(tx, resolved, actor, "communication.read", { messageId: msg.id }, ctx);
+    });
+
+    socketBus.scheduleEmit(() => {
+      socketBus.emitToWorkspace(resolved!.auditWorkspaceId, SocketEvents.COMMUNICATION_READ, {
+        workspaceType,
+        workspaceId,
+        messageId: input.messageId,
+        userId: actor.id,
+      });
+    });
+  }
+
+  private async loadMessageForActor(
+    messageId: string,
+    actor: AuthUser,
+    resolved: ResolvedWorkspace,
+  ): Promise<MessageRow> {
+    const msg = await this.db.workspaceMessage.findUnique({
+      where: { id: messageId },
+      include: {
+        mentions: true,
+        readReceipts: true,
+        attachments: true,
+        conversation: true,
+      },
+    });
+    if (!msg || msg.conversation.workspaceType !== resolved.workspaceType
+      || msg.conversation.workspaceId !== resolved.workspaceId) {
+      throw new AppError(404, "MESSAGE_NOT_FOUND");
+    }
+    const ctx = await buildVisibilityContext(this.db, resolved);
+    if (!canViewMessage(actor, msg.visibility as never, ctx)) {
+      throw new AppError(403, "FORBIDDEN_VISIBILITY");
+    }
+    return msg;
+  }
+
+  private async ensureConversation(resolved: ResolvedWorkspace) {
+    return this.ensureConversationTx(this.db, resolved);
+  }
+
+  private async ensureConversationTx(
+    tx: Prisma.TransactionClient | PrismaClient,
+    resolved: ResolvedWorkspace,
+  ) {
+    const existing = await tx.workspaceConversation.findUnique({
+      where: {
+        workspaceType_workspaceId: {
+          workspaceType: resolved.workspaceType,
+          workspaceId: resolved.workspaceId,
+        },
+      },
+    });
+    if (existing) return existing;
+    return tx.workspaceConversation.create({
+      data: {
+        workspaceType: resolved.workspaceType,
+        workspaceId: resolved.workspaceId,
+      },
+    });
+  }
+
+  private async notifyRecipients(
+    tx: Prisma.TransactionClient,
+    resolved: ResolvedWorkspace,
+    visibility: MessageVisibility,
+    authorId: string,
+    mentionIds: string[],
+  ): Promise<string[]> {
+    const parts = await tx.workspaceParticipant.findMany({
+      where: { workspaceId: resolved.auditWorkspaceId, leftAt: null },
+      include: { user: { select: { id: true, role: true } } },
+    });
+    const ctx = await buildVisibilityContext(this.db, resolved);
+    const ids = new Set<string>(mentionIds);
+    for (const p of parts) {
+      if (p.userId === authorId) continue;
+      const viewer: AuthUser = { id: p.user.id, email: "", role: p.user.role };
+      if (canViewMessage(viewer, visibility, ctx)) ids.add(p.userId);
+    }
+    const admins = await tx.user.findMany({ where: { role: "ADMIN" }, select: { id: true } });
+    for (const a of admins) {
+      if (a.id !== authorId && canViewMessage(
+        { id: a.id, email: "", role: "ADMIN" },
+        visibility,
+        ctx,
+      )) ids.add(a.id);
+    }
+    ids.delete(authorId);
+    return [...ids];
+  }
+
+  private async resolveMentions(
+    body: string,
+    explicitIds: string[],
+    ctx: VisibilityContext,
+  ): Promise<string[]> {
+    const ids = new Set<string>(explicitIds);
+    const handles = [...body.matchAll(/@([a-zA-Z0-9._-]+)/g)].map((m) => m[1].toLowerCase());
+    if (!handles.length) return [...ids];
+
+    const users = await this.db.user.findMany({
+      where: {
+        OR: handles.flatMap((h) => [
+          { email: { startsWith: h, mode: "insensitive" as const } },
+          { displayName: { contains: h, mode: "insensitive" as const } },
+        ]),
+      },
+      select: { id: true },
+    });
+    for (const u of users) {
+      if (ctx.participantUserIds.includes(u.id)) ids.add(u.id);
+    }
+    return [...ids];
+  }
+
+  private async mapMessages(
+    rows: MessageRow[],
+    actor: AuthUser,
+    ctx: VisibilityContext,
+  ): Promise<WorkspaceMessage[]> {
+    const userIds = new Set<string>();
+    for (const r of rows) {
+      userIds.add(r.authorUserId);
+      for (const rr of r.readReceipts) userIds.add(rr.userId);
+      for (const m of r.mentions) userIds.add(m.mentionedUserId);
+    }
+    const users = await this.db.user.findMany({
+      where: { id: { in: [...userIds] } },
+      select: { id: true, displayName: true, role: true },
+    });
+    const byId = new Map(users.map((u) => [u.id, u]));
+
+    return rows.map((r) => {
+      const author = byId.get(r.authorUserId);
+      const readByMe = r.readReceipts.some((rr) => rr.userId === actor.id);
+      return {
+        id: r.id,
+        conversationId: r.conversationId,
+        authorUserId: r.authorUserId,
+        authorName: author?.displayName ?? "User",
+        authorRole: author?.role ?? "BUYER",
+        messageType: r.messageType as WorkspaceMessage["messageType"],
+        visibility: r.visibility as WorkspaceMessage["visibility"],
+        body: r.status === "DELETED" ? "[deleted]" : r.body,
+        status: r.status as WorkspaceMessage["status"],
+        parentMessageId: r.parentMessageId,
+        mentions: r.mentions.map((m) => ({
+          userId: m.mentionedUserId,
+          displayName: byId.get(m.mentionedUserId)?.displayName ?? "User",
+        })),
+        attachments: r.attachments.map((a) => ({
+          id: a.id,
+          fileName: a.fileName,
+          mimeType: a.mimeType,
+          fileSizeBytes: a.fileSizeBytes,
+          uploadedAt: a.createdAt.toISOString(),
+        })),
+        readReceipts: r.readReceipts.map((rr) => ({
+          userId: rr.userId,
+          displayName: byId.get(rr.userId)?.displayName ?? "User",
+          readAt: rr.readAt.toISOString(),
+        })),
+        editedAt: r.editedAt?.toISOString() ?? null,
+        createdAt: r.createdAt.toISOString(),
+        readByMe,
+      };
+    });
+  }
+
+  private workspaceLink(workspaceType: CommWorkspaceType, workspaceId: string): string {
+    const seg: Record<CommWorkspaceType, string> = {
+      RFQ: "rfq",
+      COMMODITYBID: "commoditybid",
+      ORDER: "order",
+      SHIPMENT: "shipment",
+      PO: "po",
+      FREIGHTIQ: "order",
+    };
+    return `/workspace/${seg[workspaceType]}/${workspaceId}`;
+  }
+
+  private async audit(
+    tx: Prisma.TransactionClient,
+    resolved: ResolvedWorkspace,
+    actor: AuthUser,
+    action: string,
+    payload: Record<string, unknown>,
+    ctx?: { ip?: string; userAgent?: string },
+  ) {
+    const ws = await tx.workspace.findUnique({
+      where: { id: resolved.auditWorkspaceId },
+      select: { state: true },
+    });
+    await tx.auditLog.create({
+      data: {
+        workspaceId: resolved.auditWorkspaceId,
+        actorUserId: actor.id,
+        actorEmail: actor.email,
+        actorRole: actor.role,
+        action,
+        fromState: ws?.state ?? "UNKNOWN",
+        toState: ws?.state ?? "UNKNOWN",
+        payload: payload as Prisma.InputJsonValue,
+        ipAddress: ctx?.ip,
+        userAgent: ctx?.userAgent,
+      },
+    });
+  }
+
+  private async timeline(
+    tx: Prisma.TransactionClient,
+    workspaceId: string,
+    actorUserId: string,
+    eventType: string,
+    payload: Record<string, unknown>,
+  ) {
+    await tx.timelineEvent.create({
+      data: {
+        workspaceId,
+        eventType,
+        actorUserId,
+        payload: payload as Prisma.InputJsonValue,
+      },
+    });
+  }
+}

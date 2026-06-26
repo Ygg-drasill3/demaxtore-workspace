@@ -1,0 +1,241 @@
+// =============================================================================
+// DeMaxtore — Sprint 2 Prisma Schema Additions for STANDARD_RFQ_WORKSPACE
+// Append to apps/backend/prisma/schema.prisma (existing Sprint 1 schema stays).
+// Migration name: sprint2_rfq_workflow
+// =============================================================================
+
+// --- Workspace deltas (Decision #8 + #11 + #5) ---
+// In Sprint 2 we replace the WorkspaceState enum with String + per-type validation
+// in @dmx/contracts. The old enum migration drops it.
+
+model Workspace {
+  id              String   @id @default(uuid()) @db.Uuid
+  externalRef     String   @unique @map("external_ref")
+  type            WorkspaceType
+  state           String   // was enum; now validated by type at app layer
+  currency        String?  // ISO 4217 — RFQ/CommodityBid required, post-publish IMMUTABLE
+  createdById     String   @map("created_by_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Deadline & extensions (FSM Decision #5)
+  deadlineAt                 DateTime? @map("deadline_at")
+  deadlineExtensionCount     Int       @default(0) @map("deadline_extension_count")
+  deadlineExtensionTotalDays Int       @default(0) @map("deadline_extension_total_days")
+
+  // Proforma SLA (FSM Decision #3 — 5 business days)
+  proformaRequestedAt        DateTime? @map("proforma_requested_at")
+  proformaSlaDeadlineAt      DateTime? @map("proforma_sla_deadline_at")
+
+  // Reserved for Sprint 3 Order spawn (real FK, Decision #7)
+  spawnedFromId  String?    @map("spawned_from_id") @db.Uuid
+  spawnedFrom    Workspace? @relation("WorkspaceSpawn", fields: [spawnedFromId], references: [id])
+  spawnedChildren Workspace[] @relation("WorkspaceSpawn")
+
+  createdBy       User           @relation("WorkspaceCreator", fields: [createdById], references: [id])
+  participants    WorkspaceParticipant[]
+  timelineEvents  TimelineEvent[]
+  rfqDetails      RfqDetails?
+  rfqLineItems    RfqLineItem[]
+  rfqAttachments  RfqAttachment[]
+  supplierAssignments SupplierAssignment[]
+  clarificationThread ClarificationThread?
+  auditLogs       AuditLog[]
+  notifications   Notification[]
+
+  @@index([type, state])
+  @@index([createdById])
+  @@index([spawnedFromId])
+  @@map("workspaces")
+}
+
+// --- RFQ-specific 1:1 satellite ---
+
+model RfqDetails {
+  id                String   @id @default(uuid()) @db.Uuid
+  workspaceId       String   @unique @map("workspace_id") @db.Uuid
+
+  title             String
+  productCategory   String   @map("product_category")
+  productDescription String  @map("product_description") @db.Text
+  targetMarket      String   @map("target_market")
+  incoterm          String                            // EXW|FOB
+
+  // Rejection trail (Decision #6 — revisable)
+  lastRejectionReason String? @map("last_rejection_reason")
+  lastRejectedAt      DateTime? @map("last_rejected_at")
+
+  // Selected supplier reference (post UNDER_EVALUATION → SUPPLIER_SELECTED)
+  selectedSupplierUserId String? @map("selected_supplier_user_id") @db.Uuid
+  selectedQuotationId    String? @map("selected_quotation_id") @db.Uuid
+  selectionRationale     String? @map("selection_rationale")
+
+  // Proforma artefacts (Sprint 2 stub; full upload module Sprint 3)
+  proformaFileUrl     String? @map("proforma_file_url")
+  proformaSubmittedAt DateTime? @map("proforma_submitted_at")
+  proformaApprovedAt  DateTime? @map("proforma_approved_at")
+
+  // PO (Sprint 2 holds the number; Order workspace spawn = Sprint 3)
+  poNumber          String?  @unique @map("po_number")
+  poIssuedAt        DateTime? @map("po_issued_at")
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([selectedSupplierUserId])
+  @@map("rfq_details")
+}
+
+model RfqLineItem {
+  id              String   @id @default(uuid()) @db.Uuid
+  workspaceId     String   @map("workspace_id") @db.Uuid
+  position        Int                                       // line item order (1, 2, 3, …)
+  description     String   @db.Text
+  quantity        Decimal  @db.Decimal(18, 4)
+  uom             String                                    // "MT" | "PCS" | "KG" | …
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, position])
+  @@index([workspaceId])
+  @@map("rfq_line_items")
+}
+
+model RfqAttachment {
+  id              String   @id @default(uuid()) @db.Uuid
+  workspaceId     String   @map("workspace_id") @db.Uuid
+  fileName        String   @map("file_name")
+  fileSizeBytes   Int      @map("file_size_bytes")
+  mimeType        String   @map("mime_type")
+  storageUrl      String   @map("storage_url")              // S3/MinIO key or signed URL
+  uploadedById    String   @map("uploaded_by_id") @db.Uuid
+  uploadedAt      DateTime @default(now()) @map("uploaded_at")
+
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@map("rfq_attachments")
+}
+
+// --- Supplier assignment ---
+
+model SupplierAssignment {
+  id              String   @id @default(uuid()) @db.Uuid
+  workspaceId     String   @map("workspace_id") @db.Uuid
+  supplierUserId  String   @map("supplier_user_id") @db.Uuid
+  assignedById    String   @map("assigned_by_id") @db.Uuid  // ADMIN
+  assignedAt      DateTime @default(now()) @map("assigned_at")
+  removedAt       DateTime? @map("removed_at")
+  removedById     String?  @map("removed_by_id") @db.Uuid
+
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  // One ACTIVE assignment per (workspace, supplier) — partial index in raw SQL
+  @@index([workspaceId])
+  @@index([supplierUserId])
+  @@map("supplier_assignments")
+}
+
+// --- Clarification center (FSM transition #15: post_clarification) ---
+
+model ClarificationThread {
+  id              String   @id @default(uuid()) @db.Uuid
+  workspaceId     String   @unique @map("workspace_id") @db.Uuid
+  createdAt       DateTime @default(now())
+
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  messages        ClarificationMessage[]
+
+  @@map("clarification_threads")
+}
+
+model ClarificationMessage {
+  id              String   @id @default(uuid()) @db.Uuid
+  threadId        String   @map("thread_id") @db.Uuid
+  authorUserId    String   @map("author_user_id") @db.Uuid
+  parentMessageId String?  @map("parent_message_id") @db.Uuid    // optional reply
+  body            String   @db.Text
+  createdAt       DateTime @default(now()) @map("created_at")
+  readAt          DateTime? @map("read_at")
+  readBy          Json     @default("[]") @map("read_by")        // array of userIds who read
+
+  thread          ClarificationThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId, createdAt])
+  @@map("clarification_messages")
+}
+
+// --- Quotation placeholder (real quotations module = Sprint 2.5 / 3) ---
+// Exists only so SUPPLIER_SELECTED transitions can reference a quotation row.
+
+model QuotationPlaceholder {
+  id              String   @id @default(uuid()) @db.Uuid
+  workspaceId     String   @map("workspace_id") @db.Uuid
+  supplierUserId  String   @map("supplier_user_id") @db.Uuid
+  totalPrice      Decimal? @db.Decimal(18, 4) @map("total_price")
+  currency        String?
+  validUntil      DateTime? @map("valid_until")
+  withdrawnAt     DateTime? @map("withdrawn_at")
+  createdAt       DateTime @default(now())
+
+  @@unique([workspaceId, supplierUserId])
+  @@index([workspaceId])
+  @@map("quotation_placeholders")
+}
+
+// --- Audit log (separate from timeline_events — security forensic trail) ---
+
+model AuditLog {
+  id              String   @id @default(uuid()) @db.Uuid
+  workspaceId     String   @map("workspace_id") @db.Uuid
+  actorUserId     String   @map("actor_user_id") @db.Uuid
+  actorEmail      String   @map("actor_email")               // snapshot — user could be deleted later
+  actorRole       String   @map("actor_role")                // snapshot
+  action          String                                     // RfqAction
+  fromState       String?  @map("from_state")
+  toState         String   @map("to_state")
+  reason          String?
+  payload         Json     @default("{}")
+  ipAddress       String?  @map("ip_address")
+  userAgent       String?  @map("user_agent")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  // Append-only enforced at DB level — see migration: state-guard-trigger.sql
+  @@index([workspaceId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@map("audit_logs")
+}
+
+// --- Notification deltas (extend Sprint 1) ---
+// Add workspaceId + eventType + link columns.
+
+model Notification {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String?  @map("user_id") @db.Uuid
+  role            Role?
+  workspaceId     String?  @map("workspace_id") @db.Uuid
+  eventType       String?  @map("event_type")
+  type            NotificationType
+  title           String
+  message         String
+  link            String?
+  metadata        Json     @default("{}")
+  isRead          Boolean  @default(false) @map("is_read")
+  readAt          DateTime? @map("read_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  user            User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace       Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+
+  @@index([userId, isRead, createdAt])
+  @@index([role, createdAt])
+  @@index([workspaceId, createdAt])
+  @@map("notifications")
+}

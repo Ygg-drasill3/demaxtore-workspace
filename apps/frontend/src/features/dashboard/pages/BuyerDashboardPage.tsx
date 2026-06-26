@@ -1,0 +1,106 @@
+// Sprint 10A.2 — Buyer Command Center Dashboard
+import { Link } from "react-router-dom";
+import type { ReactNode } from "react";
+import { useAuth } from "@/store/auth.store";
+import { useT } from "@/i18n/useT";
+import { useBuyerCommandCenter } from "../hooks/useBuyerCommandCenter";
+import { useBuyerDashboardQuick } from "../hooks/useBuyerDashboardQuick";
+import { BuyerDashboardHero } from "../components/command-center/BuyerDashboardHero";
+import { KpiRow } from "../components/command-center/KpiRow";
+import { BookingKpiRow } from "../components/command-center/BookingKpiRow";
+import { TimelineKpiRow } from "../components/command-center/TimelineKpiRow";
+import { ActionInbox } from "../components/command-center/ActionInbox";
+import { ActiveTradesTable } from "../components/command-center/ActiveTradesTable";
+import { LiveAuctionsWidget } from "../components/command-center/LiveAuctionsWidget";
+import { MyShipmentsWidget } from "../components/command-center/MyShipmentsWidget";
+import { MyExceptionsWidget } from "../components/command-center/MyExceptionsWidget";
+import { DocumentStatusWidget } from "../components/command-center/DocumentStatusWidget";
+import { CommunicationCenter } from "../components/command-center/CommunicationCenter";
+import { UpcomingEventsWidget } from "../components/command-center/UpcomingEventsWidget";
+import { OnboardingSection } from "../components/command-center/OnboardingSection";
+import { TradePipelineSnippet } from "../components/command-center/TradePipelineSnippet";
+
+function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex items-center gap-3">
+      <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400">{children}</h2>
+      <span className="h-px flex-1 bg-gradient-to-r from-paper-200 to-transparent" />
+    </div>
+  );
+}
+
+export default function BuyerDashboardPage() {
+  const { t } = useT();
+  const user = useAuth((s) => s.user);
+  const { data, isLoading, isError, refetch } = useBuyerCommandCenter();
+  const { data: quick, isLoading: quickLoading } = useBuyerDashboardQuick();
+  const firstName = user?.displayName?.split(" ")[0] ?? "Buyer";
+  const kpis = quick?.kpis ?? data?.kpis;
+  const timelineKpis = quick?.timelineKpis ?? data?.timelineKpis;
+  const mode = quick?.mode ?? data?.mode ?? "standard";
+  const kpiLoading = quickLoading && !quick;
+
+  return (
+    <div data-testid="buyer-dashboard" data-dashboard-mode={mode} className="max-w-[1400px] mx-auto space-y-7 animate-fade-in">
+      <BuyerDashboardHero
+        firstName={firstName}
+        mode={mode}
+        kpis={kpis}
+        loading={kpiLoading}
+      />
+
+      {isError && (
+        <div data-testid="buyer-dashboard-error" className="dmx-card p-4 text-sm text-red-700 flex items-center justify-between gap-3">
+          <span>{t("dash.buyer.error.load")}</span>
+          <button type="button" className="dmx-btn-secondary text-sm" onClick={() => void refetch()}>{t("common.retry")}</button>
+        </div>
+      )}
+
+      <div className="space-y-4">
+        <SectionLabel>{t("dash.buyer.section.overview")}</SectionLabel>
+        <Link
+          to="/buyer/control-tower"
+          data-testid="buyer-control-tower-link"
+          className="inline-flex items-center gap-2 text-sm font-medium text-accent-900 hover:underline mb-2"
+        >
+          Open Import Control Tower →
+        </Link>
+        <KpiRow kpis={kpis} loading={kpiLoading} />
+        <TimelineKpiRow kpis={timelineKpis} loading={kpiLoading} />
+        <BookingKpiRow kpis={kpis} loading={kpiLoading} />
+      </div>
+
+      <TradePipelineSnippet topTrade={data?.activeTrades?.[0]} />
+
+      <div className="space-y-4">
+        <SectionLabel>{t("dash.buyer.section.priority")}</SectionLabel>
+        <ActionInbox actions={data?.requiredActions} loading={isLoading} />
+      </div>
+
+      <div className="space-y-4">
+        <SectionLabel>{t("dash.buyer.section.trades")}</SectionLabel>
+        <ActiveTradesTable rows={data?.activeTrades} loading={isLoading} />
+      </div>
+
+      <div className="space-y-4">
+        <SectionLabel>{t("dash.buyer.section.operations")}</SectionLabel>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <LiveAuctionsWidget rows={data?.liveAuctions} loading={isLoading} />
+          <MyShipmentsWidget />
+        </div>
+        <MyExceptionsWidget />
+      </div>
+
+      <div className="space-y-4">
+        <SectionLabel>{t("dash.buyer.section.monitoring")}</SectionLabel>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <DocumentStatusWidget rows={data?.documents} loading={isLoading} />
+          <CommunicationCenter rows={data?.communications} loading={isLoading} />
+          <UpcomingEventsWidget events={data?.upcomingEvents} loading={isLoading} />
+        </div>
+      </div>
+
+      <OnboardingSection mode={data?.mode ?? "standard"} />
+    </div>
+  );
+}

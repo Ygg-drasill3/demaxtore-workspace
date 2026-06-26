@@ -1,0 +1,98 @@
+// apps/backend/src/modules/messaging/provider.ts
+//
+// Pluggable email provider. ONE interface, three impls, env-driven selection.
+
+import { env } from "../../config/env.js";
+import { logger } from "../../config/logger.js";
+
+export interface EmailMessage {
+  to:        string;
+  subject:   string;
+  html:      string;
+  text:      string;
+  replyTo?:  string;
+}
+
+export interface EmailProvider {
+  name:   "console" | "resend" | "smtp";
+  send:   (msg: EmailMessage) => Promise<void>;
+}
+
+// ── Console provider — dev / staging default ─────────────────────────────────
+const consoleProvider: EmailProvider = {
+  name: "console",
+  async send(msg) {
+    logger.info(
+      { to: msg.to, subject: msg.subject, length: msg.html.length },
+      "📧 [console] email rendered (no provider configured)",
+    );
+    // Print the text body to make debugging trivial. HTML is omitted to keep logs sane.
+    logger.info("\n----- BEGIN EMAIL -----\n" + msg.text + "\n-----  END EMAIL  -----");
+  },
+};
+
+// ── Resend provider ──────────────────────────────────────────────────────────
+async function makeResendProvider(): Promise<EmailProvider> {
+  if (!env.RESEND_API_KEY) throw new Error("RESEND_API_KEY not set");
+  const { Resend } = await import("resend");
+  const client = new Resend(env.RESEND_API_KEY);
+  return {
+    name: "resend",
+    async send(msg) {
+      const { error } = await client.emails.send({
+        from:     env.EMAIL_FROM,
+        to:       [msg.to],
+        subject:  msg.subject,
+        html:     msg.html,
+        text:     msg.text,
+        replyTo:  msg.replyTo ?? env.EMAIL_REPLY_TO,
+      });
+      if (error) throw new Error(`Resend error: ${error.message}`);
+    },
+  };
+}
+
+// ── SMTP provider (nodemailer) ───────────────────────────────────────────────
+async function makeSmtpProvider(): Promise<EmailProvider> {
+  if (!env.SMTP_HOST) throw new Error("SMTP_HOST not set");
+  const nodemailer = await import("nodemailer");
+  const transport = nodemailer.createTransport({
+    host:   env.SMTP_HOST,
+    port:   env.SMTP_PORT,
+    secure: env.SMTP_SECURE,
+    auth:   env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS } : undefined,
+  });
+  return {
+    name: "smtp",
+    async send(msg) {
+      await transport.sendMail({
+        from:     env.EMAIL_FROM,
+        to:       msg.to,
+        subject:  msg.subject,
+        html:     msg.html,
+        text:     msg.text,
+        replyTo:  msg.replyTo ?? env.EMAIL_REPLY_TO,
+      });
+    },
+  };
+}
+
+// ── Factory ──────────────────────────────────────────────────────────────────
+let cached: Promise<EmailProvider> | null = null;
+
+export async function getEmailProvider(): Promise<EmailProvider> {
+  if (cached) return cached;
+  cached = (async () => {
+    try {
+      switch (env.EMAIL_PROVIDER) {
+        case "resend":  return await makeResendProvider();
+        case "smtp":    return await makeSmtpProvider();
+        default:        return consoleProvider;
+      }
+    } catch (e) {
+      logger.warn({ err: e }, "Email provider init failed — falling back to console");
+      return consoleProvider;
+    }
+  })();
+  return cached;
+}

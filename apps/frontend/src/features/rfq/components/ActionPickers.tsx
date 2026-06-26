@@ -5,7 +5,7 @@
 //   • assign_suppliers  (buyer)  → multi-select supplier user IDs
 //   • select_supplier   (buyer)  → pick quotation + rationale
 //   • submit_proforma   (supplier) → upload proforma file
-//   • issue_po          (buyer)  → confirm; PO number generated server-side
+//   • issue_po          (buyer)  → auto-generated PO or manual PDF upload
 //
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { Textarea } from "@/components/ui/Input";
 import { rfqApi, rfqAttachmentUrl } from "../lib/rfq.api";
+import { EstimatedCifPoGateSummary } from "@/features/freight-estimate/components/EstimatedCifPanel";
 
 export const PICKER_ACTIONS = new Set<string>([
   "assign_suppliers",
@@ -188,35 +189,175 @@ export function SelectSupplierPicker({ workspaceId, open, onClose, onConfirm, is
   );
 }
 
-// ─── Issue PO (server-generated PO number) ───────────────────────────────────
+// ─── Issue PO (auto-generated or buyer-uploaded document) ────────────────────
 
-export function IssuePoPicker({ open, onClose, onConfirm, isPending }: PickerProps) {
+type IssuePoMode = "auto" | "manual";
+
+export function IssuePoPicker({ workspaceId, open, onClose, onConfirm, isPending }: PickerProps) {
+  const [mode, setMode] = useState<IssuePoMode>("auto");
+  const [poFileUrl, setPoFileUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setMode("auto");
+      setPoFileUrl(null);
+      setUploading(false);
+    }
+  }, [open]);
+
+  const attachments = useQuery({
+    queryKey: ["rfq", workspaceId, "attachments"],
+    queryFn: () => rfqApi.attach(workspaceId!) as Promise<RfqAttachmentRow[]>,
+    enabled: open && !!workspaceId && mode === "manual",
+  });
+
+  const pdfAttachments = useMemo(
+    () => (attachments.data ?? []).filter((a) => (a.mimeType ?? "").includes("pdf") || a.fileName.endsWith(".pdf")),
+    [attachments.data],
+  );
+
+  async function uploadFile(file: File) {
+    if (!workspaceId) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const { data } = await api.post<{ id: string }>(`/rfq/${workspaceId}/attachments`, fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setPoFileUrl(rfqAttachmentUrl(workspaceId, data.id));
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  const estimate = useQuery({
+    queryKey: ["freight-estimate-panel", workspaceId],
+    queryFn: () => import("@/features/freight-estimate/lib/freight-estimate.api").then((m) => m.freightEstimateApi.panel(workspaceId!)),
+    enabled: open && !!workspaceId,
+  });
+
+  const canConfirm = (mode === "auto" || !!poFileUrl) && !!estimate.data?.current;
+
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title="Issue PO"
-      description="A unique purchase-order number will be generated automatically. The workspace will move to PO_ISSUED and an order workspace will be created."
+      title="Sipariş emri (PO) oluştur"
+      description="Sistem otomatik PO üretebilir veya kendi PO belgenizi yükleyebilirsiniz. Onay sonrası sipariş çalışma alanı açılır."
       size="md"
       testId="issue-po-picker"
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="secondary" onClick={onClose}>İptal</Button>
           <Button
             data-testid="issue-po-confirm"
             variant="primary"
-            disabled={isPending}
+            disabled={!canConfirm || isPending || uploading}
             loading={isPending}
-            onClick={() => onConfirm({})}
+            onClick={() =>
+              onConfirm({
+                mode,
+                ...(mode === "manual" ? { poFileUrl: poFileUrl! } : {}),
+              })
+            }
           >
-            Issue PO
+            PO yayınla
           </Button>
         </>
       }
     >
-      <p className="text-sm text-zinc-600">
-        Confirm to issue the purchase order. You do not need to enter a PO number — the system assigns one at issuance.
-      </p>
+      <EstimatedCifPoGateSummary tradeId={workspaceId} />
+      <div className="flex gap-2 mb-4 mt-4">
+        <button
+          type="button"
+          data-testid="issue-po-mode-auto"
+          onClick={() => setMode("auto")}
+          className={`flex-1 rounded-lg border px-3 py-2 text-sm text-left ${
+            mode === "auto" ? "border-accent-900/30 bg-accent-50 text-accent-900" : "border-zinc-100 hover:bg-zinc-50"
+          }`}
+        >
+          <span className="font-medium block">Otomatik</span>
+          <span className="text-xs text-zinc-500">Sistem PO numarası ve belgesi üretir</span>
+        </button>
+        <button
+          type="button"
+          data-testid="issue-po-mode-manual"
+          onClick={() => setMode("manual")}
+          className={`flex-1 rounded-lg border px-3 py-2 text-sm text-left ${
+            mode === "manual" ? "border-accent-900/30 bg-accent-50 text-accent-900" : "border-zinc-100 hover:bg-zinc-50"
+          }`}
+        >
+          <span className="font-medium block">Manuel yükleme</span>
+          <span className="text-xs text-zinc-500">PO numarası sistemden; sadece PDF yükleyin</span>
+        </button>
+      </div>
+
+      {mode === "auto" ? (
+        <p className="text-sm text-zinc-600">
+          Onayladığınızda benzersiz bir PO numarası atanır ve sistem standart PO belgesini oluşturur.
+        </p>
+      ) : (
+        <div className="space-y-4">
+          <p className="text-sm text-zinc-600">
+            PO numarası otomatik atanır. Sadece kendi PO PDF belgenizi yükleyin.
+          </p>
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragOver(false);
+              const f = e.dataTransfer.files[0];
+              if (f) void uploadFile(f);
+            }}
+            className={`rounded-xl border border-dashed p-6 text-center text-sm transition-colors ${
+              dragOver ? "border-accent-900/30 bg-accent-50 text-accent-900" : "border-paper-200 text-zinc-500"
+            }`}
+          >
+            <UploadCloud className="h-6 w-6 mx-auto mb-2 text-accent-900" />
+            <p>PO PDF dosyasını sürükleyin veya</p>
+            <label className="mt-2 inline-block">
+              <span className="text-accent-900 font-medium cursor-pointer hover:underline">dosya seçin</span>
+              <input
+                type="file"
+                accept="application/pdf,.pdf"
+                className="hidden"
+                data-testid="issue-po-file-input"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void uploadFile(f);
+                }}
+              />
+            </label>
+            {uploading && <p className="text-xs mt-2 text-zinc-500">Yükleniyor…</p>}
+            {poFileUrl && <p className="text-xs mt-2 text-emerald-700">Belge hazır</p>}
+          </div>
+
+          {pdfAttachments.length > 0 && (
+            <div>
+              <p className="text-[11px] uppercase tracking-wider text-zinc-500 mb-2">Veya mevcut ek dosyayı kullanın</p>
+              <div className="space-y-1 max-h-32 overflow-y-auto">
+                {pdfAttachments.map((a) => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    data-testid={`issue-po-pick-${a.id}`}
+                    onClick={() => workspaceId && setPoFileUrl(rfqAttachmentUrl(workspaceId, a.id))}
+                    className={`w-full text-left px-3 py-2 rounded-md text-sm border ${
+                      poFileUrl?.includes(a.id) ? "border-accent-900/30 bg-accent-50" : "border-zinc-100 hover:bg-zinc-50"
+                    }`}
+                  >
+                    {a.fileName}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </Modal>
   );
 }

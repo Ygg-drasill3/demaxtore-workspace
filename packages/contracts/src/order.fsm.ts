@@ -1,0 +1,341 @@
+// =============================================================================
+// DeMaxtore — Order Workspace State Machine (TypeScript source of truth)
+// Generated FROM: docs/order-state-machine.md §3
+// =============================================================================
+
+import type { ActorRole, NotifySpec, ParticipantConstraint } from "./rfq.fsm";
+
+export type { ActorRole, NotifySpec, ParticipantConstraint };
+
+export type OrderState =
+  | "ORDER_CREATED"
+  | "SUPPLIER_CONFIRMED"
+  | "PRODUCTION_STARTED"
+  | "PRODUCTION_IN_PROGRESS"
+  | "PRODUCTION_COMPLETED"
+  | "INSPECTION_REQUESTED"
+  | "INSPECTION_COMPLETED"
+  | "FREIGHT_REQUESTED"
+  | "SHIPMENT_BOOKED"
+  | "DEPARTED"
+  | "IN_TRANSIT"
+  | "ETA_UPDATED"
+  | "ARRIVED_PORT"
+  | "PARTIALLY_DELIVERED"
+  | "DELIVERED"
+  | "CLOSED"
+  | "DISPUTED"
+  | "REJECTED"
+  | "CANCELLED";
+
+export type OrderAction =
+  | "spawn_from_rfq"
+  | "spawn_from_commoditybid"
+  | "supplier_confirm_order"
+  | "confirm_sla_expired"
+  | "start_production"
+  | "report_production_progress"
+  | "mark_production_completed"
+  | "request_inspection"
+  | "skip_inspection"
+  | "record_inspection_result"
+  | "proceed_to_freight"
+  | "book_shipment"
+  | "mark_departed"
+  | "auto_to_in_transit"
+  | "update_eta"
+  | "mark_arrived"
+  | "mark_partially_delivered"
+  | "mark_delivered"
+  | "reject_order"
+  | "close_order"
+  | "open_dispute"
+  | "resolve_dispute_close"
+  | "resolve_dispute_cancel"
+  | "cancel_order"
+  | "post_clarification"
+  | "upload_document"
+  | "add_observer"
+  | "remove_observer";
+
+export type OrderFromState = OrderState | "*" | "ANY_ACTIVE";
+
+export interface OrderTransition {
+  from: OrderFromState;
+  to: OrderState;
+  action: OrderAction;
+  allowedRoles: ActorRole[];
+  requiredParticipant?: ParticipantConstraint;
+  requiresReason?: boolean;
+  auditEvent: string;
+  preconditions?: string[];
+  notifyRecipients: NotifySpec[];
+}
+
+export const ORDER_ACTIVE_STATES: OrderState[] = [
+  "ORDER_CREATED",
+  "SUPPLIER_CONFIRMED",
+  "PRODUCTION_STARTED",
+  "PRODUCTION_IN_PROGRESS",
+  "PRODUCTION_COMPLETED",
+  "INSPECTION_REQUESTED",
+  "INSPECTION_COMPLETED",
+  "FREIGHT_REQUESTED",
+  "SHIPMENT_BOOKED",
+  "DEPARTED",
+  "IN_TRANSIT",
+  "ETA_UPDATED",
+  "ARRIVED_PORT",
+  "PARTIALLY_DELIVERED",
+  "DELIVERED",
+];
+
+export const ORDER_TRANSITIONS: OrderTransition[] = [
+  { from: "*", to: "ORDER_CREATED", action: "spawn_from_rfq",
+    allowedRoles: ["SYSTEM"], auditEvent: "order.created_from_rfq",
+    notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "SUCCESS", titleKey: "order.spawned" }] },
+  { from: "*", to: "ORDER_CREATED", action: "spawn_from_commoditybid",
+    allowedRoles: ["SYSTEM"], auditEvent: "order.created_from_commoditybid",
+    notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "SUCCESS", titleKey: "order.spawned" }] },
+
+  { from: "ORDER_CREATED", to: "SUPPLIER_CONFIRMED", action: "supplier_confirm_order",
+    allowedRoles: ["SUPPLIER"], requiredParticipant: "COUNTERPARTY",
+    auditEvent: "order.supplier_confirmed",
+    notifyRecipients: [{ target: "OWNER", type: "SUCCESS", titleKey: "order.supplier_confirmed" }] },
+  { from: "ORDER_CREATED", to: "DISPUTED", action: "confirm_sla_expired",
+    allowedRoles: ["SYSTEM"], auditEvent: "order.confirm_sla_expired",
+    notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "WARNING", titleKey: "order.confirm_sla_expired" }] },
+
+  { from: "SUPPLIER_CONFIRMED", to: "PRODUCTION_STARTED", action: "start_production",
+    allowedRoles: ["SUPPLIER"], requiredParticipant: "COUNTERPARTY",
+    preconditions: ["assertPlannedCompletionDate"],
+    auditEvent: "order.production.started",
+    notifyRecipients: [{ target: "OWNER", type: "INFO", titleKey: "order.production.started" }] },
+
+  { from: "PRODUCTION_STARTED", to: "PRODUCTION_IN_PROGRESS", action: "report_production_progress",
+    allowedRoles: ["SUPPLIER"], requiredParticipant: "COUNTERPARTY",
+    preconditions: ["assertProgressLabel", "assertProgressPercentage", "assertProgressBelow100"],
+    auditEvent: "order.production.progress_reported",
+    notifyRecipients: [{ target: "OWNER", type: "INFO", titleKey: "order.production.progress" }] },
+  { from: "PRODUCTION_IN_PROGRESS", to: "PRODUCTION_IN_PROGRESS", action: "report_production_progress",
+    allowedRoles: ["SUPPLIER"], requiredParticipant: "COUNTERPARTY",
+    preconditions: ["assertProgressLabel", "assertProgressPercentage", "assertProgressBelow100"],
+    auditEvent: "order.production.progress_reported",
+    notifyRecipients: [{ target: "OWNER", type: "INFO", titleKey: "order.production.progress" }] },
+  { from: "PRODUCTION_IN_PROGRESS", to: "PRODUCTION_COMPLETED", action: "mark_production_completed",
+    allowedRoles: ["SUPPLIER"], requiredParticipant: "COUNTERPARTY",
+    preconditions: ["assertLatestProductionPercent100"],
+    auditEvent: "order.production.completed",
+    notifyRecipients: [{ target: "OWNER", type: "SUCCESS", titleKey: "order.production.completed" }] },
+  { from: "PRODUCTION_STARTED", to: "PRODUCTION_COMPLETED", action: "mark_production_completed",
+    allowedRoles: ["SUPPLIER"], requiredParticipant: "COUNTERPARTY",
+    preconditions: ["assertLatestProductionPercent100"],
+    auditEvent: "order.production.completed",
+    notifyRecipients: [{ target: "OWNER", type: "SUCCESS", titleKey: "order.production.completed" }] },
+
+  { from: "PRODUCTION_COMPLETED", to: "INSPECTION_REQUESTED", action: "request_inspection",
+    allowedRoles: ["BUYER"], requiredParticipant: "OWNER",
+    auditEvent: "order.inspection.requested",
+    notifyRecipients: [{ broadcast: { role: "ADMIN" }, type: "WARNING", titleKey: "order.inspection.requested" }] },
+  { from: "PRODUCTION_COMPLETED", to: "INSPECTION_REQUESTED", action: "request_inspection",
+    allowedRoles: ["ADMIN"],
+    auditEvent: "order.inspection.requested",
+    notifyRecipients: [{ broadcast: { role: "ADMIN" }, type: "WARNING", titleKey: "order.inspection.requested" }] },
+  { from: "PRODUCTION_COMPLETED", to: "FREIGHT_REQUESTED", action: "skip_inspection",
+    allowedRoles: ["BUYER"], requiredParticipant: "OWNER",
+    auditEvent: "order.inspection.skipped",
+    notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "INFO", titleKey: "order.inspection.skipped" }] },
+  { from: "PRODUCTION_COMPLETED", to: "FREIGHT_REQUESTED", action: "skip_inspection",
+    allowedRoles: ["ADMIN"],
+    auditEvent: "order.inspection.skipped",
+    notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "INFO", titleKey: "order.inspection.skipped" }] },
+
+  { from: "INSPECTION_REQUESTED", to: "INSPECTION_COMPLETED", action: "record_inspection_result",
+    allowedRoles: ["ADMIN"],
+    preconditions: ["assertInspectionResult"],
+    auditEvent: "order.inspection.completed",
+    notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "SUCCESS", titleKey: "order.inspection.completed" }] },
+  { from: "INSPECTION_COMPLETED", to: "FREIGHT_REQUESTED", action: "proceed_to_freight",
+    allowedRoles: ["BUYER"], requiredParticipant: "OWNER",
+    preconditions: ["assertInspectionPass"],
+    auditEvent: "order.inspection.proceed_to_freight",
+    notifyRecipients: [{ broadcast: { role: "ADMIN" }, type: "WARNING", titleKey: "order.freight.requested" }] },
+  { from: "INSPECTION_COMPLETED", to: "FREIGHT_REQUESTED", action: "proceed_to_freight",
+    allowedRoles: ["ADMIN"],
+    preconditions: ["assertInspectionPass"],
+    auditEvent: "order.inspection.proceed_to_freight",
+    notifyRecipients: [{ broadcast: { role: "ADMIN" }, type: "WARNING", titleKey: "order.freight.requested" }] },
+  { from: "INSPECTION_COMPLETED", to: "DISPUTED", action: "open_dispute",
+    allowedRoles: ["BUYER", "ADMIN"], requiresReason: true,
+    auditEvent: "order.dispute.opened",
+    notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "ERROR", titleKey: "order.dispute.opened" }] },
+
+  { from: "FREIGHT_REQUESTED", to: "SHIPMENT_BOOKED", action: "book_shipment",
+    allowedRoles: ["ADMIN"],
+    preconditions: ["assertShipmentBooked", "assertFreightCoordinationReady"],
+    auditEvent: "order.shipment.booked",
+    notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "INFO", titleKey: "order.shipment.booked" }] },
+
+  { from: "SHIPMENT_BOOKED", to: "DEPARTED", action: "mark_departed",
+    allowedRoles: ["ADMIN"],
+    preconditions: ["assertActualDepartureDate"],
+    auditEvent: "order.shipment.departed",
+    notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "INFO", titleKey: "order.shipment.departed" }] },
+  { from: "DEPARTED", to: "IN_TRANSIT", action: "auto_to_in_transit",
+    allowedRoles: ["SYSTEM"], auditEvent: "order.shipment.in_transit", notifyRecipients: [] },
+
+  { from: "IN_TRANSIT", to: "ETA_UPDATED", action: "update_eta",
+    allowedRoles: ["ADMIN"],
+    preconditions: ["assertNewEta"],
+    auditEvent: "order.shipment.eta_updated",
+    notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "INFO", titleKey: "order.shipment.eta_updated" }] },
+  { from: "ETA_UPDATED", to: "IN_TRANSIT", action: "auto_to_in_transit",
+    allowedRoles: ["SYSTEM"], auditEvent: "order.shipment.eta_settled", notifyRecipients: [] },
+
+  { from: "IN_TRANSIT", to: "ARRIVED_PORT", action: "mark_arrived",
+    allowedRoles: ["ADMIN"],
+    preconditions: ["assertActualArrivalDate"],
+    auditEvent: "order.shipment.arrived",
+    notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "SUCCESS", titleKey: "order.shipment.arrived" }] },
+
+  { from: "ARRIVED_PORT", to: "DELIVERED", action: "mark_delivered",
+    allowedRoles: ["BUYER"], requiredParticipant: "OWNER",
+    auditEvent: "order.delivered",
+    notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "SUCCESS", titleKey: "order.delivered" }] },
+  { from: "ARRIVED_PORT", to: "DELIVERED", action: "mark_delivered",
+    allowedRoles: ["ADMIN"],
+    auditEvent: "order.delivered",
+    notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "SUCCESS", titleKey: "order.delivered" }] },
+
+  { from: "ARRIVED_PORT", to: "PARTIALLY_DELIVERED", action: "mark_partially_delivered",
+    allowedRoles: ["BUYER"], requiredParticipant: "OWNER",
+    preconditions: ["assertPartialDeliveryPayload"],
+    auditEvent: "order.partially_delivered",
+    notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "INFO", titleKey: "order.partially_delivered" }] },
+  { from: "ARRIVED_PORT", to: "PARTIALLY_DELIVERED", action: "mark_partially_delivered",
+    allowedRoles: ["ADMIN"],
+    preconditions: ["assertPartialDeliveryPayload"],
+    auditEvent: "order.partially_delivered",
+    notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "INFO", titleKey: "order.partially_delivered" }] },
+
+  { from: "PARTIALLY_DELIVERED", to: "DELIVERED", action: "mark_delivered",
+    allowedRoles: ["BUYER"], requiredParticipant: "OWNER",
+    auditEvent: "order.delivered",
+    notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "SUCCESS", titleKey: "order.delivered" }] },
+  { from: "PARTIALLY_DELIVERED", to: "DELIVERED", action: "mark_delivered",
+    allowedRoles: ["ADMIN"],
+    auditEvent: "order.delivered",
+    notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "SUCCESS", titleKey: "order.delivered" }] },
+
+  { from: "PARTIALLY_DELIVERED", to: "CLOSED", action: "close_order",
+    allowedRoles: ["BUYER"], requiredParticipant: "OWNER",
+    preconditions: ["assertSettlementConfirmation"],
+    auditEvent: "order.closed",
+    notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "SUCCESS", titleKey: "order.closed" }] },
+  { from: "PARTIALLY_DELIVERED", to: "CLOSED", action: "close_order",
+    allowedRoles: ["ADMIN"],
+    preconditions: ["assertSettlementConfirmation"],
+    auditEvent: "order.closed",
+    notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "SUCCESS", titleKey: "order.closed" }] },
+
+  { from: "DELIVERED", to: "CLOSED", action: "close_order",
+    allowedRoles: ["BUYER"], requiredParticipant: "OWNER",
+    preconditions: ["assertSettlementConfirmation"],
+    auditEvent: "order.closed",
+    notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "SUCCESS", titleKey: "order.closed" }] },
+  { from: "DELIVERED", to: "CLOSED", action: "close_order",
+    allowedRoles: ["ADMIN"],
+    preconditions: ["assertSettlementConfirmation"],
+    auditEvent: "order.closed",
+    notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "SUCCESS", titleKey: "order.closed" }] },
+
+  { from: "ANY_ACTIVE", to: "DISPUTED", action: "open_dispute",
+    allowedRoles: ["BUYER", "SUPPLIER", "ADMIN"], requiresReason: true,
+    preconditions: ["assertDisputeCategory"],
+    auditEvent: "order.dispute.opened",
+    notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "ERROR", titleKey: "order.dispute.opened" }] },
+  { from: "ANY_ACTIVE", to: "CANCELLED", action: "cancel_order",
+    allowedRoles: ["BUYER", "ADMIN"], requiresReason: true,
+    auditEvent: "order.cancelled",
+    notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "WARNING", titleKey: "order.cancelled" }] },
+
+  { from: "ANY_ACTIVE", to: "REJECTED", action: "reject_order",
+    allowedRoles: ["BUYER", "ADMIN"], requiresReason: true,
+    auditEvent: "order.rejected",
+    notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "WARNING", titleKey: "order.rejected" }] },
+
+  { from: "DISPUTED", to: "CLOSED", action: "resolve_dispute_close",
+    allowedRoles: ["ADMIN"], requiresReason: true,
+    preconditions: ["assertDisputeResolution"],
+    auditEvent: "order.dispute.resolved_closed",
+    notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "INFO", titleKey: "order.dispute.resolved" }] },
+  { from: "DISPUTED", to: "CANCELLED", action: "resolve_dispute_cancel",
+    allowedRoles: ["ADMIN"], requiresReason: true,
+    preconditions: ["assertDisputeResolution"],
+    auditEvent: "order.dispute.resolved_cancelled",
+    notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "INFO", titleKey: "order.dispute.resolved" }] },
+
+  { from: "ANY_ACTIVE", to: "ORDER_CREATED", action: "post_clarification",
+    allowedRoles: ["BUYER", "SUPPLIER", "ADMIN"],
+    auditEvent: "order.clarification.posted", notifyRecipients: [] },
+  { from: "ANY_ACTIVE", to: "ORDER_CREATED", action: "upload_document",
+    allowedRoles: ["BUYER", "SUPPLIER", "ADMIN"],
+    preconditions: ["assertDocumentUpload"],
+    auditEvent: "order.document.uploaded", notifyRecipients: [] },
+
+  { from: "*", to: "ORDER_CREATED", action: "add_observer",
+    allowedRoles: ["ADMIN"], auditEvent: "workspace.participant.added", notifyRecipients: [] },
+  { from: "*", to: "ORDER_CREATED", action: "remove_observer",
+    allowedRoles: ["ADMIN"], auditEvent: "workspace.participant.removed", notifyRecipients: [] },
+];
+
+export const ORDER_TERMINAL_STATES: OrderState[] = ["CLOSED", "CANCELLED", "REJECTED"];
+
+export const ORDER_SELF_LOOP_ACTIONS: OrderAction[] = [
+  "report_production_progress",
+  "post_clarification",
+  "upload_document",
+  "add_observer",
+  "remove_observer",
+];
+
+export function isOrderTerminal(state: OrderState): boolean {
+  return ORDER_TERMINAL_STATES.includes(state);
+}
+
+export function isOrderActive(state: OrderState): boolean {
+  return ORDER_ACTIVE_STATES.includes(state);
+}
+
+export function findOrderTransition(
+  from: OrderState,
+  action: OrderAction,
+  actorRole?: ActorRole,
+): OrderTransition | undefined {
+  const matches = ORDER_TRANSITIONS.filter((t) => {
+    if (t.action !== action) return false;
+    if (t.from === "ANY_ACTIVE") return isOrderActive(from);
+    if (t.from === "*") {
+      return action === "add_observer" || action === "remove_observer";
+    }
+    return t.from === from;
+  });
+  if (actorRole) {
+    const roleMatch = matches.find((t) => t.allowedRoles.includes(actorRole));
+    if (roleMatch) return roleMatch;
+  }
+  return matches[0];
+}
+
+/** Self-loop and observer transitions keep current state. */
+export function resolveOrderTargetState(from: OrderState, transition: OrderTransition): OrderState {
+  if (
+    transition.action === "post_clarification" ||
+    transition.action === "upload_document" ||
+    transition.action === "add_observer" ||
+    transition.action === "remove_observer"
+  ) {
+    return from;
+  }
+  return transition.to;
+}

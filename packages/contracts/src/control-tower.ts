@@ -1,0 +1,222 @@
+// =============================================================================
+// Sprint 4A — Control Tower (read-only operations intelligence)
+// =============================================================================
+
+export const AlertSeverity = ["INFO", "WARNING", "CRITICAL"] as const;
+export type AlertSeverity = (typeof AlertSeverity)[number];
+
+export const AlertCategory = [
+  "RFQ", "COMMODITYBID", "ORDER", "SHIPMENT", "FREIGHT", "SYSTEM", "ACCOUNT",
+  "MIXED_CONTAINER", "BULK_CONTAINER",
+] as const;
+export type AlertCategory = (typeof AlertCategory)[number];
+
+export const ControlTowerWorkspaceType = [
+  "RFQ", "COMMODITYBID", "ORDER", "SHIPMENT", "MIXED_CONTAINER", "BULK_CONTAINER",
+] as const;
+export type ControlTowerWorkspaceType = (typeof ControlTowerWorkspaceType)[number];
+
+/** Stable keys for alert deduplication per workspace. */
+export const AlertKey = {
+  RFQ_SUBMITTED_UNASSIGNED: "rfq_submitted_unassigned",
+  RFQ_OPEN_NO_QUOTES_DEADLINE: "rfq_open_no_quotes_deadline",
+  RFQ_PROFORMA_SLA_PAST: "rfq_proforma_sla_past",
+  CB_OPEN_NO_BIDS_DEADLINE: "cb_open_no_bids_deadline",
+  CB_AWARD_ACCEPTANCE_OVERDUE: "cb_award_acceptance_overdue",
+  CB_NO_SUPPLIERS_JOINED: "commoditybid.no_suppliers_joined",
+  CB_LOW_PARTICIPATION: "commoditybid.low_participation",
+  CB_AUCTION_FAILED: "commoditybid.auction_failed",
+  CB_AUCTION_CLOSED: "commoditybid.auction_closed",
+  CB_AWAITING_BUYER_APPROVAL: "commoditybid.awaiting_buyer_approval",
+  CB_REJECTED: "commoditybid.rejected",
+  ORDER_CREATED_INACTIVE: "order_created_inactive",
+  ORDER_PRODUCTION_STALLED: "order_production_stalled",
+  ORDER_INSPECTION_SLA_PAST: "order_inspection_sla_past",
+  ORDER_SHIPMENT_STATE_MISMATCH: "order_shipment_state_mismatch",
+  SHIPMENT_ETA_EXCEEDED: "shipment_eta_exceeded",
+  SHIPMENT_CUSTOMS_STUCK: "shipment_customs_stuck",
+  SHIPMENT_EXCEPTION: "shipment_exception",
+  TRACKING_ETA_SHIFT_24H: "tracking_eta_shift_24h",
+  TRACKING_ETA_SHIFT_72H: "tracking_eta_shift_72h",
+  TRACKING_DELAY_DETECTED: "tracking_delay_detected",
+  FREIGHT_NO_OFFER_72H: "freight_no_offer_72h",
+  FREIGHT_OFFER_EXPIRED: "freight_offer_expired",
+  FREIGHT_SELECTED_NO_SHIPMENT: "freight_selected_no_shipment",
+  FREIGHT_NO_COMMUNICATION_24H: "freight_no_communication_24h",
+  FREIGHT_NO_RESPONSE_72H: "freight_no_response_72h",
+  FREIGHT_NO_OFFER_96H: "freight_no_offer_96h",
+  FREIGHT_OFFER_EXPIRED_BEFORE_SELECTION: "freight_offer_expired_before_selection",
+  FREIGHT_MARGIN_MISSING: "freight.margin.missing",
+  FREIGHT_MARGIN_LOW: "freight.margin.low",
+  FREIGHT_MARGIN_NEGATIVE: "freight.margin.negative",
+  FREIGHT_MARGIN_OVERRIDE: "freight.margin.override",
+  FREIGHT_ROUTE_UNDERPERFORMING: "freight.route.underperforming",
+  FREIGHT_ESTIMATE_EXPIRING_SOON: "freight.estimate.expiring_soon",
+  FREIGHT_ESTIMATE_EXPIRED: "freight.estimate.expired",
+  FREIGHT_ESTIMATE_REFRESH_REQUIRED: "freight.estimate.refresh_required",
+  BOOKING_CUTOFF_RISK: "booking.cutoff_risk",
+  BOOKING_FORECAST_CHANGED: "booking.forecast_changed",
+  BOOKING_REBOOKING_REQUIRED: "booking.rebooking_required",
+  BOOKING_NOT_CONFIRMED: "booking.not_confirmed",
+  TRADE_DOC_REQUIRED_MISSING: "trade_doc_required_missing",
+  TRADE_DOC_REJECTED: "trade_doc_rejected",
+  TRADE_DOC_MISSING_72H: "trade_doc_missing_72h",
+  TRADE_DOC_DELIVERED_INCOMPLETE: "trade_doc_delivered_incomplete",
+  PO_NO_ACK_72H: "po_no_acknowledgement_72h",
+  PO_AMENDMENT_OPEN_72H: "po_amendment_open_72h",
+  PO_CANCELLED: "po_cancelled",
+  PO_REJECTED: "po_rejected",
+  COMM_QUESTION_UNREAD_48H: "comm_question_unread_48h",
+  COMM_QUESTION_UNREAD_96H: "comm_question_unread_96h",
+  COMM_DECISION_NO_RESPONSE_72H: "comm_decision_no_response_72h",
+  COMM_INTERNAL_NOTE_NO_FOLLOWUP_72H: "comm_internal_note_no_followup_72h",
+  CUSTOMER_INACTIVE_30D: "customer.inactive.30d",
+  SUPPLIER_INACTIVE_30D: "supplier.inactive.30d",
+  PIPELINE_STALLED: "pipeline.stalled",
+  OPERATOR_OVERLOADED: "operator.overloaded",
+  FORECAST_DECLINE: "forecast.decline",
+  GROWTH_BUYER_INACTIVE: "growth.buyer.inactive",
+  GROWTH_SUPPLIER_INACTIVE: "growth.supplier.inactive",
+  GROWTH_REPEAT_BUYER_AT_RISK: "growth.repeat.buyer.at_risk",
+  GROWTH_RFQ_STALLED: "growth.rfq.stalled",
+  GROWTH_PIPELINE_LEAKAGE: "growth.pipeline.leakage",
+  GROWTH_CONVERSION_DROP: "growth.conversion.drop",
+  MARKET_CATEGORY_GROWING: "market.category.growing",
+  MARKET_CATEGORY_DECLINING: "market.category.declining",
+  MARKET_ROUTE_OPPORTUNITY: "market.route.opportunity",
+  MARKET_SUPPLY_GAP: "market.supply.gap",
+  MARKET_UNSERVED_DEMAND: "market.unserved.demand",
+  MARKET_FORWARDER_UNDERUTILIZED: "market.forwarder.underutilized",
+  SYSTEM_JOB_FAILED: "system.job.failed",
+  SYSTEM_JOB_STALE: "system.job.stale",
+  SYSTEM_STORAGE_ERROR: "system.storage.error",
+  SYSTEM_BACKUP_OVERDUE: "system.backup.overdue",
+  SYSTEM_RESTORE_UNVERIFIED: "system.restore.unverified",
+  SYSTEM_SCHEDULER_FAILURE: "system.scheduler.failure",
+  ONBOARDING_STALLED: "onboarding.stalled",
+  BUYER_FIRST_TRADE_STUCK: "buyer.first_trade.stuck",
+  SUPPLIER_FIRST_TRADE_STUCK: "supplier.first_trade.stuck",
+  OPERATOR_FIRST_TRADE_STUCK: "operator.first_trade.stuck",
+  TRADE_PROGRESS_INACTIVE: "trade.progress.inactive",
+  MC_PRICING_PENDING: "mixed_container_pricing_pending",
+  MC_OFFER_EXPIRING: "mixed_container_offer_expiring",
+  MC_REVISION_PENDING: "mixed_container_revision_pending",
+  MC_OFFER_APPROVED: "mixed_container_offer_approved",
+  MC_ALLOCATION_PENDING: "mixed_container_allocation_pending",
+  MC_PROFORMA_PENDING: "mixed_container_proforma_pending",
+  MC_PAYMENT_PENDING: "mixed_container_payment_pending",
+  MC_EXECUTION_READY: "mixed_container_execution_ready",
+  SC_ORDER_SPAWN_FAILED: "smartcontainer_order_spawn_failed",
+  SC_FREIGHT_PENDING: "smartcontainer_freight_pending",
+  SC_SHIPMENT_PENDING: "smartcontainer_shipment_pending",
+  SC_EXECUTION_COMPLETE: "smartcontainer_execution_complete",
+  BC_INCOMPLETE: "bulk_container_incomplete",
+  BC_SUBMITTED: "bulk_container_submitted",
+  BC_PRICING_PENDING: "bulk_pricing_pending",
+  BC_OFFER_EXPIRING: "bulk_offer_expiring",
+  BC_OFFER_EXPIRED: "bulk_offer_expired",
+  BC_REVISION_PENDING: "bulk_revision_pending",
+  BC_OFFER_APPROVED: "bulk_offer_approved",
+  BC_ALLOCATION_PENDING: "bulk_allocation_pending",
+  BC_PROFORMA_PENDING: "bulk_proforma_pending",
+  BC_PAYMENT_PENDING: "bulk_payment_pending",
+  BC_EXECUTION_READY: "bulk_execution_ready",
+  BC_ORDER_SPAWN_FAILED: "bulkcontainer_order_spawn_failed",
+  BC_FREIGHT_PENDING: "bulkcontainer_freight_pending",
+  BC_SHIPMENT_PENDING: "bulkcontainer_shipment_pending",
+  BC_EXECUTION_COMPLETE: "bulkcontainer_execution_complete",
+  PRODUCT_MISSING_PACKING_TYPE: "product_missing_packing_type",
+  PACKING_TYPE_DEACTIVATED: "packing_type_deactivated",
+} as const;
+export type AlertKey = (typeof AlertKey)[keyof typeof AlertKey];
+
+export interface ControlTowerAlert {
+  id: string;
+  severity: AlertSeverity;
+  category: AlertCategory;
+  alertKey: string;
+  workspaceId: string | null;
+  workspaceType: ControlTowerWorkspaceType | null;
+  workspaceRef: string | null;
+  title: string;
+  description: string;
+  resolvedAt: string | null;
+  resolvedById: string | null;
+  createdAt: string;
+}
+
+export interface ControlTowerMetric {
+  key: string;
+  label: string;
+  value: number;
+}
+
+export interface ControlTowerFunnelStage {
+  state: string;
+  label: string;
+  count: number;
+}
+
+export interface ControlTowerFunnel {
+  workspaceType: ControlTowerWorkspaceType;
+  title: string;
+  stages: ControlTowerFunnelStage[];
+}
+
+export interface ControlTowerOverview {
+  widgets: Array<{
+    id: string;
+    title: string;
+    description: string;
+    metrics: ControlTowerMetric[];
+  }>;
+  openAlerts: number;
+  criticalAlerts: number;
+  warningAlerts: number;
+  overdueItems: number;
+  excludesTestData: boolean;
+}
+
+export interface SlaMetricRow {
+  key: string;
+  label: string;
+  averageHours: number | null;
+  averageHoursDisplay: string;
+  sampleSize: number;
+}
+
+export interface SupplierPerformanceRow {
+  supplierUserId: string;
+  email: string;
+  displayName: string;
+  invited: number;
+  responded: number;
+  won: number;
+  declined: number;
+  responseRate: number | null;
+  awardRate: number | null;
+}
+
+export interface BuyerPerformanceRow {
+  buyerUserId: string;
+  email: string;
+  displayName: string;
+  rfqCreated: number;
+  rfqCompleted: number;
+  ordersCreated: number;
+  shipmentsCompleted: number;
+}
+
+export interface ControlTowerAlertCreatedPayload {
+  alert: ControlTowerAlert;
+}
+
+export interface ControlTowerAlertResolvedPayload {
+  alertId: string;
+  resolvedAt: string;
+}
+
+export interface ControlTowerMetricUpdatedPayload {
+  key: string;
+  value: number;
+}

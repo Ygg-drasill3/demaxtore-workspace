@@ -1,0 +1,34 @@
+{
+  "name": "demaxtore",
+  "private": true,
+  "version": "0.2.0",
+  "description": "DeMaxtore monorepo — Workspace-centric B2B sourcing & import operating platform.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:frontend": "yarn workspace @dmx/frontend dev",
+    "dev:backend": "yarn workspace @dmx/backend dev",
+    "test": "yarn workspaces run test",
+    "test:frontend": "yarn workspace @dmx/frontend test",
+    "test:contracts": "yarn workspace @dmx/contracts test",
+    "typecheck": "yarn workspaces run typecheck",
+    "build": "yarn workspaces run build",
+    "validate:enterprise": "EV_QUICK=1 EV_API_URL=http://127.0.0.1:3001 node tools/enterprise-validation/run.mjs && node tools/enterprise-validation/generate-reports.mjs",
+    "validate:enterprise:full": "EV_API_URL=http://127.0.0.1:3001 node tools/enterprise-validation/run.mjs && node tools/enterprise-validation/generate-reports.mjs",
+    "validate:hardening": "EV9B_QUICK=1 node tools/enterprise-validation/sprint-9b-run.mjs && node tools/enterprise-validation/generate-9b-reports.mjs",
+    "validate:hardening:full": "node tools/enterprise-validation/sprint-9b-run.mjs && node tools/enterprise-validation/generate-9b-reports.mjs",
+    "seed:scale9b": "node tools/enterprise-validation/scripts/seed-scale-batch.mjs",
+    "smoke:pilot-chain": "node scripts/pilot-full-chain-smoke.mjs",
+    "demo:seed": "yarn workspace @dmx/backend prisma:seed && yarn workspace @dmx/backend demo:seed",
+    "demo:reset": "yarn workspace @dmx/backend demo:reset"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "packageManager": "yarn@1.22.22",
+  "devDependencies": {
+    "@playwright/mcp": "0.0.76"
+  }
+}

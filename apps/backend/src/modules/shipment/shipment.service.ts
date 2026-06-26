@@ -3,6 +3,7 @@ import type { Role } from "@prisma/client";
 import {
   findShipmentTransition,
   resolveShipmentTargetState,
+  SHIPMENT_SELF_LOOP_ACTIONS,
   type ShipmentState,
   type ShipmentAction,
   type ShipmentTransition,
@@ -12,6 +13,7 @@ import { resolveRecipients } from "./shipment.notifications.js";
 import { PRECONDITIONS } from "./shipment.preconditions.js";
 import { socketBus } from "../../realtime/socket-bus";
 import { AppError } from "../../utils/httpErrors.js";
+import { claimProcessedEvent, releaseProcessedEvent } from "../../lib/processed-event.js";
 
 export interface ApplyTransitionInput {
   workspaceId: string;
@@ -58,11 +60,34 @@ export class ShipmentService {
           notificationsCreated: 0,
         };
       }
+      const claimed = await claimProcessedEvent(this.prisma, {
+        source: "fsm:shipment",
+        eventId: `${workspaceId}:${idempotencyKey}`,
+        workspaceId,
+        action,
+      });
+      if (!claimed) {
+        const replay = await this.prisma.auditLog.findFirst({
+          where: { workspaceId, payload: { path: ["idempotencyKey"], equals: idempotencyKey } },
+          orderBy: { createdAt: "desc" },
+        });
+        if (replay) {
+          return {
+            workspaceId,
+            fromState: replay.fromState as ShipmentState,
+            toState: replay.toState as ShipmentState,
+            timelineEventId: "(idempotent-replay)",
+            auditLogId: replay.id,
+            notificationsCreated: 0,
+          };
+        }
+        throw new AppError(409, "IDEMPOTENT_IN_FLIGHT");
+      }
     }
 
     let exceptionId: string | undefined;
 
-    const result = await this.prisma.$transaction(async (tx) => {
+    const txnPromise = this.prisma.$transaction(async (tx) => {
       await tx.$executeRawUnsafe(`SET LOCAL app.fsm_authorised = 'true'`);
 
       const lockRows = await tx.$queryRaw<Array<{ id: string; state: string; type: string }>>(
@@ -115,8 +140,17 @@ export class ShipmentService {
       }
 
       let newState = resolveShipmentTargetState(currentState, transition);
-      if (transition.action === "resolve_exception" && payload.resumeState) {
-        newState = payload.resumeState as ShipmentState;
+      if (transition.action === "resolve_exception") {
+        // Resume ONLY to the server-recorded pre-exception state. The client must
+        // not be able to choose an arbitrary resumeState (e.g. jump straight to
+        // DELIVERED/COMPLETED), which would bypass every intermediate FSM gate (C2).
+        const open = workspaceFull.shipmentExceptions[0];
+        if (!open) throw new AppError(409, "NO_OPEN_EXCEPTION");
+        newState = open.stateBefore as ShipmentState;
+      }
+
+      if (newState === currentState && !SHIPMENT_SELF_LOOP_ACTIONS.includes(action)) {
+        throw new AppError(409, "NO_STATE_CHANGE", { from: currentState, action });
       }
 
       if (newState !== currentState) {
@@ -220,6 +254,19 @@ export class ShipmentService {
       };
     });
 
+    let result: Awaited<typeof txnPromise>;
+    if (idempotencyKey) {
+      try {
+        result = await txnPromise;
+      } catch (err) {
+        // Transaction rolled back — release the claim so a retry is not bricked.
+        await releaseProcessedEvent(this.prisma, "fsm:shipment", `${workspaceId}:${idempotencyKey}`).catch(() => {});
+        throw err;
+      }
+    } else {
+      result = await txnPromise;
+    }
+
     if (result.toState === "COMPLETED") {
       const { FreightCommercialService } = await import(
         "../freightiq/commercial/freight-commercial.service.js"
@@ -230,7 +277,26 @@ export class ShipmentService {
       );
     }
 
+    void this.notifyOrchestrator(workspaceId, action, payload, result).catch(() => {});
+
     return result;
+  }
+
+  private async notifyOrchestrator(
+    shipmentId: string,
+    action: ShipmentAction,
+    payload: Record<string, unknown>,
+    result: ApplyTransitionResult,
+  ): Promise<void> {
+    const { isOrchestratorEnabled } = await import("../../config/orchestrator.js");
+    if (!isOrchestratorEnabled()) return;
+    const { OrderShipmentOrchestrator } = await import("../orchestration/order-shipment-orchestrator.service.js");
+    await new OrderShipmentOrchestrator(this.prisma).onShipmentTransition({
+      shipmentId,
+      action,
+      payload,
+      eventId: `${shipmentId}:${action}:${result.fromState}->${result.toState}`,
+    });
   }
 
   private async runActionSideEffects(
@@ -297,8 +363,25 @@ export class ShipmentService {
       case "complete_customs":
         await update({ customsCompletedAt: new Date() });
         break;
+      case "confirm_partial_delivery":
+        await tx.shipmentStatusUpdate.create({
+          data: {
+            workspaceId: ws.id,
+            updateType: "DELIVERY",
+            label: payload.partialDeliveryNote as string,
+            notes: [
+              payload.deliveredQuantity != null ? `delivered: ${payload.deliveredQuantity}` : null,
+              payload.remainingQuantity != null ? `remaining: ${payload.remainingQuantity}` : null,
+            ].filter(Boolean).join("; ") || undefined,
+            reportedById: actor.id,
+          },
+        });
+        break;
       case "confirm_delivery":
         await update({ deliveredAt: new Date() });
+        break;
+      case "reject_shipment":
+        await update({ completedAt: new Date() });
         break;
       case "complete_shipment":
         await update({ completedAt: new Date() });
@@ -325,7 +408,7 @@ export class ShipmentService {
             data: {
               status: "RESOLVED",
               resolution: (payload.resolution as string) ?? (reason as string),
-              resumeState: (newState ?? payload.resumeState) as string | undefined,
+              resumeState: newState as string | undefined,
               resolvedById: actor.id,
               resolvedAt: new Date(),
             },

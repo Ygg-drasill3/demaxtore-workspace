@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =========================================================================
+   DeMaxtore — Global tokens
+   Premium SaaS · Clean white · Enterprise B2B sourcing platform
+   ========================================================================= */
+
+@layer base {
+  html, body, #root { height: 100%; }
+  body {
+    background-color: theme("colors.paper.50");
+    color: theme("colors.ink.900");
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection { background: theme("colors.accent.900"); color: white; }
+  h1, h2, h3, h4 { font-family: theme("fontFamily.display"); letter-spacing: -0.01em; }
+}
+
+@layer components {
+  /* The core surface — replaces every shadcn Card usage across the app. */
+  .dmx-card {
+    @apply bg-white border border-paper-200 rounded-xl shadow-card transition-shadow;
+  }
+  .dmx-card-hover { @apply hover:shadow-cardHover; }
+
+  /* Compact label used above every dense field group. */
+  .dmx-eyebrow {
+    @apply text-[11px] uppercase tracking-[0.14em] text-zinc-500 font-medium;
+  }
+
+  /* Inputs — neutral, no purple/violet AI-slop styling. */
+  .dmx-input {
+    @apply h-11 w-full px-3 rounded-lg border border-paper-200 bg-white text-sm
+           text-ink-900 placeholder:text-zinc-400
+           focus:outline-none focus:ring-2 focus:ring-accent-900/15 focus:border-accent-900/40
+           disabled:bg-paper-100 disabled:cursor-not-allowed;
+  }
+
+  /* Soft focus ring for buttons */
+  .dmx-focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-900/20 focus-visible:ring-offset-2;
+  }
+
+  /* Primary / secondary actions — matches components/ui/Button.tsx */
+  .dmx-btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors dmx-focus-ring
+           h-11 px-5 text-sm bg-accent-900 text-white hover:bg-accent-600 active:bg-ink-900
+           disabled:opacity-60 disabled:cursor-not-allowed;
+  }
+  .dmx-btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors dmx-focus-ring
+           h-10 px-4 text-sm bg-white text-ink-900 border border-paper-200 hover:bg-paper-50 active:bg-paper-100
+           disabled:opacity-60 disabled:cursor-not-allowed;
+  }
+
+  /* Scrollbars: keep them subtle */
+  .dmx-thin-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+  .dmx-thin-scroll::-webkit-scrollbar-thumb { background: rgba(15,23,42,0.15); border-radius: 3px; }
+  .dmx-thin-scroll::-webkit-scrollbar-thumb:hover { background: rgba(15,23,42,0.25); }
+}
+
+/* Workspace timeline rail */
+.timeline-rail {
+  background-image: linear-gradient(to bottom, theme("colors.paper.200") 0%, theme("colors.paper.200") 100%);
+  background-size: 1px 100%;
+  background-position: 11px 0;
+  background-repeat: no-repeat;
+}

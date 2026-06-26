@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
+import { cached } from "../../lib/response-cache.js";
 import type {
   BuyerOpportunity,
   CategoryOpportunity,
@@ -538,7 +539,7 @@ export class MarketService {
   }
 
   async getInsight(): Promise<MarketInsight> {
-    return this.buildInsight(true);
+    return cached("market:insights", 10 * 60_000, () => this.buildInsight(true));
   }
 
   private async buildInsight(emitSocket: boolean): Promise<MarketInsight> {

@@ -1,0 +1,132 @@
+import type { TranslationDict } from "../types";
+
+const dashboardTr: TranslationDict = {
+  "dash.common.open": "Aç",
+  "dash.common.openArrow": "Aç →",
+  "dash.common.loading": "Yükleniyor…",
+  "dash.common.loadingTrades": "Ticaretler yükleniyor…",
+  "dash.common.loadingActions": "İşlemler yükleniyor…",
+  "dash.common.loadingAuctions": "İhaleler yükleniyor…",
+  "dash.common.loadingShipments": "Sevkiyatlar yükleniyor…",
+  "dash.common.loadingDocuments": "Belgeler yükleniyor…",
+  "dash.common.loadingConversations": "Konuşmalar yükleniyor…",
+  "dash.common.loadingEvents": "Etkinlikler yükleniyor…",
+  "dash.common.loadingExceptions": "İstisnalar yükleniyor…",
+  "dash.common.item": "öğe",
+  "dash.common.items": "öğe",
+  "dash.common.urgent": "Acil · ",
+  "dash.common.reference": "Referans",
+  "dash.common.ref": "Ref",
+  "dash.common.type": "Tür",
+  "dash.common.stage": "Aşama",
+  "dash.common.status": "Durum",
+  "dash.common.owner": "Sahip",
+  "dash.common.risk": "Risk",
+  "dash.common.nextAction": "Sonraki işlem",
+  "dash.common.nextActionTitle": "Sonraki İşlem",
+
+  "dash.buyer.eyebrow": "Alıcı · Komuta Merkezi",
+  "dash.buyer.hello": "Merhaba, {name}.",
+  "dash.buyer.subtitle.standard": "Operasyonel özet — dikkat gerektirenler, devam edenler ve sıradakiler.",
+  "dash.buyer.subtitle.power": "Aktif portföy — tüm ticaret akışları tek bakışta.",
+  "dash.buyer.pill.actions": "bekleyen işlem",
+  "dash.buyer.pill.auctions": "canlı ihale",
+  "dash.buyer.pill.messages": "okunmamış mesaj",
+  "dash.buyer.createAuction": "İhale Oluştur",
+  "dash.buyer.newRfq": "Yeni RFQ",
+  "dash.buyer.error.load": "Panel verileri yüklenemedi. Bazı bileşenler boş görünebilir.",
+  "dash.buyer.section.overview": "Genel metrikler",
+  "dash.buyer.section.priority": "Öncelikli işlemler",
+  "dash.buyer.section.trades": "Aktif ticaretler",
+  "dash.buyer.section.operations": "Canlı operasyonlar",
+  "dash.buyer.section.monitoring": "İzleme ve iletişim",
+
+  "dash.supplier.eyebrow": "Tedarikçi · Komuta Merkezi",
+  "dash.supplier.hello": "Merhaba, {name}.",
+  "dash.supplier.subtitle": "Fırsatlar, operasyon yükü ve gerekli işlemler tek bakışta.",
+  "dash.supplier.link.rfq": "RFQ davetleri",
+  "dash.supplier.link.auctions": "İhaleler",
+  "dash.supplier.link.orders": "Siparişler",
+
+  "dash.admin.eyebrow": "Operasyon · Komuta Merkezi",
+  "dash.admin.fullTower": "Tam Kontrol Kulesi",
+  "dash.admin.subtitle": "Müdahale gerektirenler, gecikenler ve kârlılık — tek bakışta.",
+  "dash.admin.link.triage": "RFQ triyaj",
+  "dash.admin.link.growth": "Büyüme",
+  "dash.admin.link.intel": "Pazar analizi",
+
+  "dash.eyebrow.priority": "Öncelik",
+  "dash.eyebrow.pipeline": "Hattı",
+  "dash.eyebrow.collaboration": "İş birliği",
+  "dash.eyebrow.compliance": "Uyumluluk",
+  "dash.eyebrow.timeline": "Zaman çizelgesi",
+  "dash.eyebrow.execution": "Operasyon",
+  "dash.eyebrow.commoditybid": "CommodityBid",
+  "dash.eyebrow.knowledge": "Bilgi",
+  "dash.eyebrow.commercial": "Ticari",
+  "dash.eyebrow.alerts": "Uyarılar",
+  "dash.eyebrow.workload": "İş yükü",
+  "dash.eyebrow.freightiq": "FreightIQ",
+  "dash.eyebrow.tradeLifecycle": "Ticaret yaşam döngüsü",
+  "dash.eyebrow.exceptionHub": "İstisna Merkezi",
+
+  "dash.actionInbox.title": "Gerekli İşlemler",
+  "dash.actionInbox.empty": "Bekleyen işlem yok — her şey güncel.",
+
+  "dash.activeTrades.title": "Aktif Ticaretlerim",
+
+  "dash.liveAuctions.title": "Canlı İhaleler",
+  "dash.liveAuctions.empty": "Planlanmış veya canlı ihale yok.",
+  "dash.liveAuctions.approval": "Kazanan onay bekliyor",
+
+  "dash.shipments.title": "Sevkiyatlarım",
+  "dash.shipments.empty": "Aktif sevkiyat yok.",
+
+  "dash.exceptions.title": "İstisnalarım",
+  "dash.exceptions.open": "Açık",
+  "dash.exceptions.critical": "Kritik",
+  "dash.exceptions.waitingForMe": "Benden Beklenen",
+  "dash.exceptions.resolvedWeek": "Bu Hafta Çözülen",
+  "dash.exceptions.empty": "Sizi bekleyen istisna yok.",
+
+  "dash.communication.title": "İletişim Merkezi",
+  "dash.communication.empty": "Son konuşma yok.",
+  "dash.communication.supplierEmpty": "Henüz konuşma yok.",
+
+  "dash.events.title": "Yaklaşan Etkinlikler",
+  "dash.events.empty": "Yaklaşan son tarih veya kilometre taşı yok.",
+  "dash.events.emptyShort": "Yaklaşan son tarih yok.",
+
+  "dash.documents.title": "Belge Durumu",
+  "dash.documents.empty": "Henüz belge çalışma alanı yok.",
+  "dash.documents.controlTitle": "Belge Kontrolü",
+  "dash.documents.controlEmpty": "Belge uyumluluk riski yok.",
+  "dash.documents.supplierTitle": "Belge Merkezi",
+
+  "dash.revenue.title": "Gelir Görünürlüğü",
+  "dash.revenue.thisMonth": "Bu ay",
+  "dash.revenue.pending": "Bekleyen",
+  "dash.revenue.realized": "Gerçekleşen",
+  "dash.revenue.topRoute": "En iyi rota:",
+  "dash.revenue.topForwarder": "En iyi forwarder:",
+
+  "dash.controlTower.title": "Kontrol Kulesi",
+  "dash.controlTower.empty": "Açık uyarı yok.",
+
+  "dash.execution.title": "Operasyon Merkezi",
+
+  "dash.tradeBoard.title": "Ticaret Operasyon Panosu",
+  "dash.tradeBoard.empty": "Aktif ticaret yok.",
+
+  "dash.freight.title": "Navlun Operasyonları",
+  "dash.freight.empty": "Açık navlun görevi yok.",
+
+  "dash.auctionMonitor.title": "Canlı İhale İzleyici",
+  "dash.auctionMonitor.pendingApproval": "Onay bekliyor",
+
+  "dash.opportunity.title": "Fırsat Merkezi",
+  "dash.teamWorkload.title": "Ekip İş Yükü",
+  "dash.shipmentCenter.title": "Sevkiyat Komuta Merkezi",
+};
+
+export default dashboardTr;

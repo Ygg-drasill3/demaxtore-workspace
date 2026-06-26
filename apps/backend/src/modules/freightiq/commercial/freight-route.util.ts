@@ -1,0 +1,70 @@
+/** Sprint 6B — route / lane resolution from POL/POD codes */
+
+const PORT_COUNTRY: Record<string, string> = {
+  TRIST: "Turkey",
+  MERSIN: "Turkey",
+  IST: "Turkey",
+  TRMER: "Turkey",
+  AEJEA: "UAE",
+  JEA: "UAE",
+  AEADH: "UAE",
+  SADMM: "Saudi Arabia",
+  SAJED: "Saudi Arabia",
+  NGLOS: "Nigeria",
+  NGAPP: "Nigeria",
+  GBFXT: "UK",
+  GBLGP: "UK",
+  NLRTM: "Netherlands",
+  USLAX: "USA",
+  USNYC: "USA",
+  USHOU: "USA",
+  USMIA: "USA",
+};
+
+function normalizePort(code: string): string {
+  return code.trim().toUpperCase().replace(/\s+/g, "");
+}
+
+function countryForPort(code: string): string {
+  const key = normalizePort(code);
+  if (PORT_COUNTRY[key]) return PORT_COUNTRY[key];
+  if (key.length >= 2) {
+    const prefix = key.slice(0, 2);
+    const byPrefix: Record<string, string> = {
+      TR: "Turkey",
+      AE: "UAE",
+      SA: "Saudi Arabia",
+      NG: "Nigeria",
+      GB: "UK",
+      US: "USA",
+      NL: "Netherlands",
+      DE: "Germany",
+      FR: "France",
+      IT: "Italy",
+      ES: "Spain",
+      CN: "China",
+      IN: "India",
+    };
+    if (byPrefix[prefix]) return byPrefix[prefix];
+  }
+  return key || "Unknown";
+}
+
+export interface ResolvedRoute {
+  pol: string;
+  pod: string;
+  countryFrom: string;
+  countryTo: string;
+  lane: string;
+  route: string;
+}
+
+export function resolveFreightRoute(pol: string, pod: string): ResolvedRoute {
+  const polNorm = normalizePort(pol);
+  const podNorm = normalizePort(pod);
+  const countryFrom = countryForPort(polNorm);
+  const countryTo = countryForPort(podNorm);
+  const lane = `${countryFrom} → ${countryTo}`;
+  const route = `${polNorm}→${podNorm}`;
+  return { pol: polNorm, pod: podNorm, countryFrom, countryTo, lane, route };
+}

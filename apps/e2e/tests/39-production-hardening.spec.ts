@@ -1,6 +1,7 @@
 // Sprint D — Faz 4 production hardening E2E (API-focused)
 import { test, expect } from "@playwright/test";
 import { execSync } from "node:child_process";
+import { readFileSync, existsSync } from "node:fs";
 import {
   apiLogin,
   newRequest,
@@ -14,6 +15,10 @@ import {
   findOpenAlert,
   setupLiveCommodityBid,
   bootstrapAcknowledgedPo,
+  advanceOrderToFreightRequested,
+  postSignedPaymentWebhook,
+  E2E_PAYMENT_WEBHOOK_SECRET,
+  e2eHeaders,
 } from "./_helpers";
 
 test.describe.serial("Production hardening (Sprint D)", () => {
@@ -24,11 +29,26 @@ test.describe.serial("Production hardening (Sprint D)", () => {
   let buyerUserId = "";
   let supBId = "";
 
+  function getDbUrl(): string | undefined {
+    const raw = process.env.DATABASE_URL ?? (() => {
+      try {
+        const envFile = `${REPO_ROOT}/apps/backend/.env`;
+        if (existsSync(envFile)) {
+          const m = readFileSync(envFile, "utf8").match(/^DATABASE_URL=["']?(.+?)["']?\s*$/m);
+          return m?.[1];
+        }
+      } catch { /* ignore */ }
+      return undefined;
+    })();
+    return raw?.replace(/^["']|["']$/g, "");
+  }
+
   function backdateWorkspaceDeadline(workspaceId: string): void {
+    const dbUrl = getDbUrl();
     execSync(`node scripts/e2e-backdate-workspace-deadline.mjs ${workspaceId}`, {
       cwd: `${REPO_ROOT}/apps/backend`,
       stdio: "pipe",
-      env: { ...process.env },
+      env: { ...process.env, ...(dbUrl ? { DATABASE_URL: dbUrl } : {}) },
     });
   }
 
@@ -52,7 +72,7 @@ test.describe.serial("Production hardening (Sprint D)", () => {
   ) {
     const req = await newRequest();
     return req.post(`${API_BASE}/api/commoditybid/${cbId}/lots/${lotId}/bids`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${token}` }),
       data: { payload },
     });
   }
@@ -60,23 +80,23 @@ test.describe.serial("Production hardening (Sprint D)", () => {
   async function advanceRfqToProformaApproved(rfqId: string) {
     const req = await newRequest();
     await req.post(`${API_BASE}/api/rfq/${rfqId}/actions/request-proforma`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
       data: { payload: {} },
     });
     const fd = new FormData();
     fd.append("file", new Blob([Buffer.from("x")], { type: "application/pdf" }), "p.pdf");
     const up = await fetch(`${API_BASE}/api/rfq/${rfqId}/attachments`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${supplierToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${supplierToken}` }),
       body: fd as unknown as BodyInit,
     });
     const upJson = await up.json() as { id: string };
     await req.post(`${API_BASE}/api/rfq/${rfqId}/actions/submit-proforma`, {
-      headers: { Authorization: `Bearer ${supplierToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${supplierToken}` }),
       data: { payload: { proformaFileUrl: `${API_BASE}/api/rfq/${rfqId}/attachments/${upJson.id}` } },
     });
     await req.post(`${API_BASE}/api/rfq/${rfqId}/actions/approve-proforma`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
       data: { payload: {} },
     });
   }
@@ -84,10 +104,10 @@ test.describe.serial("Production hardening (Sprint D)", () => {
   async function selectSupplierOnRfq(rfqId: string) {
     const req = await newRequest();
     const quotes = await req.get(`${API_BASE}/api/rfq/${rfqId}/quotations`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
     }).then((r) => r.json()) as Array<{ id: string }>;
     await req.post(`${API_BASE}/api/rfq/${rfqId}/actions/select-supplier`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
       data: { payload: { quotationId: quotes[0].id, supplierUserId: supplierId, rationale: "x" } },
     });
   }
@@ -98,13 +118,13 @@ test.describe.serial("Production hardening (Sprint D)", () => {
     adminToken = await apiLogin(req, USERS.admin);
     supplierToken = await apiLogin(req, USERS.supA1);
     const lookup = await req.get(`${API_BASE}/api/admin/rfq/suppliers?limit=20`, {
-      headers: { Authorization: `Bearer ${adminToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${adminToken}` }),
     });
     const suppliers = await lookup.json() as Array<{ id: string; email: string }>;
     supplierId = suppliers.find((u) => u.email === USERS.supA1.email)!.id;
     supBId = suppliers.find((u) => u.email === USERS.supB1.email)!.id;
     const me = await req.get(`${API_BASE}/api/auth/me`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
     }).then((r) => r.json()) as { id: string };
     buyerUserId = me.id;
   });
@@ -114,22 +134,22 @@ test.describe.serial("Production hardening (Sprint D)", () => {
     const { id: rfqId } = await setupSubmittedRfq(req, buyerToken, `E2E Val ${Date.now()}`);
     await assignAndPublish(req, adminToken, rfqId, [USERS.supA1.email]);
     await req.post(`${API_BASE}/api/rfq/${rfqId}/quotations`, {
-      headers: { Authorization: `Bearer ${supplierToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${supplierToken}` }),
       data: { currency: "USD", lineItems: [{ position: 1, description: "w", quantity: 1, unitPrice: 9 }] },
     });
     await closeQuotationsAndStartEvaluation(req, buyerToken, rfqId);
     const quotes = await req.get(`${API_BASE}/api/rfq/${rfqId}/quotations`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
     }).then((r) => r.json()) as Array<{ id: string }>;
 
     const bad = await req.post(`${API_BASE}/api/rfq/${rfqId}/actions/select-supplier`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
       data: { payload: { quotationId: quotes[0].id, supplierUserId: buyerUserId, rationale: "bad" } },
     });
     expect(bad.status()).toBeGreaterThanOrEqual(400);
 
     const missing = await req.post(`${API_BASE}/api/rfq/${rfqId}/actions/select-supplier`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
       data: { payload: { supplierUserId: supplierId } },
     });
     expect(missing.status()).toBe(400);
@@ -139,7 +159,7 @@ test.describe.serial("Production hardening (Sprint D)", () => {
     const req = await newRequest();
     const { id: rfqId } = await setupSubmittedRfq(req, buyerToken, `E2E Role ${Date.now()}`);
     const res = await req.post(`${API_BASE}/api/rfq/${rfqId}/actions/assign-suppliers`, {
-      headers: { Authorization: `Bearer ${adminToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${adminToken}` }),
       data: { payload: { supplierUserIds: [buyerUserId] } },
     });
     expect(res.status()).toBe(400);
@@ -151,19 +171,19 @@ test.describe.serial("Production hardening (Sprint D)", () => {
     const { id: rfqId } = await setupSubmittedRfq(req, buyerToken, `E2E POdup ${ts}`);
     await assignAndPublish(req, adminToken, rfqId, [USERS.supA1.email]);
     await req.post(`${API_BASE}/api/rfq/${rfqId}/quotations`, {
-      headers: { Authorization: `Bearer ${supplierToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${supplierToken}` }),
       data: { currency: "USD", lineItems: [{ position: 1, description: "w", quantity: 1, unitPrice: 5 }] },
     });
     await closeQuotationsAndStartEvaluation(req, buyerToken, rfqId);
     await selectSupplierOnRfq(rfqId);
     await advanceRfqToProformaApproved(rfqId);
     const first = await req.post(`${API_BASE}/api/rfq/${rfqId}/actions/issue-po`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
       data: { payload: {} },
     });
     expect(first.ok()).toBeTruthy();
     const second = await req.post(`${API_BASE}/api/rfq/${rfqId}/actions/issue-po`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
       data: { payload: {} },
     });
     expect(second.status()).toBe(409);
@@ -175,68 +195,56 @@ test.describe.serial("Production hardening (Sprint D)", () => {
     const { id: rfqId } = await setupSubmittedRfq(req, buyerToken, `E2E FreightGuard ${ts}`);
     await assignAndPublish(req, adminToken, rfqId, [USERS.supA1.email]);
     await req.post(`${API_BASE}/api/rfq/${rfqId}/quotations`, {
-      headers: { Authorization: `Bearer ${supplierToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${supplierToken}` }),
       data: { currency: "USD", lineItems: [{ position: 1, description: "w", quantity: 1, unitPrice: 5 }] },
     });
     await closeQuotationsAndStartEvaluation(req, buyerToken, rfqId);
     const quotes = await req.get(`${API_BASE}/api/rfq/${rfqId}/quotations`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
     }).then((r) => r.json()) as Array<{ id: string }>;
     await req.post(`${API_BASE}/api/rfq/${rfqId}/actions/select-supplier`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
       data: { payload: { quotationId: quotes[0].id, supplierUserId: supplierId, rationale: "x" } },
     });
     await req.post(`${API_BASE}/api/rfq/${rfqId}/actions/request-proforma`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
       data: { payload: {} },
     });
     const fd = new FormData();
     fd.append("file", new Blob([Buffer.from("x")], { type: "application/pdf" }), "p.pdf");
     const up = await fetch(`${API_BASE}/api/rfq/${rfqId}/attachments`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${supplierToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${supplierToken}` }),
       body: fd as unknown as BodyInit,
     });
     const upJson = await up.json() as { id: string };
     await req.post(`${API_BASE}/api/rfq/${rfqId}/actions/submit-proforma`, {
-      headers: { Authorization: `Bearer ${supplierToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${supplierToken}` }),
       data: { payload: { proformaFileUrl: `${API_BASE}/api/rfq/${rfqId}/attachments/${upJson.id}` } },
     });
     await req.post(`${API_BASE}/api/rfq/${rfqId}/actions/approve-proforma`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
       data: { payload: {} },
     });
     await req.post(`${API_BASE}/api/rfq/${rfqId}/actions/issue-po`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
       data: { payload: {} },
     });
     const orders = await req.get(`${API_BASE}/api/rfq/${rfqId}/spawned-orders`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
     }).then((r) => r.json()) as Array<{ id: string }>;
     const orderId = orders[0].id;
     const future = new Date(Date.now() + 30 * 86400_000).toISOString();
-    await req.post(`${API_BASE}/api/orders/${orderId}/actions/supplier-confirm-order`, {
-      headers: { Authorization: `Bearer ${supplierToken}` },
-      data: { payload: { plannedCompletionDate: future } },
-    });
-    await req.post(`${API_BASE}/api/orders/${orderId}/actions/start-production`, {
-      headers: { Authorization: `Bearer ${supplierToken}` },
-      data: { payload: { plannedCompletionDate: future } },
-    });
-    await req.post(`${API_BASE}/api/orders/${orderId}/actions/mark-production-completed`, {
-      headers: { Authorization: `Bearer ${supplierToken}` },
-      data: { payload: {} },
-    });
-    await req.post(`${API_BASE}/api/orders/${orderId}/actions/skip-inspection`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
-      data: { payload: {} },
-    });
+    await advanceOrderToFreightRequested(req, orderId, {
+      supplier: supplierToken,
+      buyer: buyerToken,
+    }, future);
     await req.post(`${API_BASE}/api/freightiq/orders/${orderId}/actions/create-request`, {
-      headers: { Authorization: `Bearer ${adminToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${adminToken}` }),
       data: { payload: { mode: "OCEAN_FCL", pol: "CNSHA", pod: "NLRTM", cargoDescription: "guard test" } },
     });
     const book = await req.post(`${API_BASE}/api/orders/${orderId}/actions/book-shipment`, {
-      headers: { Authorization: `Bearer ${adminToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${adminToken}` }),
       data: {
         payload: {
           freightForwarder: "FF",
@@ -255,65 +263,57 @@ test.describe.serial("Production hardening (Sprint D)", () => {
     const { id: rfqId } = await setupSubmittedRfq(req, buyerToken, `E2E FIQ ${ts}`);
     await assignAndPublish(req, adminToken, rfqId, [USERS.supA1.email]);
     await req.post(`${API_BASE}/api/rfq/${rfqId}/quotations`, {
-      headers: { Authorization: `Bearer ${supplierToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${supplierToken}` }),
       data: { currency: "USD", lineItems: [{ position: 1, description: "w", quantity: 1, unitPrice: 5 }] },
     });
     await closeQuotationsAndStartEvaluation(req, buyerToken, rfqId);
     const quotes = await req.get(`${API_BASE}/api/rfq/${rfqId}/quotations`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
     }).then((r) => r.json()) as Array<{ id: string }>;
     await req.post(`${API_BASE}/api/rfq/${rfqId}/actions/select-supplier`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
       data: { payload: { quotationId: quotes[0].id, supplierUserId: supplierId, rationale: "x" } },
     });
     await req.post(`${API_BASE}/api/rfq/${rfqId}/actions/request-proforma`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
       data: { payload: {} },
     });
     const fd = new FormData();
     fd.append("file", new Blob([Buffer.from("x")], { type: "application/pdf" }), "p.pdf");
     const up = await fetch(`${API_BASE}/api/rfq/${rfqId}/attachments`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${supplierToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${supplierToken}` }),
       body: fd as unknown as BodyInit,
     });
     const upJson = await up.json() as { id: string };
     await req.post(`${API_BASE}/api/rfq/${rfqId}/actions/submit-proforma`, {
-      headers: { Authorization: `Bearer ${supplierToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${supplierToken}` }),
       data: { payload: { proformaFileUrl: `${API_BASE}/api/rfq/${rfqId}/attachments/${upJson.id}` } },
     });
     await req.post(`${API_BASE}/api/rfq/${rfqId}/actions/approve-proforma`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
       data: { payload: {} },
     });
     await req.post(`${API_BASE}/api/rfq/${rfqId}/actions/issue-po`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
       data: { payload: {} },
     });
     const orders = await req.get(`${API_BASE}/api/rfq/${rfqId}/spawned-orders`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
     }).then((r) => r.json()) as Array<{ id: string }>;
     const orderId = orders[0].id;
     const future = new Date(Date.now() + 30 * 86400_000).toISOString();
-    await req.post(`${API_BASE}/api/orders/${orderId}/actions/supplier-confirm-order`, {
-      headers: { Authorization: `Bearer ${supplierToken}` },
-      data: { payload: { plannedCompletionDate: future } },
-    });
-    await req.post(`${API_BASE}/api/orders/${orderId}/actions/start-production`, {
-      headers: { Authorization: `Bearer ${supplierToken}` },
-      data: { payload: { plannedCompletionDate: future } },
-    });
-    await req.post(`${API_BASE}/api/orders/${orderId}/actions/mark-production-completed`, {
-      headers: { Authorization: `Bearer ${supplierToken}` },
-      data: { payload: {} },
-    });
+    await advanceOrderToFreightRequested(req, orderId, {
+      supplier: supplierToken,
+      buyer: buyerToken,
+    }, future);
     await req.post(`${API_BASE}/api/freightiq/orders/${orderId}/actions/create-request`, {
-      headers: { Authorization: `Bearer ${adminToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${adminToken}` }),
       data: { payload: { mode: "OCEAN_FCL", pol: "CNSHA", pod: "NLRTM", cargoDescription: "bridge", containerType: "40HC" } },
     });
     const validUntil = new Date(Date.now() + 14 * 86400_000).toISOString();
     const offerRes = await req.post(`${API_BASE}/api/freightiq/orders/${orderId}/actions/submit-offer`, {
-      headers: { Authorization: `Bearer ${adminToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${adminToken}` }),
       data: {
         payload: {
           providerName: "Forwarder X",
@@ -328,7 +328,7 @@ test.describe.serial("Production hardening (Sprint D)", () => {
     const offerBody = await offerRes.json() as { offers: Array<{ id: string }> };
     const offerId = offerBody.offers[0].id;
     const sel = await req.post(`${API_BASE}/api/freightiq/orders/${orderId}/actions/select-offer`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
       data: { payload: { offerId } },
     });
     expect(sel.ok()).toBeTruthy();
@@ -341,7 +341,7 @@ test.describe.serial("Production hardening (Sprint D)", () => {
 
     const shipmentId = summary.selection!.shipmentWorkspaceId!;
     const shp = await req.get(`${API_BASE}/api/shipments/${shipmentId}`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
     }).then((r) => r.json()) as { carrierName: string | null; originPort: string };
     expect(shp.carrierName).toBe("Maersk");
     expect(shp.originPort).toBe("CNSHA");
@@ -353,57 +353,57 @@ test.describe.serial("Production hardening (Sprint D)", () => {
     const { id: rfqId } = await setupSubmittedRfq(req, buyerToken, `E2E POrej ${ts}`);
     await assignAndPublish(req, adminToken, rfqId, [USERS.supA1.email]);
     await req.post(`${API_BASE}/api/rfq/${rfqId}/quotations`, {
-      headers: { Authorization: `Bearer ${supplierToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${supplierToken}` }),
       data: { currency: "USD", lineItems: [{ position: 1, description: "w", quantity: 1, unitPrice: 5 }] },
     });
     await closeQuotationsAndStartEvaluation(req, buyerToken, rfqId);
     const quotes = await req.get(`${API_BASE}/api/rfq/${rfqId}/quotations`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
     }).then((r) => r.json()) as Array<{ id: string }>;
     await req.post(`${API_BASE}/api/rfq/${rfqId}/actions/select-supplier`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
       data: { payload: { quotationId: quotes[0].id, supplierUserId: supplierId, rationale: "x" } },
     });
     await req.post(`${API_BASE}/api/rfq/${rfqId}/actions/request-proforma`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
       data: { payload: {} },
     });
     const fd = new FormData();
     fd.append("file", new Blob([Buffer.from("x")], { type: "application/pdf" }), "p.pdf");
     const up = await fetch(`${API_BASE}/api/rfq/${rfqId}/attachments`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${supplierToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${supplierToken}` }),
       body: fd as unknown as BodyInit,
     });
     const upJson = await up.json() as { id: string };
     await req.post(`${API_BASE}/api/rfq/${rfqId}/actions/submit-proforma`, {
-      headers: { Authorization: `Bearer ${supplierToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${supplierToken}` }),
       data: { payload: { proformaFileUrl: `${API_BASE}/api/rfq/${rfqId}/attachments/${upJson.id}` } },
     });
     await req.post(`${API_BASE}/api/rfq/${rfqId}/actions/approve-proforma`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
       data: { payload: {} },
     });
     await req.post(`${API_BASE}/api/rfq/${rfqId}/actions/issue-po`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
       data: { payload: {} },
     });
     const orders = await req.get(`${API_BASE}/api/rfq/${rfqId}/spawned-orders`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
     }).then((r) => r.json()) as Array<{ id: string }>;
     const orderId = orders[0].id;
     const po = await req.get(`${API_BASE}/api/orders/${orderId}/purchase-order`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
     }).then((r) => r.json()) as { purchaseOrder: { id: string } };
     await req.post(`${API_BASE}/api/purchase-orders/${po.purchaseOrder.id}/actions/acknowledge-po`, {
-      headers: { Authorization: `Bearer ${supplierToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${supplierToken}` }),
       data: { payload: { status: "REJECTED", notes: "Cannot supply" } },
     });
     await runControlTowerScan(req, adminToken);
     const alert = await findOpenAlert(req, adminToken, { workspaceId: orderId, alertKey: "po_rejected" });
     expect(alert).toBeTruthy();
     const exc = await req.get(`${API_BASE}/api/exceptions`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
     }).then((r) => r.json()) as { items: Array<{ status: string; exceptionType: string }> };
     const hit = exc.items.find((e) => e.status === "Waiting For Buyer" && e.exceptionType === "PO Pending");
     expect(hit).toBeTruthy();
@@ -413,20 +413,20 @@ test.describe.serial("Production hardening (Sprint D)", () => {
     const req = await newRequest();
     await runControlTowerScan(req, adminToken);
     const alerts = await req.get(`${API_BASE}/api/control-tower/alerts?resolved=false&limit=5`, {
-      headers: { Authorization: `Bearer ${adminToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${adminToken}` }),
     }).then((r) => r.json()) as { items: Array<{ id: string }> };
     test.skip(alerts.items.length === 0, "no open alerts");
     const alertId = alerts.items[0].id;
     await req.get(`${API_BASE}/api/exceptions`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
     });
     const resolve = await req.post(`${API_BASE}/api/control-tower/alerts/${alertId}/resolve`, {
-      headers: { Authorization: `Bearer ${adminToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${adminToken}` }),
       data: { note: "E2E resolve" },
     });
     expect(resolve.ok()).toBeTruthy();
     const excList = await req.get(`${API_BASE}/api/exceptions`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
     }).then((r) => r.json()) as { items: Array<{ alertId?: string; status: string }> };
     const linked = excList.items.find((e) => e.alertId === alertId);
     if (linked) expect(["Closed", "Resolved"]).toContain(linked.status);
@@ -438,126 +438,143 @@ test.describe.serial("Production hardening (Sprint D)", () => {
     const { id: rfqId } = await setupSubmittedRfq(req, buyerToken, `E2E AMD ${ts}`);
     await assignAndPublish(req, adminToken, rfqId, [USERS.supA1.email]);
     await req.post(`${API_BASE}/api/rfq/${rfqId}/quotations`, {
-      headers: { Authorization: `Bearer ${supplierToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${supplierToken}` }),
       data: { currency: "USD", lineItems: [{ position: 1, description: "w", quantity: 1, unitPrice: 5 }] },
     });
     await closeQuotationsAndStartEvaluation(req, buyerToken, rfqId);
     const quotes = await req.get(`${API_BASE}/api/rfq/${rfqId}/quotations`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
     }).then((r) => r.json()) as Array<{ id: string }>;
     await req.post(`${API_BASE}/api/rfq/${rfqId}/actions/select-supplier`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
       data: { payload: { quotationId: quotes[0].id, supplierUserId: supplierId, rationale: "x" } },
     });
     await req.post(`${API_BASE}/api/rfq/${rfqId}/actions/request-proforma`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
       data: { payload: {} },
     });
     const fd = new FormData();
     fd.append("file", new Blob([Buffer.from("x")], { type: "application/pdf" }), "p.pdf");
     const up = await fetch(`${API_BASE}/api/rfq/${rfqId}/attachments`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${supplierToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${supplierToken}` }),
       body: fd as unknown as BodyInit,
     });
     const upJson = await up.json() as { id: string };
     await req.post(`${API_BASE}/api/rfq/${rfqId}/actions/submit-proforma`, {
-      headers: { Authorization: `Bearer ${supplierToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${supplierToken}` }),
       data: { payload: { proformaFileUrl: `${API_BASE}/api/rfq/${rfqId}/attachments/${upJson.id}` } },
     });
     await req.post(`${API_BASE}/api/rfq/${rfqId}/actions/approve-proforma`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
       data: { payload: {} },
     });
     await req.post(`${API_BASE}/api/rfq/${rfqId}/actions/issue-po`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
       data: { payload: {} },
     });
     const orders = await req.get(`${API_BASE}/api/rfq/${rfqId}/spawned-orders`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
     }).then((r) => r.json()) as Array<{ id: string }>;
     const po = await req.get(`${API_BASE}/api/orders/${orders[0].id}/purchase-order`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
     }).then((r) => r.json()) as { purchaseOrder: { id: string } };
     await req.post(`${API_BASE}/api/purchase-orders/${po.purchaseOrder.id}/actions/acknowledge-po`, {
-      headers: { Authorization: `Bearer ${supplierToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${supplierToken}` }),
       data: { payload: { status: "ACCEPTED" } },
     });
     const first = await req.post(`${API_BASE}/api/purchase-orders/${po.purchaseOrder.id}/actions/request-amendment`, {
-      headers: { Authorization: `Bearer ${supplierToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${supplierToken}` }),
       data: { payload: { reason: "Qty change", proposedLines: [{ description: "w", quantity: 2, unitPrice: 5 }] } },
     });
     expect(first.ok()).toBeTruthy();
     const dup = await req.post(`${API_BASE}/api/purchase-orders/${po.purchaseOrder.id}/actions/request-amendment`, {
-      headers: { Authorization: `Bearer ${supplierToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${supplierToken}` }),
       data: { payload: { reason: "Again" } },
     });
     expect(dup.status()).toBe(409);
   });
 
   test("Payments stub — create intent and status", async () => {
+    test.setTimeout(120_000);
     const req = await newRequest();
     const ts = Date.now();
     const { id: rfqId } = await setupSubmittedRfq(req, buyerToken, `E2E Pay ${ts}`);
     await assignAndPublish(req, adminToken, rfqId, [USERS.supA1.email]);
     await req.post(`${API_BASE}/api/rfq/${rfqId}/quotations`, {
-      headers: { Authorization: `Bearer ${supplierToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${supplierToken}` }),
       data: { currency: "USD", lineItems: [{ position: 1, description: "w", quantity: 1, unitPrice: 5 }] },
     });
     await closeQuotationsAndStartEvaluation(req, buyerToken, rfqId);
     const quotes = await req.get(`${API_BASE}/api/rfq/${rfqId}/quotations`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
     }).then((r) => r.json()) as Array<{ id: string }>;
     await req.post(`${API_BASE}/api/rfq/${rfqId}/actions/select-supplier`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
       data: { payload: { quotationId: quotes[0].id, supplierUserId: supplierId, rationale: "x" } },
     });
     await req.post(`${API_BASE}/api/rfq/${rfqId}/actions/request-proforma`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
       data: { payload: {} },
     });
     const fd = new FormData();
     fd.append("file", new Blob([Buffer.from("x")], { type: "application/pdf" }), "p.pdf");
     const up = await fetch(`${API_BASE}/api/rfq/${rfqId}/attachments`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${supplierToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${supplierToken}` }),
       body: fd as unknown as BodyInit,
     });
     const upJson = await up.json() as { id: string };
     await req.post(`${API_BASE}/api/rfq/${rfqId}/actions/submit-proforma`, {
-      headers: { Authorization: `Bearer ${supplierToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${supplierToken}` }),
       data: { payload: { proformaFileUrl: `${API_BASE}/api/rfq/${rfqId}/attachments/${upJson.id}` } },
     });
     await req.post(`${API_BASE}/api/rfq/${rfqId}/actions/approve-proforma`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
       data: { payload: {} },
     });
     await req.post(`${API_BASE}/api/rfq/${rfqId}/actions/issue-po`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
       data: { payload: {} },
     });
     const orders = await req.get(`${API_BASE}/api/rfq/${rfqId}/spawned-orders`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
     }).then((r) => r.json()) as Array<{ id: string }>;
     const orderId = orders[0].id;
 
     const intent = await req.post(`${API_BASE}/api/payments/orders/${orderId}/intents`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
       data: { amount: 100, currency: "USD", description: "E2E payment" },
     });
     expect(intent.status()).toBe(201);
     const body = await intent.json() as { id: string; status: string };
     expect(body.status).toBe("pending");
     const status = await req.get(`${API_BASE}/api/payments/intents/${body.id}`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
     });
     expect(status.ok()).toBeTruthy();
-    const webhook = await req.post(`${API_BASE}/api/payments/webhook`, {
-      data: { intentId: body.id, status: "succeeded" },
-    });
+    const webhookPayload = {
+      intentId: body.id,
+      status: "succeeded",
+      eventId: `e2e-pay-${body.id}-${Date.now()}`,
+    };
+    const webhook = await postSignedPaymentWebhook(req, webhookPayload, E2E_PAYMENT_WEBHOOK_SECRET);
     expect(webhook.ok()).toBeTruthy();
+    const webhookDup = await postSignedPaymentWebhook(req, webhookPayload, E2E_PAYMENT_WEBHOOK_SECRET);
+    expect(webhookDup.ok()).toBeTruthy();
+    const dupBody = await webhookDup.json() as { duplicate?: boolean };
+    expect(dupBody.duplicate).toBe(true);
+
+    const badSig = await req.post(`${API_BASE}/api/payments/webhook`, {
+      headers: {
+        "Content-Type": "application/json",
+        "X-Demaxtore-Signature": "sha256=invalid",
+      },
+      data: JSON.stringify(webhookPayload),
+    });
+    expect(badSig.status()).toBe(401);
     const after = await req.get(`${API_BASE}/api/payments/intents/${body.id}`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
     }).then((r) => r.json()) as { status: string };
     expect(after.status).toBe("succeeded");
   });
@@ -566,10 +583,6 @@ test.describe.serial("Production hardening (Sprint D)", () => {
     test.setTimeout(120_000);
     const req = await newRequest();
     const { cbId, lotId } = await setupLiveCommodityBid(req, buyerToken, adminToken, [supplierId], "E2E CB deadline submit");
-    await req.post(`${API_BASE}/api/commoditybid/${cbId}/actions/join-auction`, {
-      headers: { Authorization: `Bearer ${supplierToken}` },
-      data: {},
-    });
     backdateWorkspaceDeadline(cbId);
     const validUntil = new Date(Date.now() + 86400_000).toISOString();
     const res = await submitCommodityBidLot(cbId, lotId, supplierToken, {
@@ -584,10 +597,6 @@ test.describe.serial("Production hardening (Sprint D)", () => {
     test.setTimeout(120_000);
     const req = await newRequest();
     const { cbId, lotId } = await setupLiveCommodityBid(req, buyerToken, adminToken, [supplierId], "E2E CB deadline revise");
-    await req.post(`${API_BASE}/api/commoditybid/${cbId}/actions/join-auction`, {
-      headers: { Authorization: `Bearer ${supplierToken}` },
-      data: {},
-    });
     const validUntil = new Date(Date.now() + 86400_000).toISOString();
     const first = await submitCommodityBidLot(cbId, lotId, supplierToken, {
       unitPrice: 420,
@@ -608,10 +617,6 @@ test.describe.serial("Production hardening (Sprint D)", () => {
     test.setTimeout(120_000);
     const req = await newRequest();
     const { cbId, lotId } = await setupLiveCommodityBid(req, buyerToken, adminToken, [supplierId], "E2E CB currency submit");
-    await req.post(`${API_BASE}/api/commoditybid/${cbId}/actions/join-auction`, {
-      headers: { Authorization: `Bearer ${supplierToken}` },
-      data: {},
-    });
     const validUntil = new Date(Date.now() + 86400_000).toISOString();
     const res = await submitCommodityBidLot(cbId, lotId, supplierToken, {
       unitPrice: 415,
@@ -626,10 +631,6 @@ test.describe.serial("Production hardening (Sprint D)", () => {
     test.setTimeout(120_000);
     const req = await newRequest();
     const { cbId, lotId } = await setupLiveCommodityBid(req, buyerToken, adminToken, [supplierId], "E2E CB currency revise");
-    await req.post(`${API_BASE}/api/commoditybid/${cbId}/actions/join-auction`, {
-      headers: { Authorization: `Bearer ${supplierToken}` },
-      data: {},
-    });
     const validUntil = new Date(Date.now() + 86400_000).toISOString();
     const first = await submitCommodityBidLot(cbId, lotId, supplierToken, {
       unitPrice: 418,
@@ -656,12 +657,12 @@ test.describe.serial("Production hardening (Sprint D)", () => {
     }, "E2E PO approve");
     const proposedLines = [{ description: "widget amended", quantity: 22, unitPrice: 44 }];
     const reqAmend = await req.post(`${API_BASE}/api/purchase-orders/${boot.poId}/actions/request-amendment`, {
-      headers: { Authorization: `Bearer ${supplierToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${supplierToken}` }),
       data: { payload: { reason: "Qty and price change", proposedLines } },
     });
     expect(reqAmend.ok()).toBeTruthy();
     const before = await req.get(`${API_BASE}/api/purchase-orders/${boot.poId}`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
     }).then((r) => r.json()) as {
       amendments: Array<{ id: string; status: string }>;
       revisions: Array<{ revisionNumber: number }>;
@@ -671,7 +672,7 @@ test.describe.serial("Production hardening (Sprint D)", () => {
     const revCountBefore = before.revisions.length;
 
     const approve = await req.post(`${API_BASE}/api/purchase-orders/${boot.poId}/actions/approve-amendment`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
       data: {
         payload: {
           amendmentId: open!.id,
@@ -682,7 +683,7 @@ test.describe.serial("Production hardening (Sprint D)", () => {
     expect(approve.ok()).toBeTruthy();
 
     const after = await req.get(`${API_BASE}/api/purchase-orders/${boot.poId}`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
     }).then((r) => r.json()) as {
       purchaseOrder: { status: string };
       lines: Array<{ description: string; quantity: number; unitPrice: number }>;
@@ -710,7 +711,7 @@ test.describe.serial("Production hardening (Sprint D)", () => {
       supplierId,
     }, "E2E PO reject");
     const before = await req.get(`${API_BASE}/api/purchase-orders/${boot.poId}`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
     }).then((r) => r.json()) as {
       purchaseOrder: { status: string };
       lines: Array<{ description: string; quantity: number }>;
@@ -719,7 +720,7 @@ test.describe.serial("Production hardening (Sprint D)", () => {
     const baselineLines = before.lines.map((l) => ({ description: l.description, quantity: l.quantity }));
 
     const reqAmend = await req.post(`${API_BASE}/api/purchase-orders/${boot.poId}/actions/request-amendment`, {
-      headers: { Authorization: `Bearer ${supplierToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${supplierToken}` }),
       data: {
         payload: {
           reason: "Reject path test",
@@ -729,18 +730,18 @@ test.describe.serial("Production hardening (Sprint D)", () => {
     });
     expect(reqAmend.ok()).toBeTruthy();
     const open = await req.get(`${API_BASE}/api/purchase-orders/${boot.poId}`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
     }).then((r) => r.json()) as { amendments: Array<{ id: string; status: string }> };
     const amendmentId = open.amendments.find((a) => a.status === "OPEN")!.id;
 
     const reject = await req.post(`${API_BASE}/api/purchase-orders/${boot.poId}/actions/reject-amendment`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
       data: { payload: { amendmentId, reason: "Not acceptable" } },
     });
     expect(reject.ok()).toBeTruthy();
 
     const after = await req.get(`${API_BASE}/api/purchase-orders/${boot.poId}`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
     }).then((r) => r.json()) as {
       purchaseOrder: { status: string };
       lines: Array<{ description: string; quantity: number }>;
@@ -757,7 +758,7 @@ test.describe.serial("Production hardening (Sprint D)", () => {
     const { id: rfqId } = await setupSubmittedRfq(req, buyerToken, `E2E QuoteVal ${Date.now()}`);
     await assignAndPublish(req, adminToken, rfqId, [USERS.supA1.email]);
     const bad = await req.post(`${API_BASE}/api/rfq/${rfqId}/quotations`, {
-      headers: { Authorization: `Bearer ${supplierToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${supplierToken}` }),
       data: { currency: "USD", lineItems: [] },
     });
     expect([400, 422]).toContain(bad.status());
@@ -765,15 +766,15 @@ test.describe.serial("Production hardening (Sprint D)", () => {
     expect(body.error?.code).toBeTruthy();
 
     await req.post(`${API_BASE}/api/rfq/${rfqId}/quotations`, {
-      headers: { Authorization: `Bearer ${supplierToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${supplierToken}` }),
       data: { currency: "USD", lineItems: [{ position: 1, description: "ok", quantity: 1, unitPrice: 5 }] },
     });
     await closeQuotationsAndStartEvaluation(req, buyerToken, rfqId);
     const quotes = await req.get(`${API_BASE}/api/rfq/${rfqId}/quotations`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
     }).then((r) => r.json()) as Array<{ id: string }>;
     const mismatch = await req.post(`${API_BASE}/api/rfq/${rfqId}/actions/select-supplier`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
       data: { payload: { quotationId: quotes[0].id, supplierUserId: supBId, rationale: "wrong supplier" } },
     });
     await expectDomainError(mismatch, [400, 404, 409], [
@@ -789,7 +790,7 @@ test.describe.serial("Production hardening (Sprint D)", () => {
     const { id: rfqId } = await setupSubmittedRfq(req, buyerToken, `E2E RoleQuote ${Date.now()}`);
     await assignAndPublish(req, adminToken, rfqId, [USERS.supA1.email]);
     const res = await req.post(`${API_BASE}/api/rfq/${rfqId}/quotations`, {
-      headers: { Authorization: `Bearer ${buyerToken}` },
+      headers: e2eHeaders({ Authorization: `Bearer ${buyerToken}` }),
       data: { currency: "USD", lineItems: [{ position: 1, description: "w", quantity: 1, unitPrice: 9 }] },
     });
     expect(res.status()).toBe(403);

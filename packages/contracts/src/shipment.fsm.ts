@@ -20,9 +20,11 @@ export type ShipmentState =
   | "ARRIVED_DESTINATION_PORT"
   | "CUSTOMS_CLEARANCE"
   | "READY_FOR_DELIVERY"
+  | "PARTIALLY_DELIVERED"
   | "DELIVERED"
   | "COMPLETED"
   | "CANCELLED"
+  | "REJECTED"
   | "EXCEPTION";
 
 export type ShipmentAction =
@@ -37,7 +39,9 @@ export type ShipmentAction =
   | "start_customs"
   | "complete_customs"
   | "ready_delivery"
+  | "confirm_partial_delivery"
   | "confirm_delivery"
+  | "reject_shipment"
   | "complete_shipment"
   | "report_exception"
   | "resolve_exception"
@@ -71,6 +75,7 @@ export const SHIPMENT_ACTIVE_STATES: ShipmentState[] = [
   "ARRIVED_DESTINATION_PORT",
   "CUSTOMS_CLEARANCE",
   "READY_FOR_DELIVERY",
+  "PARTIALLY_DELIVERED",
   "DELIVERED",
 ];
 
@@ -140,6 +145,26 @@ export const SHIPMENT_TRANSITIONS: ShipmentTransition[] = [
     auditEvent: "shipment.delivered",
     notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "SUCCESS", titleKey: "shipment.delivered" }] },
 
+  { from: "READY_FOR_DELIVERY", to: "PARTIALLY_DELIVERED", action: "confirm_partial_delivery",
+    allowedRoles: ["BUYER"], requiredParticipant: "OWNER",
+    preconditions: ["assertPartialDeliveryPayload"],
+    auditEvent: "shipment.partially_delivered",
+    notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "INFO", titleKey: "shipment.partially_delivered" }] },
+  { from: "READY_FOR_DELIVERY", to: "PARTIALLY_DELIVERED", action: "confirm_partial_delivery",
+    allowedRoles: ["ADMIN"],
+    preconditions: ["assertPartialDeliveryPayload"],
+    auditEvent: "shipment.partially_delivered",
+    notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "INFO", titleKey: "shipment.partially_delivered" }] },
+
+  { from: "PARTIALLY_DELIVERED", to: "DELIVERED", action: "confirm_delivery",
+    allowedRoles: ["BUYER"], requiredParticipant: "OWNER",
+    auditEvent: "shipment.delivered",
+    notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "SUCCESS", titleKey: "shipment.delivered" }] },
+  { from: "PARTIALLY_DELIVERED", to: "DELIVERED", action: "confirm_delivery",
+    allowedRoles: ["ADMIN"],
+    auditEvent: "shipment.delivered",
+    notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "SUCCESS", titleKey: "shipment.delivered" }] },
+
   { from: "DELIVERED", to: "COMPLETED", action: "complete_shipment",
     allowedRoles: ["ADMIN"], auditEvent: "shipment.completed",
     notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "SUCCESS", titleKey: "shipment.completed" }] },
@@ -161,13 +186,23 @@ export const SHIPMENT_TRANSITIONS: ShipmentTransition[] = [
     auditEvent: "shipment.cancelled",
     notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "WARNING", titleKey: "shipment.cancelled" }] },
 
+  { from: "ANY_ACTIVE", to: "REJECTED", action: "reject_shipment",
+    allowedRoles: ["BUYER", "ADMIN"], requiresReason: true,
+    auditEvent: "shipment.rejected",
+    notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "WARNING", titleKey: "shipment.rejected" }] },
+
   { from: "ANY_ACTIVE", to: "SHIPMENT_CREATED", action: "upload_document",
     allowedRoles: ["BUYER", "SUPPLIER", "ADMIN"],
     preconditions: ["assertDocumentUpload"],
     auditEvent: "shipment.document.uploaded", notifyRecipients: [] },
 ];
 
-export const SHIPMENT_TERMINAL_STATES: ShipmentState[] = ["COMPLETED", "CANCELLED"];
+export const SHIPMENT_TERMINAL_STATES: ShipmentState[] = ["COMPLETED", "CANCELLED", "REJECTED"];
+
+export const SHIPMENT_SELF_LOOP_ACTIONS: ShipmentAction[] = [
+  "upload_document",
+  "ready_delivery",
+];
 
 export function isShipmentTerminal(state: ShipmentState): boolean {
   return SHIPMENT_TERMINAL_STATES.includes(state);

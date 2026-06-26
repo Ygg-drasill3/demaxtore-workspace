@@ -1,6 +1,6 @@
 # Backlog — Test Infrastructure Hardening
 
-Items deferred from Sprint D Faz 4. Isolated from production feature work; address in a dedicated infra sprint.
+Items deferred from Sprint D Faz 4. Sprint E (Mini) addressed several items — see status below.
 
 ---
 
@@ -8,10 +8,11 @@ Items deferred from Sprint D Faz 4. Isolated from production feature work; addre
 
 | Field | Detail |
 |-------|--------|
-| **Problem** | `commoditybid.scheduler.test.ts` and `commoditybid.sealed-bid.test.ts` call live HTTP endpoints and receive 404 on workspace create. Vitest does not start or align with the API server port (`E2E_API_URL` / default 3001 vs test default). |
-| **Impact** | `yarn workspace @dmx/backend test` fails even when unit logic is correct. CI cannot gate on full backend test suite without flaky or skipped HTTP suites. |
-| **Proposed fix** | Standardise test bootstrap: read `TEST_API_BASE` from env, document in `apps/backend/README` or vitest setup; optionally spin up in-process Express app for HTTP integration tests instead of external server. Mark HTTP suites with explicit `@integration` tag and separate npm script. |
-| **Priority** | **High** — blocks reliable CI for backend |
+| **Status** | ✅ **Resolved (Sprint E)** |
+| **Problem** | `commoditybid.scheduler.test.ts` and `commoditybid.sealed-bid.test.ts` defaulted to `http://localhost:8001` while CI/E2E use port **3001**, causing 404 when no server listened on 8001. |
+| **Root cause** | Hard-coded legacy port in `TEST_API_URL` fallback; vitest did not start or probe an API server. |
+| **Fix** | `src/test/integration-http.ts` resolves `TEST_API_URL` → `E2E_API_URL` → `http://127.0.0.1:3001`; `vitest.global-setup.ts` probes `/api/healthz` and spawns backend if needed; CI sets `TEST_API_URL`. |
+| **Priority** | ~~High~~ Done |
 
 ---
 
@@ -19,10 +20,11 @@ Items deferred from Sprint D Faz 4. Isolated from production feature work; addre
 
 | Field | Detail |
 |-------|--------|
-| **Problem** | Advisory lock test `allows only one concurrent holder` intermittently observes `innerRuns === 2` instead of 1 under parallel load or shared DB state. |
-| **Impact** | `yarn workspace @dmx/backend test:unit` is non-deterministic; false failures in CI and local dev. |
-| **Proposed fix** | Use isolated DB connection per test, increase lock hold duration in test, or run lock tests serially (`describe.sequential` + dedicated schema). Consider mocking `pg_advisory_lock` for unit layer and one true integration test in CI only. |
-| **Priority** | **Medium** — unit suite reliability |
+| **Status** | ✅ **Resolved (Sprint E)** |
+| **Problem** | Parallel `Promise.all` allowed second acquirer to run after first released lock (`innerRuns === 2`). |
+| **Root cause** | Test measured concurrent exclusion but both tasks could succeed sequentially when first finished before second attempted `try_advisory_lock`. |
+| **Fix** | Hold first lock until explicit release; poll until first holder enters; assert second returns `false` while first holds; verify third acquire after release. |
+| **Priority** | ~~Medium~~ Done |
 
 ---
 
@@ -30,10 +32,11 @@ Items deferred from Sprint D Faz 4. Isolated from production feature work; addre
 
 | Field | Detail |
 |-------|--------|
-| **Problem** | `setupLiveCommodityBid` polls admin scheduler tick until `LIVE` (~3–40 attempts × 1.5s). Slow CI hosts or scheduler backlog can exceed default Playwright timeout. |
-| **Impact** | Production hardening spec (`39-production-hardening.spec.ts`) CommodityBid tests may flake in CI despite passing locally. |
-| **Proposed fix** | Reduce poll interval when `NODE_ENV=test`; add admin test hook to force `auction_started` without wall-clock wait; increase `test.setTimeout` only for CB describe block; cache LIVE workspace in serial suite where safe. |
-| **Priority** | **Medium** — E2E stability |
+| **Status** | ✅ **Resolved (Sprint E)** |
+| **Problem** | `waitForCommodityBidLive` polled up to 40×1.5s waiting for wall-clock auction start. |
+| **Root cause** | Real-time scheduler dependency for SCHEDULED → LIVE transition. |
+| **Fix** | `e2e-force-cb-auction-live.mjs` + `commoditybid-test-utils.ts` backdate invitation/start clocks; scheduler ticks advance to LIVE without wall-clock wait. Removed invalid `join-auction` calls when already LIVE. |
+| **Priority** | ~~Medium~~ Done |
 
 ---
 
@@ -41,10 +44,11 @@ Items deferred from Sprint D Faz 4. Isolated from production feature work; addre
 
 | Field | Detail |
 |-------|--------|
-| **Problem** | CommodityBid deadline guard tests call `e2e-backdate-workspace-deadline.mjs` via `execSync`, requiring direct Prisma/DB access from Playwright runner and correct `E2E_REPO_ROOT` / cwd. |
-| **Impact** | Tests fail in environments without DB credentials on the E2E runner, or when cwd differs from monorepo root. Not pure HTTP E2E. |
-| **Proposed fix** | Replace script with admin-only test endpoint (`POST /api/admin/test/backdate-deadline`) gated by `NODE_ENV=test`, or use Prisma in Playwright globalSetup with shared helper module instead of shell exec. |
-| **Priority** | **Low–Medium** — portability and CI setup complexity |
+| **Status** | 🟡 **Partially mitigated** |
+| **Problem** | Deadline guard E2E uses `e2e-backdate-workspace-deadline.mjs` via `execSync` (requires DB access from Playwright runner). |
+| **Impact** | CI must run E2E on same host as Postgres with `apps/backend` cwd; not pure HTTP. |
+| **Proposed fix** | Admin test-only endpoint gated by `NODE_ENV=test` (future). |
+| **Priority** | Low–Medium |
 
 ---
 
@@ -52,15 +56,22 @@ Items deferred from Sprint D Faz 4. Isolated from production feature work; addre
 
 | Field | Detail |
 |-------|--------|
-| **Problem** | Sprint D validation did not include `yarn workspace @dmx/frontend lint`. Lint debt in frontend may be unrelated to Sprint D but is unknown. |
-| **Impact** | Pre-commit/CI may fail on lint when enabled; undetected style and a11y issues in RFQ and workspace UI. |
-| **Proposed fix** | Add lint to Sprint D smoke checklist; run `yarn workspace @dmx/frontend lint` in CI pipeline; fix or baseline existing violations in a separate PR. |
-| **Priority** | **Low** — quality gate, not blocking Sprint D runtime |
+| **Status** | ✅ **Resolved (Sprint E)** |
+| **Problem** | `eslint` binary not in `@dmx/frontend` devDependencies; `yarn lint` exited 127. |
+| **Fix** | Added `eslint`, `typescript-eslint`, React plugins, and `eslint.config.js` with baseline rules (`no-explicit-any` → warn for legacy debt). |
+| **Result** | `yarn workspace @dmx/frontend lint` **PASS** (warnings only, no errors). |
+| **Priority** | ~~Low~~ Done |
 
 ---
 
-## Related Sprint D artifacts (in scope, validated)
+## Sprint E validation snapshot
 
-- `apps/e2e/tests/39-production-hardening.spec.ts` — 18/18 PASS
-- `winner-engine.test.ts`, `commoditybid.preconditions.test.ts` — PASS
-- `tsc --noEmit`, `prisma migrate status` — PASS
+| Check | Result |
+|-------|--------|
+| `yarn workspace @dmx/backend test` | **PASS** — 20/20 |
+| `yarn workspace @dmx/backend test:unit` | **PASS** — 14/14 |
+| `yarn workspace @dmx/backend tsc --noEmit` | **PASS** |
+| `yarn workspace @dmx/frontend typecheck` | **PASS** |
+| `yarn workspace @dmx/frontend build` | **PASS** |
+| `39-production-hardening.spec.ts` | **PASS** — 18/18 (after deadline backdate fix) |
+| `yarn workspace @dmx/frontend lint` | **PASS** — 0 errors, 46 warnings (legacy `any` debt) |

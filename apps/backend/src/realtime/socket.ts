@@ -8,7 +8,8 @@ import { verifyAccessToken } from "../modules/auth/jwt.js";
 import { corsOrigins } from "../config/env.js";
 import { logger } from "../config/logger.js";
 import { canAccessWorkspace } from "../modules/workspace/workspace.policy.js";
-import { checkSocketHandshakeLimit } from "../middleware/rate-limit.js";
+import { checkSocketHandshakeLimitAsync } from "../middleware/rate-limit.js";
+import { isValidE2eSecretValue } from "../middleware/e2e-bypass.js";
 import { prisma } from "../db/prisma.js";
 import type { Role } from "@prisma/client";
 
@@ -33,11 +34,19 @@ export async function initSocket(http: HttpServer): Promise<SocketServer> {
 
   // ── Handshake auth: accessToken in `auth.token` or `Authorization: Bearer`. ─
   io.use((socket, next) => {
-    const ip = socket.handshake.address ?? "unknown";
-    if (!checkSocketHandshakeLimit(ip)) {
-      return next(new Error("RATE_LIMITED"));
+    const e2eSecret = socket.handshake.auth?.e2eSecret as string | undefined;
+    if (isValidE2eSecretValue(e2eSecret)) {
+      next();
+      return;
     }
+    const ip = socket.handshake.address ?? "unknown";
+    void checkSocketHandshakeLimitAsync(ip).then((ok) => {
+      if (!ok) return next(new Error("RATE_LIMITED"));
+      next();
+    }).catch(() => next(new Error("RATE_LIMITED")));
+  });
 
+  io.use((socket, next) => {
     const token =
       (socket.handshake.auth?.token as string | undefined) ??
       (socket.handshake.headers.authorization?.startsWith("Bearer ")

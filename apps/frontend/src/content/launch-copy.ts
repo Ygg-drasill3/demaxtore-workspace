@@ -1,0 +1,70 @@
+/**
+ * Launch Readiness — customer-facing copy (no business logic).
+ * Source of truth for onboarding panels and welcome messaging.
+ */
+
+export const BUYER_ONBOARDING = {
+  sectionTitle: "Your first import trade",
+  sectionSubtitle: {
+    firstTrade: "We'll walk you through RFQ → award → PO → shipment in one auditable workspace.",
+    experienced: "Guided checklist — expand when onboarding a new category or team member.",
+  },
+  welcomeTitle: "Welcome to your sourcing command center",
+  welcomeBody:
+    "DeMaxtore replaces email threads and spreadsheets with structured RFQs, sealed CommodityBid auctions, and container programmes — all tied to purchase orders and live shipment tracking.",
+  steps: [
+    { key: "create_rfq", label: "Create RFQ", hint: "Define products, quantities, and incoterms in a workspace." },
+    { key: "receive_quotation", label: "Receive quotations", hint: "Invited suppliers submit comparable bids in one place." },
+    { key: "select_supplier", label: "Award supplier", hint: "Compare price, lead time, and terms with a full audit trail." },
+    { key: "issue_po", label: "Issue purchase order", hint: "PO spawns automatically — no re-keying into ERP." },
+    { key: "track_shipment", label: "Track shipment", hint: "Freight selection links to maritime tracking and exceptions." },
+    { key: "complete_trade", label: "Close the trade", hint: "Documents approved, delivery confirmed, trade archived." },
+  ],
+  ctaLearning: "Open Learning Center",
+  ctaRfq: "Create your first RFQ",
+} as const;
+
+export const SUPPLIER_ONBOARDING = {
+  sectionTitle: "Supplier workspace guide",
+  sectionSubtitle: {
+    newSupplier: "You've been invited to quote — here's how to win and execute on DeMaxtore.",
+    active: "Quick reference for invitations, PO acknowledgement, and document uploads.",
+  },
+  welcomeTitle: "Respond faster. Execute with clarity.",
+  welcomeBody:
+    "Buyers run structured RFQs and sealed auctions on DeMaxtore. You see only workspaces you're invited to — submit quotations, acknowledge POs, and upload compliance documents in one hub.",
+  steps: [
+    { key: "receive_invitation", label: "Receive invitation", hint: "RFQ or CommodityBid invite appears in your dashboard." },
+    { key: "submit_offer", label: "Submit your offer", hint: "Quote line items or bid lots before the deadline." },
+    { key: "accept_order", label: "Acknowledge PO", hint: "Confirm acceptance or flag issues within SLA." },
+    { key: "upload_documents", label: "Upload documents", hint: "Proforma, certificates, and shipping docs per checklist." },
+    { key: "complete_shipment", label: "Complete shipment", hint: "Coordinate production and hand-off to freight." },
+  ],
+  ctaLearning: "Supplier learning guides",
+  ctaRfq: "View open opportunities",
+} as const;
+
+export const LANDING_COPY = {
+  eyebrow: "B2B Sourcing & Import Operating Platform",
+  headline: "Run global sourcing like an operating system — not an inbox.",
+  subhead:
+    "RFQs, reverse auctions, mixed containers, purchase orders, freight, and shipment tracking — one workspace, one timeline, one state machine.",
+  pillars: [
+    {
+      title: "Structured sourcing",
+      body: "RFQ, CommodityBid, SmartContainer, and BulkContainer programmes with supplier governance built in.",
+    },
+    {
+      title: "Award to execution",
+      body: "PO issuance, order workspaces, FreightIQ sailings, and shipment visibility without spreadsheet handoffs.",
+    },
+    {
+      title: "Operations control",
+      body: "Control Tower alerts for late acknowledgements, ETA drift, and document gaps — before customers escalate.",
+    },
+  ],
+  proof: "Trusted workflow for importers, distributors, and DeMaxtore operations teams.",
+  ctaPrimary: "Sign in to workspace",
+  ctaSecondary: "See demo environment",
+  demoNote: "Sandbox accounts available — ask your DeMaxtore contact or use seeded demo logins.",
+} as const;

@@ -59,14 +59,51 @@ const EnvSchema = z.object({
 
   // ── Socket.io scale (Sprint D) ─────────────────────────────────────────────
   SOCKET_ADAPTER: z.enum(["memory", "redis"]).default("memory"),
-  REDIS_URL:      z.string().optional(),
+  REDIS_URL:      z.string().default("redis://127.0.0.1:6379"),
+  SENTRY_DSN:     z.string().optional(),
+  APP_VERSION:    z.string().default("0.2.0"),
 
   // ── External panel SSO bridges ───────────────────────────────────────────────
   WORKSPACE_BRIDGE_SECRET: z.string().optional(),
   FREIGHTIQ_PANEL_URL:     z.string().default("https://freightiq.demaxtore.com"),
   FREIGHTIQ_API_URL:       z.string().default("http://127.0.0.1:8000"),
   COMMODITYBID_PANEL_URL:  z.string().default("https://commoditybid.demaxtore.com"),
+  COMMODITYBID_CREATE_PATH: z.string().optional(),
+  COMMODITYBID_API_URL:    z.string().optional(),
   CATALOG_RFQ_INGEST_TOKEN: z.string().optional(),
+
+  // ── Faz 1 webhooks ──────────────────────────────────────────────────────────
+  PAYMENT_WEBHOOK_SECRET: z.string().optional(),
+  PAYMENT_WEBHOOK_ENFORCE_HMAC: z.coerce.boolean().optional(),
+  CARRIER_WEBHOOK_SECRET: z.string().optional(),
+  CARRIER_WEBHOOK_ENFORCE_HMAC: z.coerce.boolean().optional(),
+
+  // ── Faz 2 orchestrator ──────────────────────────────────────────────────────
+  FSM_ORCHESTRATOR_ENABLED: z.coerce.boolean().optional(),
+  FSM_ORCHESTRATOR_SHADOW_MODE: z.coerce.boolean().optional(),
+  FSM_ORCHESTRATOR_AUTO_APPLY: z.coerce.boolean().optional(),
+
+  // ── Faz 3–6 feature flags ───────────────────────────────────────────────────
+  PAYMENT_GATES_ENABLED: z.coerce.boolean().optional(),
+  CARRIER_AUTO_TRANSITION_ENABLED: z.coerce.boolean().optional(),
+  INCOTERMS_PRECONDITIONS_ENABLED: z.coerce.boolean().optional(),
+  EXCEPTION_ENGINE_V2_ENABLED: z.coerce.boolean().optional(),
+  RBAC_EXPANDED_ROLES_ENABLED: z.coerce.boolean().optional(),
+  WHATSAPP_ACCESS_TOKEN:     z.string().optional(),
+  WHATSAPP_PHONE_NUMBER_ID:  z.string().optional(),
+  WHATSAPP_VERIFY_TOKEN:     z.string().optional(),
+  WHATSAPP_APP_SECRET:       z.string().optional(),
+  WHATSAPP_API_VERSION:      z.string().default("v21.0"),
+
+  /** Server-side E2E bypass — requests must send X-E2E-Test-Secret matching this value. */
+  E2E_TEST_SECRET: z.string().min(32).optional(),
+});
+
+const ProdSecretSchema = z.object({
+  WORKSPACE_BRIDGE_SECRET: z.string().min(32),
+  CATALOG_RFQ_INGEST_TOKEN: z.string().min(32),
+  WHATSAPP_APP_SECRET: z.string().min(32),
+  REDIS_URL: z.string().min(1),
 });
 
 const parsed = EnvSchema.safeParse(process.env);
@@ -75,8 +112,24 @@ if (!parsed.success) {
   process.exit(1);
 }
 
+if (parsed.data.NODE_ENV === "production") {
+  const prodCheck = ProdSecretSchema.safeParse(parsed.data);
+  if (!prodCheck.success) {
+    console.error("✗ Production secrets missing or too short:", prodCheck.error.flatten().fieldErrors);
+    process.exit(1);
+  }
+}
+
 export const env = parsed.data;
 export const isProd = env.NODE_ENV === "production";
 
-/** CORS origins split on comma; first is canonical. */
-export const corsOrigins = env.CORS_ORIGIN.split(",").map((s) => s.trim()).filter(Boolean);
+/** CORS origins — workspace app + embedded external panels (FreightIQ, CommodityBid). */
+export const corsOrigins = [
+  ...new Set(
+    [
+      ...env.CORS_ORIGIN.split(",").map((s) => s.trim()).filter(Boolean),
+      env.FREIGHTIQ_PANEL_URL.replace(/\/$/, ""),
+      env.COMMODITYBID_PANEL_URL.replace(/\/$/, ""),
+    ].filter(Boolean),
+  ),
+];

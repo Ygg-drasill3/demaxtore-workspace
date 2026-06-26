@@ -15,7 +15,18 @@ export function getSocketAdapterStatus(): { adapter: SocketAdapterKind; redisCon
 export async function configureSocketAdapter(io: SocketServer): Promise<void> {
   if (env.SOCKET_ADAPTER !== "redis") {
     adapterKind = "memory";
-    logger.info("Socket.io using in-memory adapter");
+    // H1 safeguard: PM2 sets NODE_APP_INSTANCE per cluster worker. A non-zero
+    // value means we are running in a multi-instance cluster, where the in-memory
+    // adapter silently drops cross-instance realtime events.
+    const clusterInstance = Number(process.env.NODE_APP_INSTANCE ?? "0");
+    if (Number.isFinite(clusterInstance) && clusterInstance > 0) {
+      logger.error(
+        { clusterInstance },
+        "Socket.io in-memory adapter running in a multi-instance cluster — realtime events WILL be dropped across instances. Set SOCKET_ADAPTER=redis + REDIS_URL or run a single instance.",
+      );
+    } else {
+      logger.info("Socket.io using in-memory adapter");
+    }
     return;
   }
 

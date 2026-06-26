@@ -7,6 +7,7 @@
 //   - collapsed (state ≥ SUPPLIER_SELECTED) → winner card with expandable others
 //
 import { useState, useMemo } from "react";
+import { useRfqTimeline } from "../hooks";
 import { Card, CardHeader, CardTitle, CardEyebrow, CardBody, CardFooter } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/SkeletonLoader";
@@ -37,7 +38,17 @@ const SHOW_PANEL_STATES = new Set<RfqState>([
 
 export function QuotationComparisonPanel(props: Props) {
   const { workspaceId, state, selectedQuotationId, isOwner } = props;
-  const { data, isLoading } = useQuotations(SHOW_PANEL_STATES.has(state) ? workspaceId : undefined);
+  const { data, isLoading } = useQuotations(
+    SHOW_PANEL_STATES.has(state) ? workspaceId : undefined,
+    state,
+  );
+  const { data: timeline } = useRfqTimeline(
+    SHOW_PANEL_STATES.has(state) ? workspaceId : undefined,
+  );
+  const revisionHistory = useMemo(
+    () => buildQuotationRevisionHistory(timeline),
+    [timeline],
+  );
 
   if (!SHOW_PANEL_STATES.has(state)) return null;
 
@@ -78,6 +89,7 @@ export function QuotationComparisonPanel(props: Props) {
   return (
     <MatrixPanel
       quotations={quotations}
+      revisionHistory={revisionHistory}
       state={state}
       buyerTargetTotal={props.buyerTargetTotal}
       buyerTargetLeadDays={props.buyerTargetLeadDays}
@@ -119,15 +131,41 @@ type QuotationWithLines = QuotationRowDTO & {
   }>;
 };
 
+type RevisionEntry = { total: number; currency: string; at: string; kind: "SUBMITTED" | "REVISED" };
+
+function buildQuotationRevisionHistory(
+  timeline: unknown,
+): Record<string, RevisionEntry[]> {
+  const events = Array.isArray(timeline) ? timeline : [];
+  const history: Record<string, RevisionEntry[]> = {};
+  for (const raw of events) {
+    const e = raw as { eventType?: string; createdAt?: string; payload?: Record<string, unknown> };
+    if (!e.eventType?.startsWith("quotation.")) continue;
+    const supplierId = String(e.payload?.supplierUserId ?? "");
+    const total = Number(e.payload?.total);
+    if (!supplierId || !Number.isFinite(total)) continue;
+    const list = history[supplierId] ?? [];
+    list.push({
+      total,
+      currency: String(e.payload?.currency ?? "USD"),
+      at: String(e.createdAt ?? new Date().toISOString()),
+      kind: e.eventType === "quotation.revised" ? "REVISED" : "SUBMITTED",
+    });
+    history[supplierId] = list;
+  }
+  return history;
+}
+
 function MatrixPanel(props: {
   quotations: QuotationRowDTO[];
+  revisionHistory: Record<string, RevisionEntry[]>;
   state: RfqState;
   buyerTargetTotal?: number;
   buyerTargetLeadDays?: number;
   workspaceId: string;
   isOwner: boolean;
 }) {
-  const { quotations, state, buyerTargetTotal, buyerTargetLeadDays, workspaceId, isOwner } = props;
+  const { quotations, revisionHistory, state, buyerTargetTotal, buyerTargetLeadDays, workspaceId, isOwner } = props;
   const select = useSelectQuotation(workspaceId);
   const { track } = useTelemetry();
   const [showLineItems, setShowLineItems] = useState(false);
@@ -180,6 +218,7 @@ function MatrixPanel(props: {
               key={q.id}
               quotation={q}
               currency={currency}
+              revisionHistory={revisionHistory[q.supplierId] ?? []}
               isLowest={q.total === lowestTotal}
               isFastest={fastestLead != null && q.leadTimeDays === fastestLead}
               canSelect={canSelect}
@@ -329,13 +368,14 @@ function MatrixPanel(props: {
 function SupplierQuoteCard(props: {
   quotation: QuotationRowDTO;
   currency: string;
+  revisionHistory: RevisionEntry[];
   isLowest: boolean;
   isFastest: boolean;
   canSelect: boolean;
   selectPending: boolean;
   onSelect: () => void;
 }) {
-  const { quotation: q, currency, isLowest, isFastest, canSelect, selectPending, onSelect } = props;
+  const { quotation: q, currency, revisionHistory, isLowest, isFastest, canSelect, selectPending, onSelect } = props;
 
   return (
     <article
@@ -372,6 +412,22 @@ function SupplierQuoteCard(props: {
           <span className="sr-only"> lowest</span>
         )}
       </div>
+
+      {revisionHistory.length > 1 && (
+        <div data-testid={`quote-history-${q.id}`} className="mt-3 rounded-lg bg-paper-50 border border-paper-200 px-3 py-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5">Bid history</p>
+          <ul className="space-y-1">
+            {revisionHistory.map((entry, idx) => (
+              <li key={`${entry.at}-${idx}`} className="flex justify-between gap-2 text-xs text-zinc-600">
+                <span>{entry.kind === "REVISED" ? "Revised" : "Submitted"}</span>
+                <span className="tabular-nums font-medium text-ink-900">
+                  {entry.currency} {entry.total.toLocaleString()}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <dl className="mt-4 space-y-2 text-sm flex-1">
         <MetricLine label="Unit price" value={q.unitPriceAvg != null ? q.unitPriceAvg.toLocaleString() : "—"} />

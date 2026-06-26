@@ -15,6 +15,7 @@ import type {
   SupplierPerformance,
   ActivationMetrics,
 } from "@dmx/contracts/commercial-funnel";
+import type { ProcurementStrategyReport } from "@dmx/contracts/procurement-strategy";
 import { resolveFreightRoute } from "../freightiq/commercial/freight-route.util.js";
 import {
   buildFunnelStages,
@@ -25,6 +26,7 @@ import {
 } from "./growth.analytics.js";
 import { growthAudit } from "./growth-audit.js";
 import { socketBus } from "../../realtime/socket-bus.js";
+import { cached } from "../../lib/response-cache.js";
 import { SocketEvents } from "@dmx/contracts/socket-events";
 
 const DRAFT = "RFQ_DRAFT";
@@ -48,56 +50,48 @@ export class GrowthService {
   constructor(private readonly db: PrismaClient) {}
 
   async getFunnel(): Promise<CommercialFunnel> {
-    const rows = await this.loadRfqFunnelRows();
-    const metrics = this.computeFunnelCounts(rows);
-    await growthAudit(this.db, "growth.report.generated", { report: "funnel" });
-    socketBus.scheduleEmit(() => {
-      socketBus.emitToRole("ADMIN", SocketEvents.GROWTH_FUNNEL_UPDATED, { at: new Date().toISOString() });
+    return cached("growth:funnel", 10 * 60_000, async () => {
+      const rows = await this.loadRfqFunnelRows();
+      const metrics = await this.computeFunnelCounts(rows);
+      await growthAudit(this.db, "growth.report.generated", { report: "funnel" });
+      socketBus.scheduleEmit(() => {
+        socketBus.emitToRole("ADMIN", SocketEvents.GROWTH_FUNNEL_UPDATED, { at: new Date().toISOString() });
+      });
+      return metrics;
     });
-    return metrics;
   }
 
   async getConversion(): Promise<ConversionMetrics> {
-    const f = await this.getFunnel();
-    const by = (s: string) => f.stages.find((x) => x.stage === s)?.count ?? 0;
-    const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 1000) / 10 : 0);
-    return {
-      assignToQuotePercent: pct(by("quotation_submitted"), by("supplier_assigned")),
-      quoteToSelectPercent: pct(by("supplier_selected"), by("quotation_submitted")),
-      rfqToPoPercent: pct(by("po_issued"), by("rfq_created")),
-      poToOrderPercent: pct(by("order_created"), by("po_issued")),
-      orderToShipmentPercent: pct(by("shipment_created"), by("order_created")),
-      shipmentCompletePercent: pct(by("shipment_completed"), by("shipment_created")),
-    };
+    const rows = await this.loadRfqFunnelRows();
+    const f = await this.computeFunnelCounts(rows);
+    return this.conversionFromFunnel(f);
   }
 
   async getDropoffs(): Promise<DropoffMetrics[]> {
-    const f = await this.getFunnel();
-    return f.stages.slice(1).map((stage, i) => {
-      const prev = f.stages[i];
-      const drop = prev.count - stage.count;
-      return {
-        stage: stage.stage,
-        label: `${prev.label} → ${stage.label}`,
-        dropoffCount: Math.max(0, drop),
-        dropoffPercent: stage.dropoffPercent,
-        primaryReason: this.dropoffReason(stage.stage),
-      };
-    });
+    const rows = await this.loadRfqFunnelRows();
+    const f = await this.computeFunnelCounts(rows);
+    return this.dropoffsFromFunnel(f);
   }
 
   async getInsights(): Promise<GrowthInsight> {
-    const [funnel, conversion, dropoffs, buyerActivation, supplierPerformance, categories, routes, repeatCustomers, lostOpportunities, trends] =
+    return cached("growth:insights", 10 * 60_000, () => this.buildInsights());
+  }
+
+  private async buildInsights(): Promise<GrowthInsight> {
+    const rows = await this.loadRfqFunnelRows();
+    const batch = await this.buildFunnelBatchMaps(rows);
+    const funnel = this.computeFunnelCountsWithBatch(rows, batch);
+    const conversion = this.conversionFromFunnel(funnel);
+    const dropoffs = this.dropoffsFromFunnel(funnel);
+    const lostOpportunities = this.buildLostOpportunitiesFromBatch(rows, batch);
+
+    const [buyerActivation, supplierPerformance, categories, routes, repeatCustomers, trends] =
       await Promise.all([
-        this.getFunnel(),
-        this.getConversion(),
-        this.getDropoffs(),
         this.getBuyerActivation(),
         this.getSupplierPerformance(),
         this.getCategoryIntelligence(),
         this.getRouteIntelligence(),
         this.getRepeatCustomers(),
-        this.getLostOpportunities(),
         this.getGrowthTrends(),
       ]);
 
@@ -111,6 +105,7 @@ export class GrowthService {
 
     await growthAudit(this.db, "growth.insight.generated", { buyers: buyerActivation.length });
     socketBus.scheduleEmit(() => {
+      socketBus.emitToRole("ADMIN", SocketEvents.GROWTH_FUNNEL_UPDATED, { at: new Date().toISOString() });
       socketBus.emitToRole("ADMIN", SocketEvents.GROWTH_METRICS_UPDATED, { at: new Date().toISOString() });
     });
 
@@ -395,6 +390,59 @@ export class GrowthService {
     return results.sort((a, b) => b.freightiqRevenueUsd - a.freightiqRevenueUsd);
   }
 
+  async getProcurementStrategy(): Promise<ProcurementStrategyReport> {
+    return cached("growth:procurement-strategy", 10 * 60_000, async () => {
+      const rfqDetails = await this.db.rfqDetails.findMany({
+        select: {
+          procurementMethod: true,
+          poNumber: true,
+          workspace: { select: { id: true, state: true, spawnedFromId: true } },
+        },
+      });
+
+      let directRfqCount = 0;
+      let commodityBidCount = 0;
+      let pendingStrategyCount = 0;
+      let directRfqPoIssued = 0;
+
+      for (const d of rfqDetails) {
+        if (!d.procurementMethod) pendingStrategyCount++;
+        else if (d.procurementMethod === "DIRECT_RFQ") {
+          directRfqCount++;
+          if (d.poNumber || d.workspace.state === "PO_ISSUED") directRfqPoIssued++;
+        } else if (d.procurementMethod === "COMMODITYBID_AUCTION") commodityBidCount++;
+      }
+
+      const cbOrders = await this.db.workspace.count({
+        where: { type: "ORDER", spawnedFrom: { type: "COMMODITYBID" } },
+      });
+
+      const directRfqConversionRate = directRfqCount > 0
+        ? Math.round((directRfqPoIssued / directRfqCount) * 1000) / 10
+        : null;
+      const auctionConversionRate = commodityBidCount > 0
+        ? Math.round((cbOrders / commodityBidCount) * 1000) / 10
+        : null;
+
+      const revenueDirectRfqUsd = directRfqPoIssued * AVG_ORDER_VALUE;
+      const revenueCommodityBidUsd = cbOrders * AVG_ORDER_VALUE;
+
+      await growthAudit(this.db, "growth.report.generated", { report: "procurement-strategy" });
+
+      return {
+        directRfqCount,
+        commodityBidCount,
+        pendingStrategyCount,
+        directRfqPoIssued,
+        commodityBidOrdersSpawned: cbOrders,
+        directRfqConversionRate,
+        auctionConversionRate,
+        revenueDirectRfqUsd,
+        revenueCommodityBidUsd,
+      };
+    });
+  }
+
   async getRepeatCustomers(): Promise<RepeatCustomerMetrics[]> {
     return this.getRepeatCustomersFixed();
   }
@@ -473,24 +521,22 @@ export class GrowthService {
   }
 
   async getLostOpportunities(): Promise<LostOpportunityReport> {
-    const items: LostOpportunityItem[] = [];
     const rows = await this.loadRfqFunnelRows();
+    const batch = await this.buildFunnelBatchMaps(rows);
+    return this.buildLostOpportunitiesFromBatch(rows, batch);
+  }
+
+  private buildLostOpportunitiesFromBatch(
+    rows: RfqRow[],
+    batch: Awaited<ReturnType<GrowthService["buildFunnelBatchMaps"]>>,
+  ): LostOpportunityReport {
+    const items: LostOpportunityItem[] = [];
 
     for (const r of rows) {
-      const assigned = await this.db.supplierAssignment.count({ where: { workspaceId: r.id } });
-      const quotes = await this.db.quotation.count({
-        where: { workspaceId: r.id, status: { not: "WITHDRAWN" } },
-      });
-      const order = await this.db.workspace.findFirst({
-        where: { type: "ORDER", spawnedFromId: r.id },
-        select: { id: true, state: true },
-      });
-      const shipment = order
-        ? await this.db.workspace.findFirst({
-            where: { type: "SHIPMENT", spawnedFromId: order.id },
-            select: { id: true, state: true },
-          })
-        : null;
+      const assigned = batch.assignedCount.get(r.id) ?? 0;
+      const quotes = batch.quoteCount.get(r.id) ?? 0;
+      const order = batch.orderByRfq.get(r.id) ?? null;
+      const shipment = order ? batch.shipmentByOrder.get(order.id) ?? null : null;
 
       const estOrder = AVG_ORDER_VALUE;
       const estFreight = AVG_FREIGHT_MARGIN;
@@ -624,9 +670,20 @@ export class GrowthService {
     });
   }
 
-  private async computeFunnelCounts(rows: RfqRow[]): Promise<CommercialFunnel> {
+  private async buildFunnelBatchMaps(rows: RfqRow[]) {
     const rfqIds = rows.map((r) => r.id);
-    const [assignments, quotes, orders, shipments] = await Promise.all([
+    if (!rfqIds.length) {
+      return {
+        assignedCount: new Map<string, number>(),
+        quoteCount: new Map<string, number>(),
+        orderByRfq: new Map<string, { id: string; state: string; createdAt: Date }>(),
+        shipmentByOrder: new Map<string, { id: string; state: string; createdAt: Date }>(),
+        assignedSet: new Set<string>(),
+        quotedSet: new Set<string>(),
+      };
+    }
+
+    const [assignments, quotes, orders] = await Promise.all([
       this.db.supplierAssignment.groupBy({
         by: ["workspaceId"],
         where: { workspaceId: { in: rfqIds } },
@@ -639,24 +696,80 @@ export class GrowthService {
       }),
       this.db.workspace.findMany({
         where: { type: "ORDER", spawnedFromId: { in: rfqIds } },
-        select: { id: true, spawnedFromId: true, createdAt: true },
-      }),
-      this.db.workspace.findMany({
-        where: { type: "SHIPMENT" },
         select: { id: true, spawnedFromId: true, state: true, createdAt: true },
       }),
     ]);
 
-    const assignedSet = new Set(assignments.map((a) => a.workspaceId));
-    const quotedSet = new Set(quotes.map((q) => q.workspaceId));
-    const orderByRfq = new Map<string, { id: string; createdAt: Date }>();
+    const orderIds = orders.map((o) => o.id);
+    const shipments = orderIds.length
+      ? await this.db.workspace.findMany({
+          where: { type: "SHIPMENT", spawnedFromId: { in: orderIds } },
+          select: { id: true, spawnedFromId: true, state: true, createdAt: true },
+        })
+      : [];
+
+    const assignedCount = new Map<string, number>();
+    for (const a of assignments) assignedCount.set(a.workspaceId, a._count);
+
+    const quoteCount = new Map<string, number>();
+    for (const q of quotes) quoteCount.set(q.workspaceId, q._count);
+
+    const orderByRfq = new Map<string, { id: string; state: string; createdAt: Date }>();
     for (const o of orders) {
-      if (o.spawnedFromId) orderByRfq.set(o.spawnedFromId, { id: o.id, createdAt: o.createdAt });
+      if (o.spawnedFromId) orderByRfq.set(o.spawnedFromId, o);
     }
+
     const shipmentByOrder = new Map<string, { id: string; state: string; createdAt: Date }>();
     for (const s of shipments) {
       if (s.spawnedFromId) shipmentByOrder.set(s.spawnedFromId, s);
     }
+
+    return { assignedCount, quoteCount, orderByRfq, shipmentByOrder, assignedSet: new Set(assignments.map((a) => a.workspaceId)), quotedSet: new Set(quotes.map((q) => q.workspaceId)) };
+  }
+
+  private conversionFromFunnel(f: CommercialFunnel): ConversionMetrics {
+    const by = (s: string) => f.stages.find((x) => x.stage === s)?.count ?? 0;
+    const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 1000) / 10 : 0);
+    return {
+      assignToQuotePercent: pct(by("quotation_submitted"), by("supplier_assigned")),
+      quoteToSelectPercent: pct(by("supplier_selected"), by("quotation_submitted")),
+      rfqToPoPercent: pct(by("po_issued"), by("rfq_created")),
+      poToOrderPercent: pct(by("order_created"), by("po_issued")),
+      orderToShipmentPercent: pct(by("shipment_created"), by("order_created")),
+      shipmentCompletePercent: pct(by("shipment_completed"), by("shipment_created")),
+    };
+  }
+
+  private dropoffsFromFunnel(f: CommercialFunnel): DropoffMetrics[] {
+    return f.stages.slice(1).map((stage, i) => {
+      const prev = f.stages[i];
+      const drop = prev.count - stage.count;
+      return {
+        stage: stage.stage,
+        label: `${prev.label} → ${stage.label}`,
+        dropoffCount: Math.max(0, drop),
+        dropoffPercent: stage.dropoffPercent,
+        primaryReason: this.dropoffReason(stage.stage),
+      };
+    });
+  }
+
+  private async computeFunnelCounts(rows: RfqRow[]): Promise<CommercialFunnel> {
+    const rfqIds = rows.map((r) => r.id);
+    if (!rfqIds.length) {
+      const stages = buildFunnelStages([0, 0, 0, 0, 0, 0, 0, 0, 0], []);
+      return { stages, totalRfqs: 0, overallConversionPercent: 0 };
+    }
+
+    const batch = await this.buildFunnelBatchMaps(rows);
+    return this.computeFunnelCountsWithBatch(rows, batch);
+  }
+
+  private computeFunnelCountsWithBatch(
+    rows: RfqRow[],
+    batch: Awaited<ReturnType<GrowthService["buildFunnelBatchMaps"]>>,
+  ): CommercialFunnel {
+    const { assignedSet, quotedSet, orderByRfq, shipmentByOrder } = batch;
 
     let c0 = 0, c1 = 0, c2 = 0, c3 = 0, c4 = 0, c6 = 0, c7 = 0, c8 = 0;
     const hours: number[][] = [[], [], [], [], [], [], [], [], []];

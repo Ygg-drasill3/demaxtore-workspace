@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build":  "echo \"@dmx/e2e: no compile step\"",
+    "build":      "echo \"@dmx/e2e: no compile step\"",
+    "typecheck":  "echo \"@dmx/e2e: no compile step\"",
     "test":   "playwright test",
     "report": "playwright show-report"
   },
