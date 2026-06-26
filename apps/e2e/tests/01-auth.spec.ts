@@ -11,9 +11,10 @@ test.describe("Auth (UI)", () => {
     await expect(page.getByTestId("operations-command-center")).toBeVisible();
   });
 
-  test("buyer1 logs in and sees the buyer dashboard", async ({ page }) => {
+  test("buyer1 logs in and lands on buyer control tower (ROLE_DASHBOARD)", async ({ page }) => {
     await uiLogin(page, USERS.buyer1);
-    await expect(page.getByTestId("buyer-dashboard")).toBeVisible();
+    await expect(page).toHaveURL(/\/buyer\/control-tower/);
+    await expect(page.getByTestId("import-control-tower")).toBeVisible();
   });
 
   test("supplier1 logs in and sees the supplier dashboard", async ({ page }) => {

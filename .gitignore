@@ -101,17 +101,17 @@ auth_testing.md
 test_result.md
 package-lock.json
 
-# Non-monorepo / legacy trees (not part of reproducible workspace build)
-backend/
-deploy/
-faith/
-frontend/
-legacy/
-memory/
-test-results/
-test_reports/
-tests/
-tools/
+# Non-monorepo / legacy trees at repo root (not apps/frontend or apps/backend)
+/backend/
+/deploy/
+/faith/
+/frontend/
+/legacy/
+/memory/
+/test-results/
+/test_reports/
+/tests/
+/tools/
 design_guidelines.json
 
 # Sprint documentation (local reports — not required for build)

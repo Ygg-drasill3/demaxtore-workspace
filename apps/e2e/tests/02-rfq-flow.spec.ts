@@ -153,7 +153,7 @@ test.describe.serial("RFQ-to-PO flow (Buyer + Admin + Supplier in real browser)"
     await page.goto(`/workspace/rfq/${rfqId}`);
     await expect(page.getByTestId("rfq-workspace")).toBeVisible();
 
-    await page.getByTestId("whn-primary-cta").click();
+    await page.getByTestId("whn-primary-cta-select_supplier").click();
     await expect(page.getByTestId("select-supplier-picker")).toBeVisible();
 
     await page.locator('[data-testid^="quotation-option-"]').first().click();
@@ -211,7 +211,7 @@ test.describe.serial("RFQ-to-PO flow (Buyer + Admin + Supplier in real browser)"
     await expect(page.getByTestId("rfq-workspace")).toBeVisible();
 
     // issue_po is the primary CTA for PROFORMA_APPROVED.
-    await page.getByTestId("whn-primary-cta").click();
+    await page.getByTestId("whn-primary-cta-issue_po").click();
     await expect(page.getByTestId("issue-po-picker")).toBeVisible();
     await page.getByTestId("issue-po-confirm").click();
     await expect(page.getByTestId("issue-po-picker")).toBeHidden({ timeout: 10_000 });

@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "node:path";
 import fs from "node:fs";
@@ -18,12 +18,31 @@ function readBuildInfo() {
   }
 }
 
+function buildInfoPlugin(info: { commitSha: string; branch: string; buildTime: string }): Plugin {
+  const json = JSON.stringify(info, null, 2);
+  return {
+    name: "dmx-build-info",
+    transformIndexHtml(html: string) {
+      const tags = [
+        `<meta name="dmx-commit-sha" content="${info.commitSha}" />`,
+        `<meta name="dmx-branch" content="${info.branch}" />`,
+        `<meta name="dmx-build-time" content="${info.buildTime}" />`,
+      ].join("\n    ");
+      return html.replace("</head>", `    ${tags}\n  </head>`);
+    },
+    generateBundle(this: import("rollup").PluginContext) {
+      this.emitFile({ type: "asset", fileName: "version.json", source: json });
+    },
+  };
+}
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const buildInfo = readBuildInfo();
   return {
   plugins: [
     react(),
+    buildInfoPlugin(buildInfo),
     nodePolyfills({ include: ["buffer", "stream", "util", "process"] }),
     visualizer({ filename: "dist/stats.html", gzipSize: true, open: false }),
   ] as import("vite").PluginOption[],

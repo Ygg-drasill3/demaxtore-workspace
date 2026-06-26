@@ -90,13 +90,24 @@ export const USERS = {
 };
 
 /** Login via UI, asserting we land on the role dashboard. */
-export async function uiLogin(page: Page, creds: Creds): Promise<void> {
+export async function uiLogin(page: Page, creds: Creds, opts?: { force?: boolean }): Promise<void> {
+  if (opts?.force) {
+    await page.context().clearCookies();
+    await page.evaluate(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
+  }
   await page.goto("/login");
   // Wait for hydrate() to finish — if cookies linger from a previous test the
   // app might bounce away from /login before we can interact.
   await waitForHydrate(page);
-  // If hydrate authenticated us already, just leave.
-  if (!page.url().includes("/login")) return;
+  // If hydrate authenticated us already, just leave (unless forcing a new login).
+  if (!opts?.force && !page.url().includes("/login")) return;
+  if (!page.url().includes("/login")) {
+    await page.goto("/login");
+    await waitForHydrate(page);
+  }
   await page.getByTestId("login-email").fill(creds.email);
   await page.getByTestId("login-password").fill(creds.password);
   await page.getByTestId("login-submit").click();

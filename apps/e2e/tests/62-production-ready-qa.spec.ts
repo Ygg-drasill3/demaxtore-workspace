@@ -114,9 +114,11 @@ test.describe("Production-ready QA", () => {
     expect(sock.connected).toBe(true);
     sock.disconnect();
 
-    const refresh = await page.request.post(`${API_BASE}/api/auth/refresh`);
-    expect(refresh.ok()).toBeTruthy();
-    const refreshed = await refresh.json() as { accessToken: string };
+    const refreshed = await page.evaluate(async () => {
+      const r = await fetch("/api/auth/refresh", { method: "POST", credentials: "include" });
+      if (!r.ok) throw new Error(`refresh failed: ${r.status}`);
+      return r.json() as Promise<{ accessToken: string }>;
+    });
     expect(refreshed.accessToken).toBeTruthy();
 
     const sock2 = await connect(refreshed.accessToken);

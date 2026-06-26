@@ -10,6 +10,9 @@ import { ErrorBoundary } from "./components/system/ErrorBoundary";
 import { clearChunkReloadFlag } from "./lib/lazyWithRetry";
 import "./index.css";
 
+// Expose build provenance for deploy verification (console, E2E, ops tooling).
+window.__DMX_BUILD_INFO__ = __DMX_BUILD_INFO__;
+
 // After deploy, stale tabs may reference deleted JS chunks — reload once (Vite + dynamic import).
 window.addEventListener("vite:preloadError", (event) => {
   event.preventDefault();
