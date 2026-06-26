@@ -4,6 +4,7 @@ import { Router } from "express";
 import authRoutes          from "./modules/auth/auth.routes.js";
 import notificationsRoutes from "./modules/notifications/notifications.routes.js";
 import healthRoutes, { readinessHandler } from "./modules/health/health.routes.js";
+import versionRoutes from "./modules/health/version.routes.js";
 import "./modules/rfq/rfq.service.read.js"; // attach prototype augmentations
 import "./modules/rfq/rfq.service.procurement.js";
 import "./modules/commoditybid/commoditybid.service.read.js";
@@ -42,7 +43,15 @@ import tradeRoutes from "./modules/trade/trade.routes.js";
 import documentCenterRoutes from "./modules/document-center/document-center.routes.js";
 import exceptionHubRoutes from "./modules/exception-hub/exception-hub.routes.js";
 import { paymentRouter } from "./modules/payments/payment.routes.js";
+import { orchestrationRouter } from "./modules/orchestration/orchestration.routes.js";
+import { forwarderRouter } from "./modules/forwarder/forwarder.routes.js";
 import { publicCatalogRfqRouter } from "./modules/integrations/catalog-rfq-ingest.routes.js";
+import { chatRouter } from "./modules/chat/chat.routes.js";
+import { conversationsRouter } from "./modules/chat/conversations.routes.js";
+import { freightEstimateRouter } from "./modules/freight-estimate/freight-estimate.routes.js";
+import { freightBookingRouter } from "./modules/freight-booking/freight-booking.routes.js";
+import tradeTimelineRoutes from "./modules/trade-timeline/trade-timeline.routes.js";
+import salesControlRouter from "./modules/sales-control/sales-control.routes.js";
 import { asyncHandler } from "./middleware/asyncHandler.js";
 import { idempotency } from "./middleware/idempotency.js";
 import { telemetryBurstLimiter, adminAnalyticsLimiter } from "./middleware/rate-limit.js";
@@ -53,6 +62,7 @@ api.use(idempotency);
 
 api.use("/public", publicCatalogRfqRouter);
 api.use("/healthz",       healthRoutes);
+api.use("/version",       versionRoutes);
 api.get("/ready", asyncHandler(readinessHandler));
 api.use("/auth",          authRoutes);
 api.use("/notifications", notificationsRoutes);
@@ -93,8 +103,16 @@ api.use("/trades", tradeRoutes);
 api.use("/documents", documentCenterRoutes);
 api.use("/exceptions", exceptionHubRoutes);
 api.use("/payments", paymentRouter);
+api.use("/orchestration", orchestrationRouter);
+api.use("/forwarder", forwarderRouter);
 api.use("/trade-documents", tradeDocumentsRouter);
 api.use("/purchase-orders", purchaseOrderRouter);
+api.use("/chat", chatRouter);
+api.use("/conversations", conversationsRouter);
+api.use("/freight-estimates", freightEstimateRouter);
+api.use("/freight-bookings", freightBookingRouter);
+api.use("/trade-timeline", tradeTimelineRoutes);
+api.use("/sales", salesControlRouter);
 api.use(
   "/workspace-communication/:workspaceType/:workspaceId",
   workspaceCommunicationRouter,

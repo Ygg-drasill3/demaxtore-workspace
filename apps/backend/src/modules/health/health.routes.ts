@@ -4,15 +4,20 @@ import { prisma } from "../../db/prisma.js";
 import { env } from "../../config/env.js";
 import { getSocketAdapterStatus } from "../../realtime/socket-adapter.js";
 import { resolveStorageProvider } from "../../lib/storage-provider.js";
+import { getBuildInfo } from "../../lib/build-info.js";
 
 const router = Router();
 
 /** Liveness — process is up (no dependency checks). */
 router.get("/", (_req, res) => {
+  const build = getBuildInfo();
   res.status(200).json({
     status: "ok",
     uptimeSec: Math.floor(process.uptime()),
     timestamp: new Date().toISOString(),
+    commitSha: build.commitSha,
+    branch: build.branch,
+    buildTime: build.buildTime,
   });
 });
 

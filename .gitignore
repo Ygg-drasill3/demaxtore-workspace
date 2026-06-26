@@ -111,6 +111,7 @@ agenthub/agents/youtube/db
 
 # Build caches
 .cache/
+packages/build-info/build-info.json
 
 memory/test_credentials.md
 
