@@ -1,10 +1,11 @@
-/** Canonical login URL — static login-ui app (not the main SPA). */
+/** Canonical login URL — workspace SPA auth routes. */
 export function loginPageUrl(from?: string): string {
-  const url = new URL("/login/", window.location.origin);
+  const url = new URL("/login", window.location.origin);
   if (from && from.startsWith("/") && !from.startsWith("/login")) {
     url.searchParams.set("from", from);
   }
-  return `${url.pathname}${url.search}`;
+  const qs = url.searchParams.toString();
+  return qs ? `${url.pathname}?${qs}` : url.pathname;
 }
 
 export function redirectToLogin(from?: string): void {
