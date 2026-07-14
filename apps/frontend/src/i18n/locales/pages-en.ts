@@ -155,6 +155,16 @@ const rfqEn: TranslationDict = {
   "rfq.details.field.notes": "Notes",
   "rfq.details.noExtraInfo": "No additional details",
 
+  "rfq.participants.title": "Participants",
+  "rfq.participants.empty": "No participants yet.",
+  "rfq.participants.maskedHint": "Supplier names appear after DeMaxtore publishes this RFQ.",
+
+  "rfq.procurement.cbNotEligible.title": "CommodityBid is not available for this RFQ",
+  "rfq.procurement.cbNotEligible.body": "You selected a non-commodity product. CommodityBid can only be created for: {{products}}.",
+  "rfq.procurement.cbEligible.hint": "These products are eligible for CommodityBid: {{products}}.",
+  "rfq.procurement.cbCard.disabled": "Products are outside the CommodityBid catalog",
+  "rfq.procurement.cbCard.enabled": "Live reverse auction for price discovery",
+
   "rfq.catalog.mandatoryHint": "Fields marked with * are mandatory.",
   "rfq.catalog.requestSection": "Catalog request",
   "rfq.catalog.contactSection": "Your contact details",
@@ -232,6 +242,25 @@ const rfqEn: TranslationDict = {
   "documents.dc.filterRfq": "RFQ",
   "documents.dc.allSources": "All sources",
   "documents.dc.allRfqs": "All RFQs",
+
+  "rfq.quotation.award.closeOpen.title": "Close quotations and continue?",
+  "rfq.quotation.award.closeClosed.title": "Proceed to evaluation?",
+  "rfq.quotation.award.closeOpen.description": "Stop accepting new bids and proceed to supplier selection? Suppliers will not be able to submit new quotations after this step.",
+  "rfq.quotation.award.closeClosed.description": "Quotations have been collected. Proceed to evaluation and confirm your selected supplier?",
+  "rfq.quotation.award.decline": "No, go back",
+  "rfq.quotation.award.confirmContinue": "Yes, continue",
+  "rfq.quotation.award.pendingQuote": "Quotation you are about to select: {price}",
+  "rfq.quotation.award.select.title": "Select supplier",
+  "rfq.quotation.award.select.description": "Confirm the winning supplier and provide your rationale.",
+  "rfq.quotation.award.selectConfirm": "Select supplier",
+  "rfq.quotation.award.verifiedManufacturer": "Verified Manufacturer",
+  "rfq.quotation.award.leadTime": "{days} days lead time",
+  "rfq.quotation.award.rationalePlaceholder": "At least 15 characters — why are you selecting this supplier?",
+  "rfq.quotation.award.selectFootnote": "Upon confirmation, quotations will be closed (if needed), evaluation completed, and the selected supplier notified.",
+  "rfq.quotation.award.success": "Supplier selected successfully",
+  "rfq.quotation.award.error": "Could not complete supplier selection",
+  "rfq.quotation.award.checkboxSelect": "Select {supplier} as supplier",
+  "rfq.quotation.compare.checkbox": "Compare {supplier}",
 };
 
 export default rfqEn;

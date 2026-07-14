@@ -40,16 +40,16 @@ export function QuickActions({ actions, collapsed }: { actions: QuickAction[]; c
   const secondary = actions.filter((a) => !FEATURED_IDS.has(a.testId));
 
   return (
-    <div data-testid="nav-quick-actions" className="px-3 pt-3 pb-2">
-      <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-        <div className="mb-2.5 flex items-center gap-2 px-1">
+    <div data-testid="nav-quick-actions" className="px-2.5 pt-2 pb-1 shrink-0">
+      <div className="rounded-lg border border-white/[0.06] bg-white/[0.03] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+        <div className="mb-1.5 flex items-center gap-2 px-1">
           <span className="h-1 w-1 rounded-full bg-accent-500/80" />
           <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
             {t("common.quickActions")}
           </span>
         </div>
 
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           {featured.map((a) => {
             const Icon = a.icon;
             const isCreate = a.testId === "qa-create-cb";
@@ -60,7 +60,7 @@ export function QuickActions({ actions, collapsed }: { actions: QuickAction[]; c
                 data-testid={a.testId}
                 className={({ isActive }) =>
                   cn(
-                    "group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-all duration-200",
+                    "group flex items-center gap-2 rounded-lg px-2 py-1.5 text-[13px] font-medium transition-all duration-200",
                     isCreate
                       ? isActive
                         ? "bg-gradient-to-r from-accent-900 to-accent-600 text-white shadow-lg shadow-accent-900/35 ring-1 ring-white/20"
@@ -87,8 +87,8 @@ export function QuickActions({ actions, collapsed }: { actions: QuickAction[]; c
 
         {secondary.length > 0 && (
           <>
-            <div className="my-2.5 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-            <div className="grid grid-cols-2 gap-1">
+            <div className="my-1.5 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+            <div className="grid grid-cols-2 gap-0.5">
               {secondary.map((a) => {
                 const Icon = a.icon;
                 return (
@@ -96,10 +96,10 @@ export function QuickActions({ actions, collapsed }: { actions: QuickAction[]; c
                     key={a.testId}
                     to={a.to}
                     data-testid={a.testId}
-                    className="group flex flex-col gap-1 rounded-lg px-2 py-2 text-[11px] text-zinc-400 transition-all duration-200 hover:bg-white/[0.05] hover:text-zinc-100"
+                    className="group flex flex-col gap-0.5 rounded-lg px-1.5 py-1.5 text-[10px] text-zinc-400 transition-all duration-200 hover:bg-white/[0.05] hover:text-zinc-100"
                   >
-                    <span className="grid h-6 w-6 place-items-center rounded-md bg-white/[0.04] text-zinc-500 transition-colors group-hover:bg-white/[0.08] group-hover:text-white">
-                      <Icon className="h-3.5 w-3.5" />
+                    <span className="grid h-5 w-5 place-items-center rounded-md bg-white/[0.04] text-zinc-500 transition-colors group-hover:bg-white/[0.08] group-hover:text-white">
+                      <Icon className="h-3 w-3" />
                     </span>
                     <span className="leading-tight line-clamp-2">{a.label}</span>
                   </Link>

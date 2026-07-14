@@ -36,13 +36,6 @@ const PRODUCTION_USERS = [
     orgName: "DeMaxtore Operations",
     orgKind: "DEMAXTORE" as const,
   },
-  {
-    email: "ilham@demaxtore.com",
-    displayName: "İlham Bellahcene",
-    role: Role.SALES_CONTROL,
-    orgName: "DeMaxtore Sales",
-    orgKind: "DEMAXTORE" as const,
-  },
 ];
 
 async function main() {
@@ -113,9 +106,8 @@ async function main() {
   console.log(`  · removed ${deletedUsers.count} demo user(s) (others skipped if still referenced)`);
 
   console.log("\n✅ Production setup complete.");
-  console.log("   Admin:         ugur@demaxtore.com");
-  console.log("   Sales Control: ilham@demaxtore.com");
-  console.log(`   Password:      ${PRODUCTION_PASSWORD}`);
+  console.log("   Admin:    ugur@demaxtore.com");
+  console.log(`   Password: ${PRODUCTION_PASSWORD}`);
 }
 
 main()

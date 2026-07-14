@@ -11,7 +11,7 @@ import { api } from "@/lib/api";
 import { freightiqApi } from "@/features/freightiq/lib/freightiq.api";
 import { toast } from "@/store/toast.store";
 import PoSummaryPanel from "@/features/purchase-order/components/PoSummaryPanel";
-import WorkspaceCommunicationPanel from "@/features/workspace-communication/components/WorkspaceCommunicationPanel";
+import ConversationHubPanel from "@/features/conversation-hub/components/ConversationHubPanel";
 import { SocketEvents } from "@dmx/contracts/socket-events";
 import { useWorkspaceSocket } from "@/lib/socket";
 import { focusWorkspaceCommunication, focusTradeDocuments } from "@/features/workspace-communication/lib/focus-communication";
@@ -359,7 +359,7 @@ export default function OrderWorkspacePage() {
 
       <PoSummaryPanel orderId={id!} />
 
-      <WorkspaceCommunicationPanel workspaceType="ORDER" workspaceId={id!} testId="order-communication" />
+      <ConversationHubPanel workspaceType="ORDER" workspaceId={id!} testId="order-communication" />
 
       <OrderStatusCards
         state={orderState}

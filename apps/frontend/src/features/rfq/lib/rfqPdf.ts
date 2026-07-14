@@ -47,7 +47,9 @@ type BlobStream = {
   toBlob: (mimeType: string) => Blob;
 };
 
-const PDF_FIELD_LABELS: Record<keyof CatalogIntakeDTO, { label: string; required?: boolean }> = {
+type CatalogPdfField = Exclude<keyof CatalogIntakeDTO, "productImageUrl">;
+
+const PDF_FIELD_LABELS: Record<CatalogPdfField, { label: string; required?: boolean }> = {
   productOrService: { label: "Product or service", required: true },
   deliveryLocation: { label: "Delivery location", required: true },
   quantity: { label: "Quantity", required: true },

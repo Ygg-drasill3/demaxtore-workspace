@@ -3,13 +3,17 @@ import axios from "axios";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { RegisterInput, UserDTO } from "@dmx/contracts/auth";
+import type { PasswordlessScope } from "@dmx/contracts/passwordless-access";
 import { AUTH_STORAGE_KEY, authPersistStorage } from "@/lib/auth-storage";
 
 type AuthStatus = "idle" | "hydrating" | "authenticated" | "unauthenticated";
+type AccessMode = "full" | "passwordless";
 
 interface AuthState {
   user: UserDTO | null;
   accessToken: string | null;
+  accessMode: AccessMode;
+  passwordlessScope: PasswordlessScope | null;
   status: AuthStatus;
   hydrate: () => Promise<void>;
   login: (email: string, password: string) => Promise<UserDTO>;
@@ -18,6 +22,7 @@ interface AuthState {
   logout: () => Promise<void>;
   logoutLocal: () => void;
   setSession: (user: UserDTO, accessToken: string) => void;
+  setPasswordlessSession: (user: UserDTO, accessToken: string, scope: PasswordlessScope) => void;
 }
 
 /** Isolated client — avoids circular imports with api.ts interceptors. */
@@ -33,13 +38,30 @@ export function resetAuthHydrateFlight(): void {
   hydrateInFlight = null;
 }
 
-function applyStorageSession(patch: { user: UserDTO | null; accessToken: string | null }) {
+function applyStorageSession(patch: {
+  user: UserDTO | null;
+  accessToken: string | null;
+  accessMode?: AccessMode;
+  passwordlessScope?: PasswordlessScope | null;
+}) {
   if (patch.user && patch.accessToken) {
-    useAuth.setState({ user: patch.user, accessToken: patch.accessToken, status: "authenticated" });
+    useAuth.setState({
+      user: patch.user,
+      accessToken: patch.accessToken,
+      accessMode: patch.accessMode ?? useAuth.getState().accessMode ?? "full",
+      passwordlessScope: patch.passwordlessScope ?? useAuth.getState().passwordlessScope,
+      status: "authenticated",
+    });
     return;
   }
   if (!patch.user && !patch.accessToken) {
-    useAuth.setState({ user: null, accessToken: null, status: "unauthenticated" });
+    useAuth.setState({
+      user: null,
+      accessToken: null,
+      accessMode: "full",
+      passwordlessScope: null,
+      status: "unauthenticated",
+    });
   }
 }
 
@@ -49,7 +71,12 @@ if (typeof window !== "undefined") {
     try {
       const parsed = JSON.parse(e.newValue).state;
       if (!parsed) return;
-      applyStorageSession({ user: parsed.user ?? null, accessToken: parsed.accessToken ?? null });
+      applyStorageSession({
+        user: parsed.user ?? null,
+        accessToken: parsed.accessToken ?? null,
+        accessMode: parsed.accessMode,
+        passwordlessScope: parsed.passwordlessScope ?? null,
+      });
     } catch {
       /* ignore corrupt storage */
     }
@@ -61,9 +88,15 @@ export const useAuth = create<AuthState>()(
     (set, get) => ({
       user: null,
       accessToken: null,
+      accessMode: "full",
+      passwordlessScope: null,
       status: "idle",
 
       hydrate: async () => {
+        if (get().accessMode === "passwordless") {
+          set({ status: get().accessToken ? "authenticated" : "unauthenticated" });
+          return;
+        }
         if (hydrateInFlight) return hydrateInFlight;
         hydrateInFlight = (async () => {
           set({ status: "hydrating" });
@@ -72,10 +105,18 @@ export const useAuth = create<AuthState>()(
             set((s) => ({
               user: data.user ?? s.user,
               accessToken: data.accessToken,
+              accessMode: "full",
+              passwordlessScope: null,
               status: "authenticated",
             }));
           } catch {
-            set({ user: null, accessToken: null, status: "unauthenticated" });
+            set({
+              user: null,
+              accessToken: null,
+              accessMode: "full",
+              passwordlessScope: null,
+              status: "unauthenticated",
+            });
           } finally {
             hydrateInFlight = null;
           }
@@ -88,13 +129,13 @@ export const useAuth = create<AuthState>()(
           email,
           password,
         });
-        set({ user: data.user, accessToken: data.accessToken, status: "authenticated" });
+        set({ user: data.user, accessToken: data.accessToken, accessMode: "full", passwordlessScope: null, status: "authenticated" });
         return data.user;
       },
 
       register: async (input) => {
         const { data } = await authHttp.post<{ user: UserDTO; accessToken: string }>("/auth/register", input);
-        set({ user: data.user, accessToken: data.accessToken, status: "authenticated" });
+        set({ user: data.user, accessToken: data.accessToken, accessMode: "full", passwordlessScope: null, status: "authenticated" });
         return data.user;
       },
 
@@ -103,6 +144,8 @@ export const useAuth = create<AuthState>()(
         set((s) => ({
           user: data.user ?? s.user,
           accessToken: data.accessToken,
+          accessMode: "full",
+          passwordlessScope: null,
           status: "authenticated",
         }));
       },
@@ -116,14 +159,39 @@ export const useAuth = create<AuthState>()(
         }
       },
 
-      logoutLocal: () => set({ user: null, accessToken: null, status: "unauthenticated" }),
+      logoutLocal: () => set({
+        user: null,
+        accessToken: null,
+        accessMode: "full",
+        passwordlessScope: null,
+        status: "unauthenticated",
+      }),
 
-      setSession: (user, accessToken) => set({ user, accessToken, status: "authenticated" }),
+      setSession: (user, accessToken) => set({
+        user,
+        accessToken,
+        accessMode: "full",
+        passwordlessScope: null,
+        status: "authenticated",
+      }),
+
+      setPasswordlessSession: (user, accessToken, scope) => set({
+        user,
+        accessToken,
+        accessMode: "passwordless",
+        passwordlessScope: scope,
+        status: "authenticated",
+      }),
     }),
     {
       name: AUTH_STORAGE_KEY,
       storage: authPersistStorage,
-      partialize: (s) => ({ user: s.user, accessToken: s.accessToken }),
+      partialize: (s) => ({
+        user: s.user,
+        accessToken: s.accessToken,
+        accessMode: s.accessMode,
+        passwordlessScope: s.passwordlessScope,
+      }),
       onRehydrateStorage: () => (state) => {
         if (state && !state.user) state.status = "idle";
       },

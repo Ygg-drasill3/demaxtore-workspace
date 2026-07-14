@@ -94,7 +94,7 @@ export const rfqController = {
       "../supplier-activity/supplier-activity.service.js"
     );
     await recordSupplierViewIfApplicable(ws.id, req.user!, ws.participants);
-    res.json(await service.toDTO(ws));
+    res.json(await service.toDTO(ws, req.user!));
   },
 
   async list(req: Request, res: Response) {
@@ -114,7 +114,19 @@ export const rfqController = {
 
   async timeline(req: Request, res: Response) {
     const ws = await loadAccessible(req);
-    res.json(await service.timeline(ws.id, req.query));
+    const events = await service.timeline(ws.id, req.query);
+    if (req.user!.role === "SUPPLIER") {
+      res.json(
+        (events as Array<{ actor?: { displayName?: string; role?: string } | null }>).map((e) => ({
+          ...e,
+          actor: e.actor
+            ? { ...e.actor, displayName: e.actor.role === "SUPPLIER" ? e.actor.displayName : "Buyer" }
+            : e.actor,
+        })),
+      );
+      return;
+    }
+    res.json(events);
   },
 
   async listClarifications(req: Request, res: Response) {

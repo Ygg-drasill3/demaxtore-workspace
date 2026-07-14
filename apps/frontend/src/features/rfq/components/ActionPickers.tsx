@@ -16,6 +16,8 @@ import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { Textarea } from "@/components/ui/Input";
 import { rfqApi, rfqAttachmentUrl } from "../lib/rfq.api";
+import { supplierCompanyLabel } from "../lib/suppliers.normalize";
+import { productSectionTitle } from "../lib/quotations-by-product";
 import { EstimatedCifPoGateSummary } from "@/features/freight-estimate/components/EstimatedCifPanel";
 
 export const PICKER_ACTIONS = new Set<string>([
@@ -35,10 +37,19 @@ export interface PickerProps {
 
 // ─── Assign suppliers ─────────────────────────────────────────────────────────
 
-export function AssignSuppliersPicker({ open, onClose, onConfirm, isPending }: PickerProps) {
+export function AssignSuppliersPicker({ workspaceId, open, onClose, onConfirm, isPending }: PickerProps) {
   const [search, setSearch] = useState("");
   const [ids, setIds] = useState<string[]>([]);
-  useEffect(() => { if (!open) { setIds([]); setSearch(""); } }, [open]);
+  const [lineBySupplier, setLineBySupplier] = useState<Record<string, string[]>>({});
+  useEffect(() => { if (!open) { setIds([]); setSearch(""); setLineBySupplier({}); } }, [open]);
+
+  const rfq = useQuery({
+    queryKey: ["rfq", workspaceId, "assign-picker-lines"],
+    queryFn: () => rfqApi.get(workspaceId!),
+    enabled: open && !!workspaceId,
+  });
+  const lineItems = rfq.data?.lineItems ?? [];
+  const multiProduct = lineItems.length > 1;
 
   const list = useQuery({
     queryKey: ["admin-suppliers", search],
@@ -46,15 +57,60 @@ export function AssignSuppliersPicker({ open, onClose, onConfirm, isPending }: P
     enabled: open,
   });
 
-  const toggle = (id: string) =>
-    setIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  const toggleSupplier = (id: string) => {
+    setIds((prev) => {
+      if (prev.includes(id)) {
+        setLineBySupplier((lbs) => {
+          const next = { ...lbs };
+          delete next[id];
+          return next;
+        });
+        return prev.filter((x) => x !== id);
+      }
+      if (lineItems.length === 1) {
+        setLineBySupplier((lbs) => ({ ...lbs, [id]: [lineItems[0]!.id] }));
+      }
+      return [...prev, id];
+    });
+  };
+
+  const toggleLine = (supplierId: string, lineId: string) => {
+    setLineBySupplier((prev) => {
+      const current = prev[supplierId] ?? [];
+      const next = current.includes(lineId)
+        ? current.filter((x) => x !== lineId)
+        : [...current, lineId];
+      return { ...prev, [supplierId]: next };
+    });
+  };
+
+  const canConfirm =
+    ids.length > 0 &&
+    (!multiProduct || ids.every((sid) => (lineBySupplier[sid]?.length ?? 0) > 0));
+
+  const confirm = () => {
+    if (multiProduct) {
+      onConfirm({
+        assignments: ids.map((supplierUserId) => ({
+          supplierUserId,
+          rfqLineItemIds: lineBySupplier[supplierUserId] ?? [],
+        })),
+      });
+      return;
+    }
+    onConfirm({ supplierUserIds: ids });
+  };
 
   return (
     <Modal
       open={open}
       onClose={onClose}
       title="Assign suppliers"
-      description="Select suppliers to invite to this RFQ."
+      description={
+        multiProduct
+          ? "Select suppliers and which products each may quote on."
+          : "Select suppliers to invite to this RFQ."
+      }
       size="md"
       testId="assign-suppliers-picker"
       footer={
@@ -63,9 +119,9 @@ export function AssignSuppliersPicker({ open, onClose, onConfirm, isPending }: P
           <Button
             data-testid="assign-suppliers-confirm"
             variant="primary"
-            disabled={ids.length === 0 || isPending}
+            disabled={!canConfirm || isPending}
             loading={isPending}
-            onClick={() => onConfirm({ supplierUserIds: ids })}
+            onClick={confirm}
           >
             Assign ({ids.length})
           </Button>
@@ -83,18 +139,52 @@ export function AssignSuppliersPicker({ open, onClose, onConfirm, isPending }: P
         {(list.data ?? []).map((s) => {
           const selected = ids.includes(s.id);
           return (
-            <button
-              key={s.id}
-              type="button"
-              data-testid={`supplier-option-${s.id}`}
-              onClick={() => toggle(s.id)}
-              className={`w-full text-left px-3 py-2 rounded-md text-sm border ${
-                selected ? "border-accent-900/30 bg-accent-50" : "border-transparent hover:bg-zinc-50"
-              }`}
-            >
-              <div className="font-medium">{s.displayName}</div>
-              <div className="text-xs text-zinc-500">{s.email}</div>
-            </button>
+            <div key={s.id} className="space-y-1">
+              <button
+                type="button"
+                data-testid={`supplier-option-${s.id}`}
+                onClick={() => toggleSupplier(s.id)}
+                className={`w-full text-left px-3 py-2 rounded-md text-sm border ${
+                  selected ? "border-accent-900/30 bg-accent-50" : "border-transparent hover:bg-zinc-50"
+                }`}
+              >
+                <div className="font-medium">{supplierCompanyLabel(s)}</div>
+                <div className="text-xs text-zinc-500">
+                  {s.organisation?.trim() ? (
+                    <>{s.displayName} · {s.email}</>
+                  ) : (
+                    s.email
+                  )}
+                </div>
+              </button>
+              {selected && multiProduct && (
+                <div
+                  className="ml-2 mr-1 mb-2 rounded-lg border border-paper-200 bg-paper-50/80 p-2 space-y-1"
+                  data-testid={`supplier-products-${s.id}`}
+                >
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 px-1">
+                    Products to quote
+                  </p>
+                  {lineItems.map((li) => {
+                    const checked = (lineBySupplier[s.id] ?? []).includes(li.id);
+                    return (
+                      <label
+                        key={li.id}
+                        className="flex items-start gap-2 px-2 py-1.5 rounded-md hover:bg-white cursor-pointer text-sm"
+                      >
+                        <input
+                          type="checkbox"
+                          className="mt-0.5"
+                          checked={checked}
+                          onChange={() => toggleLine(s.id, li.id)}
+                        />
+                        <span className="text-ink-900 leading-snug">{productSectionTitle(li.description)}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           );
         })}
         {list.isLoading && <div className="text-xs text-zinc-500 px-2">Loading…</div>}

@@ -34,7 +34,7 @@ function toRow(
   return {
     id:           q.id,
     supplierId:   q.supplierUserId,
-    supplierName: supplier.displayName ?? supplier.organisation?.name ?? "Supplier",
+    supplierName: supplier.organisation?.name ?? supplier.displayName ?? "Supplier",
     total:        Number(q.total),
     currency:     q.currency,
     unitPriceAvg,
@@ -47,12 +47,13 @@ function toRow(
     status,
     submittedAt:  q.submittedAt.toISOString(),
     lineItems:    q.lineItems.map((li) => ({
-      id:          li.id,
-      position:    li.position,
-      description: li.description,
-      quantity:    Number(li.quantity),
-      unitPrice:   Number(li.unitPrice),
-      total:       Number(li.total),
+      id:            li.id,
+      rfqLineItemId: li.rfqLineItemId ?? null,
+      position:      li.position,
+      description:   li.description,
+      quantity:      Number(li.quantity),
+      unitPrice:     Number(li.unitPrice),
+      total:         Number(li.total),
     })),
   };
 }

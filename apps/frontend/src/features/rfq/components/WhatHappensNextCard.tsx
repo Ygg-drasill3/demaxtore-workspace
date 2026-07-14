@@ -72,6 +72,17 @@ export function WhatHappensNextCard(props: WhatHappensNextCardProps) {
     return allowed.find((a) => a.action === script.primaryAction) ?? null;
   }, [script, state, actor.role, isOwner, isCounterparty, isSelectedSupplier, hasQuotationFromUser]);
 
+  const promotedNextActions = useMemo<NextAction[]>(() => {
+    if (!script?.promotedSecondaryActions?.length) return [];
+    const allowed = computeRfqNextActions({
+      state, actorRole: actor.role, isOwner, isCounterparty,
+      isSelectedSupplier, hasQuotationFromUser,
+    });
+    return script.promotedSecondaryActions
+      .map((action) => allowed.find((a) => a.action === action))
+      .filter((a): a is NextAction => !!a);
+  }, [script, state, actor.role, isOwner, isCounterparty, isSelectedSupplier, hasQuotationFromUser]);
+
   // Defensive fallback if state isn't in the table.
   if (!script) {
     return (
@@ -103,6 +114,17 @@ export function WhatHappensNextCard(props: WhatHappensNextCardProps) {
       apply.mutate({ action: primaryNextAction.action });
     }
     onPrimaryClick?.(primaryNextAction);
+  };
+
+  const handlePromoted = (action: NextAction) => {
+    track("next_action.clicked", { workspaceId, targetId: action.action });
+    if (action.requiresConfirmation) {
+      const ok = window.confirm(`${action.label}\n\n${action.description || "This cannot be undone."}`);
+      if (!ok) return;
+    }
+    if (!action.requiresReason) {
+      apply.mutate({ action: action.action });
+    }
   };
 
   const confirmPicker = (payload: Record<string, unknown>) => {
@@ -147,8 +169,8 @@ export function WhatHappensNextCard(props: WhatHappensNextCardProps) {
         <Stat label={statR.label} value={statR.value} testId="whn-stat-right" />
       </div>
 
-      {(primaryNextAction || script.fallbackPrimary) && (
-        <div className="mt-5">
+      {(primaryNextAction || script.fallbackPrimary || promotedNextActions.length > 0) && (
+        <div className="mt-5 space-y-2">
           {primaryNextAction ? (
             <Button
               data-testid={primaryNextAction ? `whn-primary-cta-${primaryNextAction.action}` : "whn-primary-cta"}
@@ -160,7 +182,7 @@ export function WhatHappensNextCard(props: WhatHappensNextCardProps) {
             >
               {script.primaryLabel ?? primaryNextAction.label}
             </Button>
-          ) : (
+          ) : script.fallbackPrimary ? (
             <Button
               data-testid="whn-fallback-cta"
               size="lg"
@@ -173,7 +195,20 @@ export function WhatHappensNextCard(props: WhatHappensNextCardProps) {
             >
               {script.fallbackPrimary?.label}
             </Button>
-          )}
+          ) : null}
+          {promotedNextActions.map((action) => (
+            <Button
+              key={action.action}
+              data-testid={`whn-promoted-cta-${action.action}`}
+              size="lg"
+              className="w-full"
+              variant={action.variant === "destructive" ? "destructive" : "secondary"}
+              onClick={() => handlePromoted(action)}
+              loading={apply.isPending && apply.variables?.action === action.action}
+            >
+              {action.label}
+            </Button>
+          ))}
         </div>
       )}
 

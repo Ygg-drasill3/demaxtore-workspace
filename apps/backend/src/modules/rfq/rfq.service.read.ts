@@ -15,6 +15,8 @@ import type { AuthUser } from "./rfq.policy";
 import { canAccessRfq } from "./rfq.policy";
 import { repairRfqStateIfOrderClosed } from "./rfq-order.sync.js";
 import { CatalogIntakeDTO } from "@dmx/contracts/catalog-rfq-intake";
+import { redactRfqDtoForSupplier, redactRfqListItemForSupplier } from "./supplier-rfq-redact.js";
+import { mapRfqParticipantsForViewer } from "./rfq-participants.js";
 
 type WsFull = Prisma.WorkspaceGetPayload<{
   include: {
@@ -32,8 +34,8 @@ declare module "./rfq.service" {
     createDraft(input: CreateRfqDraftInput, actor: AuthUser): Promise<unknown>;
     editDraft(wsId: string, input: EditRfqDraftInput, actor: AuthUser): Promise<unknown>;
     list(query: ListRfqQuery, actor: AuthUser): Promise<unknown>;
-    toDTO(ws: WsFull | Workspace & Record<string, unknown>): Promise<unknown>;
-    fetchDTO(wsId: string): Promise<unknown>;
+    toDTO(ws: WsFull | Workspace & Record<string, unknown>, actor?: AuthUser): Promise<unknown>;
+    fetchDTO(wsId: string, actor?: AuthUser): Promise<unknown>;
     timeline(wsId: string, query: unknown): Promise<unknown>;
     listClarifications(wsId: string): Promise<unknown>;
     listAttachments(wsId: string): Promise<unknown>;
@@ -161,7 +163,14 @@ RfqService.prototype.createDraft = async function (input, actor) {
     return ws.id;
   });
 
-  return await this.fetchDTO(created);
+  void (async () => {
+    const { bootstrapWorkspaceConversationAsync, emitConversationSystemEvent } =
+      await import("../conversation-hub/conversation-hub.hooks.js");
+    bootstrapWorkspaceConversationAsync(prisma, "RFQ", created);
+    emitConversationSystemEvent(prisma, "RFQ", created, "WORKSPACE_CREATED", actor.id, input.title);
+  })();
+
+  return await this.fetchDTO(created, actor);
 };
 
 RfqService.prototype.editDraft = async function (wsId, input, actor) {
@@ -209,7 +218,7 @@ RfqService.prototype.editDraft = async function (wsId, input, actor) {
     });
   });
 
-  return await this.fetchDTO(wsId);
+  return await this.fetchDTO(wsId, actor);
 };
 
 RfqService.prototype.list = async function (query, actor) {
@@ -272,8 +281,23 @@ RfqService.prototype.list = async function (query, actor) {
     const last = rows.pop()!;
     nextCursor = last.createdAt.toISOString();
   }
+
+  let myQuotedWorkspaceIds = new Set<string>();
+  if (actor.role === "SUPPLIER" && rows.length > 0) {
+    const quoted = await this.prisma.quotation.findMany({
+      where: {
+        workspaceId: { in: rows.map((r) => r.id) },
+        supplierUserId: actor.id,
+        status: { not: "WITHDRAWN" },
+      },
+      select: { workspaceId: true },
+    });
+    myQuotedWorkspaceIds = new Set(quoted.map((q) => q.workspaceId));
+  }
+
   return {
-    items: rows.map((r) => ({
+    items: rows.map((r) => {
+      const item = {
       id:             r.id,
       externalRef:    r.externalRef,
       title:          r.rfqDetails?.title ?? "",
@@ -288,16 +312,73 @@ RfqService.prototype.list = async function (query, actor) {
       procurementMethod: r.rfqDetails?.procurementMethod ?? null,
       linkedCommoditybidId: r.rfqDetails?.linkedCommoditybidId ?? null,
       trashedAt: r.trashedAt?.toISOString() ?? null,
-    })),
+      ...(actor.role === "SUPPLIER" ? { hasMyQuotation: myQuotedWorkspaceIds.has(r.id) } : {}),
+    };
+      return actor.role === "SUPPLIER" ? redactRfqListItemForSupplier(item) : item;
+    }),
     nextCursor,
   };
 };
 
-RfqService.prototype.toDTO = async function (ws) {
-  return dtoFromWorkspace(ws as WsFull);
+RfqService.prototype.toDTO = async function (ws, actor?: AuthUser) {
+  const wsFull = ws as WsFull;
+  const base = dtoFromWorkspace(wsFull);
+  const { resolveLineItemProductImageUrl } = await import("./rfq-product-image.js");
+
+  const participantUserIds = [...new Set((wsFull.participants ?? []).map((p) => p.userId))];
+  const participantUsers = participantUserIds.length
+    ? await this.prisma.user.findMany({
+        where: { id: { in: participantUserIds } },
+        select: {
+          id: true,
+          displayName: true,
+          email: true,
+          organisation: { select: { name: true } },
+        },
+      })
+    : [];
+  const userMap = new Map(participantUsers.map((u) => [u.id, u]));
+  const participants = mapRfqParticipantsForViewer({
+    state: wsFull.state,
+    participants: wsFull.participants ?? [],
+    users: userMap,
+    viewerRole: actor?.role,
+    viewerId: actor?.id,
+  });
+
+  const rawLines = (base.lineItems as Array<{
+    id: string;
+    position: number;
+    description: string;
+    quantity: number;
+    uom: string;
+    notes: string | null;
+  }>) ?? [];
+
+  const lineItems = await Promise.all(
+    rawLines.map(async (li) => ({
+      ...li,
+      imageUrl: await resolveLineItemProductImageUrl(wsFull.id, li.description),
+    })),
+  );
+
+  const productImageUrl = rawLines.length === 1
+    ? lineItems[0]?.imageUrl ?? null
+    : null;
+
+  const enriched = { ...base, lineItems, productImageUrl, participants };
+  if (actor?.role === "SUPPLIER") {
+    const { getAllowedQuoteLineIds } = await import("./supplier-line-scope.service.js");
+    const allowedQuoteLineItemIds = await getAllowedQuoteLineIds(ws.id, actor.id);
+    return redactRfqDtoForSupplier(
+      { ...enriched, allowedQuoteLineItemIds } as Parameters<typeof redactRfqDtoForSupplier>[0],
+      actor.id,
+    );
+  }
+  return enriched;
 };
 
-RfqService.prototype.fetchDTO = async function (wsId) {
+RfqService.prototype.fetchDTO = async function (wsId, actor?: AuthUser) {
   const ws = await this.prisma.workspace.findUnique({
     where: { id: wsId },
     include: {
@@ -322,10 +403,10 @@ RfqService.prototype.fetchDTO = async function (wsId) {
           createdBy: { select: { displayName: true } },
         },
       });
-      if (refreshed) return dtoFromWorkspace(refreshed);
+      if (refreshed) return this.toDTO(refreshed, actor);
     }
   }
-  return dtoFromWorkspace(ws);
+  return this.toDTO(ws, actor);
 };
 
 RfqService.prototype.timeline = async function (wsId, _query) {
@@ -490,6 +571,7 @@ RfqService.prototype.lookupSuppliers = async function (query) {
     where.OR = [
       { displayName: { contains: query.q, mode: "insensitive" } },
       { email:       { contains: query.q, mode: "insensitive" } },
+      { organisation: { name: { contains: query.q, mode: "insensitive" } } },
     ];
   }
   const users = await this.prisma.user.findMany({

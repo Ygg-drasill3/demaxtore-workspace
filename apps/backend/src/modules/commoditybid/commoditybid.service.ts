@@ -79,7 +79,7 @@ export class CommodityBidService {
       }
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       // (a) Allow the state-guard trigger to permit the UPDATE we are about to do
       await tx.$executeRawUnsafe(`SET LOCAL app.fsm_authorised = 'true'`);
 
@@ -286,32 +286,13 @@ export class CommodityBidService {
           if (n.role)   socketBus.emitToRole(n.role as Role, "notification:new", { notification: dto });
         }
 
-        // ── Critical notification → email fallback (Sprint 2.9) ──────────
-        //   Allowlist (intentionally tight to avoid mail noise):
-        //     rfq.published · rfq.supplier.selected · proforma.requested ·
-        //     po.issued · password.reset
-        const FALLBACK_EVENTS = new Set(["bid.published", "bid.awards.published"]);
-        if (FALLBACK_EVENTS.has(transition.auditEvent)) {
-          void (async () => {
-            const { mailer } = await import("../messaging/mailer.js");
-            const { notificationFallbackTemplate } = await import("../messaging/templates.js");
-            for (const n of createdNotifications) {
-              if (!n.userId) continue;
-              const user = await this.prisma.user.findUnique({ where: { id: n.userId } });
-              if (!user) continue;
-              const tpl = notificationFallbackTemplate({
-                displayName:  user.displayName,
-                title:        n.title,
-                body:         n.message ?? null,
-                eventType:    transition.auditEvent,
-                workspaceUrl: n.workspaceId
-                  ? `${process.env.APP_BASE_URL ?? "http://localhost:3000"}/workspace/commoditybid/${n.workspaceId}`
-                  : null,
-              });
-              mailer.sendAsync({ to: user.email, ...tpl });
-            }
-          })();
-        }
+        void import("../notification-center/delivery.dispatcher.js").then(({ scheduleNotificationChannelDeliveries }) => {
+          scheduleNotificationChannelDeliveries(
+            createdNotifications
+              .filter((n) => n.userId)
+              .map((n) => ({ id: n.id, userId: n.userId! })),
+          );
+        });
       });
 
       const result = {
@@ -325,6 +306,26 @@ export class CommodityBidService {
 
       return result;
     });
+
+    void (async () => {
+      const { emitFromFsmAuditEvent, bootstrapSpawnedOrdersForParent } =
+        await import("../conversation-hub/conversation-hub.hooks.js");
+      const transition = findCommodityBidTransition(result.fromState, action);
+      if (transition?.auditEvent && result.timelineEventId !== "(idempotent-replay)") {
+        emitFromFsmAuditEvent(
+          this.prisma,
+          "COMMODITYBID",
+          workspaceId,
+          transition.auditEvent,
+          actor.role === "SYSTEM" ? null : actor.id,
+        );
+      }
+      if (action === "spawn_orders") {
+        bootstrapSpawnedOrdersForParent(this.prisma, workspaceId, actor.id);
+      }
+    })();
+
+    return result;
   }
 
   /** Legacy no-op — auction engine uses buyer approval path. */

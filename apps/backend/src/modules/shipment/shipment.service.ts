@@ -12,6 +12,7 @@ import type { ActorRole } from "@dmx/contracts/rfq.fsm";
 import { resolveRecipients } from "./shipment.notifications.js";
 import { PRECONDITIONS } from "./shipment.preconditions.js";
 import { socketBus } from "../../realtime/socket-bus";
+import { buildFsmNotificationMetadata } from "../notification-engine/fsm-notification-metadata.js";
 import { AppError } from "../../utils/httpErrors.js";
 import { claimProcessedEvent, releaseProcessedEvent } from "../../lib/processed-event.js";
 
@@ -187,9 +188,9 @@ export class ShipmentService {
       });
 
       const recipients = await resolveRecipients(tx, transition, workspaceFull, actor);
-      let notificationsCreated = 0;
+      const createdNotifications: Array<{ id: string; userId: string | null }> = [];
       for (const r of recipients) {
-        await tx.notification.create({
+        const n = await tx.notification.create({
           data: {
             userId: r.userId,
             role: r.broadcastRole ?? null,
@@ -199,9 +200,15 @@ export class ShipmentService {
             title: r.title,
             message: r.message,
             link: `/workspace/shipment/${workspaceId}`,
+            metadata: buildFsmNotificationMetadata({
+              auditEvent: transition.auditEvent,
+              commWorkspaceType: "SHIPMENT",
+              commWorkspaceId: workspaceId,
+              workspaceRef: workspaceFull.externalRef,
+            }),
           },
         });
-        notificationsCreated++;
+        if (n.userId) createdNotifications.push({ id: n.id, userId: n.userId });
       }
 
       const timelineEventDTO = {
@@ -241,6 +248,14 @@ export class ShipmentService {
         if (transition.action === "resolve_exception" && exceptionId) {
           socketBus.emitToWorkspace(workspaceId, "shipment.exception.resolved", { workspaceId, exceptionId });
         }
+
+        if (createdNotifications.length) {
+          void import("../notification-center/delivery.dispatcher.js").then(({ scheduleNotificationChannelDeliveries }) => {
+            scheduleNotificationChannelDeliveries(
+              createdNotifications.filter((n): n is { id: string; userId: string } => Boolean(n.userId)),
+            );
+          });
+        }
       });
 
       return {
@@ -249,7 +264,7 @@ export class ShipmentService {
         toState: newState,
         timelineEventId: timelineEvent.id,
         auditLogId: auditLog.id,
-        notificationsCreated,
+        notificationsCreated: createdNotifications.length,
         exceptionId,
       };
     });
@@ -278,6 +293,22 @@ export class ShipmentService {
     }
 
     void this.notifyOrchestrator(workspaceId, action, payload, result).catch(() => {});
+
+    if (result.timelineEventId !== "(idempotent-replay)") {
+      void (async () => {
+        const { emitFromFsmAuditEvent } = await import("../conversation-hub/conversation-hub.hooks.js");
+        const transition = findShipmentTransition(result.fromState, action, actor.role);
+        if (transition?.auditEvent) {
+          emitFromFsmAuditEvent(
+            this.prisma,
+            "SHIPMENT",
+            workspaceId,
+            transition.auditEvent,
+            actor.role === "SYSTEM" ? null : actor.id,
+          );
+        }
+      })();
+    }
 
     return result;
   }

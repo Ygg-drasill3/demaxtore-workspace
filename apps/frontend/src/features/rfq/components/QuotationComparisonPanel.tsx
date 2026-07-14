@@ -1,33 +1,57 @@
 // apps/frontend/src/features/rfq/components/QuotationComparisonPanel.tsx
-//
-// Sprint 2.5 — quotations promoted from timeline events to first-class panel.
-// Three render modes:
-//   - empty (state == RFQ_OPEN, zero quotations) → explanation card
-//   - matrix (state == QUOTATIONS_CLOSED / UNDER_EVALUATION) → compare grid
-//   - collapsed (state ≥ SUPPLIER_SELECTED) → winner card with expandable others
-//
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRfqTimeline } from "../hooks";
-import { Card, CardHeader, CardTitle, CardEyebrow, CardBody, CardFooter } from "@/components/ui/Card";
+import { Card, CardHeader, CardTitle, CardEyebrow, CardBody } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/SkeletonLoader";
 import { Badge } from "@/components/ui/Badge";
 import { useQuotations, useSelectQuotation } from "../hooks/useQuotations";
 import { useTelemetry } from "@/features/telemetry/useTelemetry";
 import { cn } from "@/lib/utils";
-import { Star, ChevronRight, TrendingDown, Clock, Layers, FileDown, Target } from "lucide-react";
+import {
+  Star, CheckCircle2, Medal, Trophy, Award, Info, Scale, ChevronDown,
+  Globe, Layers, Tag, Lock, Package, MapPin, FileText, CalendarClock,
+  Wheat, Coffee, Milk, Beef, Fish, Apple, Cookie,
+  Shirt, Droplet, FlaskConical, Cpu, Sofa, Pill, Car, Wrench,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import type { RfqState } from "@dmx/contracts/rfq.fsm";
 import type { QuotationRowDTO } from "@dmx/contracts/supplier-activity";
 import { activeQuotations } from "../lib/quotations.normalize";
+import {
+  groupQuotationsByProduct,
+  productSectionTitle,
+  type RfqLineRef,
+} from "../lib/quotations-by-product";
+import { QuotationAwardFlowModal } from "./QuotationAwardFlowModal";
+import { useT } from "@/i18n/useT";
+
+export interface QuotationProductSummary {
+  name: string;
+  category?: string;
+  imageUrl?: string | null;
+  products?: Array<{
+    name: string;
+    category?: string;
+    imageUrl?: string | null;
+    quantity?: string;
+  }>;
+  quantity?: string;
+  destination?: string;
+  incoterm?: string;
+  deadline?: string | null;
+}
 
 interface Props {
-  workspaceId:    string;
-  state:          RfqState;
-  /** Optional buyer target (sum of lineItems.qty * targetPrice). */
+  workspaceId:       string;
+  state:             RfqState;
+  rfqLineItems?:     RfqLineRef[];
   buyerTargetTotal?: number;
   buyerTargetLeadDays?: number;
   selectedQuotationId?: string | null;
   isOwner: boolean;
+  productSummary?: QuotationProductSummary;
 }
 
 const SHOW_PANEL_STATES = new Set<RfqState>([
@@ -45,474 +69,829 @@ export function QuotationComparisonPanel(props: Props) {
   const { data: timeline } = useRfqTimeline(
     SHOW_PANEL_STATES.has(state) ? workspaceId : undefined,
   );
-  const revisionHistory = useMemo(
-    () => buildQuotationRevisionHistory(timeline),
-    [timeline],
-  );
+  const revisionHistory = useMemo(() => buildRevisionHistory(timeline), [timeline]);
 
   if (!SHOW_PANEL_STATES.has(state)) return null;
 
   const quotations = activeQuotations(data ?? []);
-  const isCollapsedDefault = (state === "SUPPLIER_SELECTED" ||
-                              state === "PROFORMA_REQUESTED" ||
-                              state === "PROFORMA_RECEIVED"  ||
-                              state === "PROFORMA_APPROVED"  ||
-                              state === "PO_ISSUED") && !!selectedQuotationId;
+  const isCollapsed =
+    (state === "SUPPLIER_SELECTED" ||
+     state === "PROFORMA_REQUESTED" ||
+     state === "PROFORMA_RECEIVED" ||
+     state === "PROFORMA_APPROVED" ||
+     state === "PO_ISSUED") && !!selectedQuotationId;
 
   if (isLoading) {
     return (
       <Card data-testid="quotations-panel-loading">
-        <CardHeader><CardTitle>Quotations</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Supplier Quotations</CardTitle></CardHeader>
         <CardBody className="space-y-3">
-          {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
+          {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 w-full" />)}
         </CardBody>
       </Card>
     );
   }
 
-  if (state === "RFQ_OPEN" && quotations.length === 0) {
-    return <EmptyPanel />;
-  }
+  if (state === "RFQ_OPEN" && quotations.length === 0) return <EmptyPanel />;
 
-  if (isCollapsedDefault) {
-    return (
-      <CollapsedPanel
-        quotations={quotations}
-        selectedId={selectedQuotationId!}
-        workspaceId={workspaceId}
-        state={state}
-        isOwner={isOwner}
-      />
-    );
+  if (isCollapsed) {
+    return <CollapsedPanel quotations={quotations} selectedId={selectedQuotationId!} />;
   }
 
   return (
-    <MatrixPanel
+    <QuotationListPanel
       quotations={quotations}
+      rfqLineItems={props.rfqLineItems ?? []}
       revisionHistory={revisionHistory}
       state={state}
-      buyerTargetTotal={props.buyerTargetTotal}
-      buyerTargetLeadDays={props.buyerTargetLeadDays}
       workspaceId={workspaceId}
       isOwner={isOwner}
+      productSummary={props.productSummary}
     />
   );
 }
 
 // ---------------------------------------------------------------------------
-function EmptyPanel() {
-  return (
-    <Card data-testid="quotations-panel-empty">
-      <CardHeader>
-        <div><CardEyebrow>Quotations</CardEyebrow><CardTitle className="mt-1">0 received</CardTitle></div>
-      </CardHeader>
-      <CardBody>
-        <div className="rounded-xl border border-dashed border-paper-200 bg-paper-50/80 px-6 py-10 text-center">
-          <p className="text-sm text-zinc-600 max-w-md mx-auto leading-relaxed">
-            Suppliers are reviewing your RFQ. Bids will land here as they arrive — you will be notified
-            when the comparison view is ready.
-          </p>
-          <p className="text-xs text-zinc-400 mt-4">Track engagement in supplier activity above</p>
-        </div>
-      </CardBody>
-    </Card>
-  );
-}
-
-// ---------------------------------------------------------------------------
-type QuotationWithLines = QuotationRowDTO & {
-  lineItems?: Array<{
-    id: string;
-    position: number;
-    description: string;
-    quantity: number;
-    unitPrice: number;
-    total: number;
-  }>;
-};
-
 type RevisionEntry = { total: number; currency: string; at: string; kind: "SUBMITTED" | "REVISED" };
 
-function buildQuotationRevisionHistory(
-  timeline: unknown,
-): Record<string, RevisionEntry[]> {
+function buildRevisionHistory(timeline: unknown): Record<string, RevisionEntry[]> {
   const events = Array.isArray(timeline) ? timeline : [];
   const history: Record<string, RevisionEntry[]> = {};
   for (const raw of events) {
     const e = raw as { eventType?: string; createdAt?: string; payload?: Record<string, unknown> };
     if (!e.eventType?.startsWith("quotation.")) continue;
-    const supplierId = String(e.payload?.supplierUserId ?? "");
+    const sid = String(e.payload?.supplierUserId ?? "");
     const total = Number(e.payload?.total);
-    if (!supplierId || !Number.isFinite(total)) continue;
-    const list = history[supplierId] ?? [];
+    if (!sid || !Number.isFinite(total)) continue;
+    const list = history[sid] ?? [];
     list.push({
       total,
       currency: String(e.payload?.currency ?? "USD"),
-      at: String(e.createdAt ?? new Date().toISOString()),
+      at: String(e.createdAt ?? ""),
       kind: e.eventType === "quotation.revised" ? "REVISED" : "SUBMITTED",
     });
-    history[supplierId] = list;
+    history[sid] = list;
   }
   return history;
 }
 
-function MatrixPanel(props: {
-  quotations: QuotationRowDTO[];
-  revisionHistory: Record<string, RevisionEntry[]>;
-  state: RfqState;
-  buyerTargetTotal?: number;
-  buyerTargetLeadDays?: number;
-  workspaceId: string;
-  isOwner: boolean;
-}) {
-  const { quotations, revisionHistory, state, buyerTargetTotal, buyerTargetLeadDays, workspaceId, isOwner } = props;
-  const select = useSelectQuotation(workspaceId);
-  const { track } = useTelemetry();
-  const [showLineItems, setShowLineItems] = useState(false);
-  const canSelect = state === "UNDER_EVALUATION" && isOwner;
+function fmt(currency: string, amount: number) {
+  return `${currency} ${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 
-  const lowestTotal = useMemo(() => Math.min(...quotations.map((q) => q.total)), [quotations]);
-  const fastestLead = useMemo(() => {
-    const leads = quotations.map((q) => q.leadTimeDays).filter((d): d is number => d != null);
-    return leads.length ? Math.min(...leads) : null;
-  }, [quotations]);
+const RANK_CONFIG = [
+  { icon: Trophy, color: "text-yellow-500", bg: "bg-yellow-50 border-yellow-200" },
+  { icon: Medal,  color: "text-zinc-400",   bg: "bg-zinc-50 border-zinc-200" },
+  { icon: Award,  color: "text-amber-600",  bg: "bg-amber-50 border-amber-200" },
+];
 
-  const currency = quotations[0]?.currency ?? "USD";
-  const priceSpread = useMemo(() => {
-    const totals = quotations.map((q) => q.total);
-    return Math.max(...totals) - Math.min(...totals);
-  }, [quotations]);
+const ATTRIBUTES = [
+  { icon: Globe,  label: "Export Experience" },
+  { icon: Layers, label: "High Capacity" },
+  { icon: Tag,    label: "Private Label" },
+];
 
-  const lowestSupplier = quotations.find((q) => q.total === lowestTotal)?.supplierName;
-  const fastestSupplier =
-    fastestLead != null
-      ? quotations.find((q) => q.leadTimeDays === fastestLead)?.supplierName
-      : null;
-
-  const rowsWithLines = quotations as QuotationWithLines[];
-  const hasLineItems = rowsWithLines.some((q) => (q.lineItems?.length ?? 0) > 0);
-
-  const gridCols = cn(
-    "grid gap-3",
-    quotations.length + (buyerTargetTotal != null ? 1 : 0) <= 2
-      ? "sm:grid-cols-2"
-      : "sm:grid-cols-2 lg:grid-cols-3",
-  );
-
+// ---------------------------------------------------------------------------
+function EmptyPanel() {
   return (
-    <Card data-testid="quotations-panel-matrix">
-      <CardHeader>
-        <div>
-          <CardEyebrow>Quotations</CardEyebrow>
-          <CardTitle className="mt-1">{quotations.length} received</CardTitle>
-        </div>
-        <Badge tone="accent" dot>
-          {state === "UNDER_EVALUATION" ? "Evaluation open" : "Ready to evaluate"}
-        </Badge>
-      </CardHeader>
-
-      <CardBody className="space-y-4">
-        <div className={gridCols} data-testid="quotation-matrix">
-          {quotations.map((q) => (
-            <SupplierQuoteCard
-              key={q.id}
-              quotation={q}
-              currency={currency}
-              revisionHistory={revisionHistory[q.supplierId] ?? []}
-              isLowest={q.total === lowestTotal}
-              isFastest={fastestLead != null && q.leadTimeDays === fastestLead}
-              canSelect={canSelect}
-              selectPending={select.isPending && select.variables?.quotationId === q.id}
-              onSelect={() => {
-                track("next_action.clicked", {
-                  workspaceId,
-                  targetId: "select_supplier",
-                  meta: { quotationId: q.id },
-                });
-                select.mutate({
-                  quotationId: q.id,
-                  supplierUserId: q.supplierId,
-                  rationale: "Selected from quotation comparison panel",
-                });
-              }}
-            />
-          ))}
-          {buyerTargetTotal != null && (
-            <div
-              className="rounded-xl border border-dashed border-accent-900/25 bg-accent-50/40 p-4 flex flex-col"
-              data-testid="quotation-buyer-target"
-            >
-              <div className="flex items-center gap-2 text-accent-900">
-                <Target className="h-4 w-4 shrink-0" />
-                <span className="text-xs font-semibold uppercase tracking-wider">Your target</span>
-              </div>
-              <p className="mt-3 font-display text-2xl font-semibold tabular-nums text-accent-900">
-                {formatMoney(currency, buyerTargetTotal)}
-              </p>
-              {buyerTargetLeadDays != null && (
-                <p className="mt-2 text-sm text-zinc-600">{buyerTargetLeadDays} days lead (goal)</p>
-              )}
-              <p className="mt-auto pt-4 text-xs text-zinc-500 leading-relaxed">
-                Compare each bid against this benchmark before awarding.
-              </p>
-            </div>
-          )}
-        </div>
-
-        {canSelect && (
-          <p className="text-xs text-zinc-500 leading-relaxed rounded-lg bg-paper-50 border border-paper-200 px-3 py-2.5">
-            Awarding a supplier records your choice in the audit trail. Use{" "}
-            <span className="font-medium text-ink-800">Select Supplier</span> in the hero card if you need a written rationale.
+    <Card data-testid="quotations-panel-empty">
+      <CardHeader><CardTitle>Supplier Quotations</CardTitle></CardHeader>
+      <CardBody>
+        <div className="rounded-xl border border-dashed border-paper-200 bg-paper-50/80 px-6 py-10 text-center">
+          <p className="text-sm text-zinc-600 max-w-md mx-auto leading-relaxed">
+            Suppliers are reviewing your RFQ. Bids will appear here as they arrive.
           </p>
-        )}
-
-        {showLineItems && hasLineItems && (
-          <div
-            className="rounded-xl border border-paper-200 overflow-hidden"
-            data-testid="quotation-line-items"
-          >
-            <div className="px-4 py-2.5 bg-paper-50 border-b border-paper-200 flex items-center gap-2">
-              <Layers className="h-3.5 w-3.5 text-zinc-500" />
-              <span className="text-xs font-semibold uppercase tracking-wider text-zinc-600">
-                Line-item breakdown
-              </span>
-            </div>
-            <div className="divide-y divide-paper-200">
-              {rowsWithLines.map((q) =>
-                (q.lineItems?.length ?? 0) > 0 ? (
-                  <div key={q.id} className="px-4 py-3">
-                    <div className="text-sm font-medium text-ink-900 mb-2">{q.supplierName}</div>
-                    <ul className="space-y-1.5">
-                      {q.lineItems!.map((li) => (
-                        <li
-                          key={li.id}
-                          className="flex justify-between gap-3 text-xs text-zinc-600"
-                        >
-                          <span className="truncate">
-                            {li.position}. {li.description}
-                          </span>
-                          <span className="tabular-nums shrink-0 text-ink-800">
-                            {li.quantity} × {li.unitPrice.toLocaleString()} ={" "}
-                            {li.total.toLocaleString()} {currency}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null,
-              )}
-            </div>
-          </div>
-        )}
+          <p className="text-xs text-zinc-400 mt-3">You will be notified when the comparison view is ready.</p>
+        </div>
       </CardBody>
-
-      <CardFooter className="flex flex-col gap-4">
-        <div className="grid gap-3 sm:grid-cols-3" data-testid="quotation-evaluation-summary">
-          <InsightChip
-            icon={TrendingDown}
-            label="Price spread"
-            value={`${formatMoney(currency, priceSpread)} between lowest and highest`}
-          />
-          <InsightChip
-            icon={TrendingDown}
-            label="Lowest total"
-            value={lowestSupplier ? `${lowestSupplier} · ${formatMoney(currency, lowestTotal)}` : "—"}
-          />
-          <InsightChip
-            icon={Clock}
-            label="Fastest lead"
-            value={
-              fastestSupplier && fastestLead != null
-                ? `${fastestSupplier} · ${fastestLead} days`
-                : "Not specified by suppliers"
-            }
-          />
-        </div>
-
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-1 border-t border-paper-200/80">
-          <p className="text-xs text-zinc-500 max-w-md leading-relaxed">
-            {quotations.length >= 2
-              ? "Lowest price and shortest lead time may point to different suppliers — weigh both before you award."
-              : "Waiting for more bids improves comparison confidence."}
-          </p>
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
-            {hasLineItems && (
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                className="gap-1.5"
-                onClick={() => setShowLineItems((v) => !v)}
-              >
-                <Layers className="h-3.5 w-3.5" />
-                {showLineItems ? "Hide line items" : "Line-item comparison"}
-              </Button>
-            )}
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="gap-1.5 text-zinc-600"
-              onClick={() => {}}
-            >
-              <FileDown className="h-3.5 w-3.5" />
-              Download PDF
-            </Button>
-          </div>
-        </div>
-      </CardFooter>
     </Card>
   );
 }
 
-function SupplierQuoteCard(props: {
+// ---------------------------------------------------------------------------
+type Row = {
   quotation: QuotationRowDTO;
+  key: string;
+  unitPrice: number;
+  total: number;
+  lineUom?: string;
+  productTitle?: string;
+};
+
+function QuotationListPanel(props: {
+  quotations: QuotationRowDTO[];
+  rfqLineItems: RfqLineRef[];
+  revisionHistory: Record<string, RevisionEntry[]>;
+  state: RfqState;
+  workspaceId: string;
+  isOwner: boolean;
+  productSummary?: QuotationProductSummary;
+}) {
+  const { quotations, rfqLineItems, state, workspaceId, isOwner, productSummary } = props;
+  const select = useSelectQuotation(workspaceId);
+  const qc = useQueryClient();
+  const { track } = useTelemetry();
+
+  const [shortlisted, setShortlisted] = useState<Set<string>>(new Set());
+  const [compareSel, setCompareSel] = useState<Set<string>>(new Set());
+  const [tab, setTab] = useState<"all" | "shortlisted" | "compared">("all");
+  const [showAll, setShowAll] = useState(false);
+  const [awardRow, setAwardRow] = useState<Row | null>(null);
+
+  const canSelect = state === "UNDER_EVALUATION" && isOwner;
+  const canAwardFromCheckbox =
+    isOwner && (state === "RFQ_OPEN" || state === "QUOTATIONS_CLOSED" || state === "UNDER_EVALUATION");
+
+  // Flatten to comparable rows. Multi-product → one row per (quotation, line).
+  const rows = useMemo<Row[]>(() => {
+    const groups = groupQuotationsByProduct(rfqLineItems, quotations);
+    if (groups) {
+      const out: Row[] = [];
+      for (const g of groups) {
+        for (const b of g.bids) {
+          out.push({
+            quotation: b.quotation,
+            key: `${b.quotation.id}-${b.lineItem.id}`,
+            unitPrice: b.lineItem.unitPrice,
+            total: b.lineTotal,
+            lineUom: g.line.uom,
+            productTitle: productSectionTitle(g.line.description),
+          });
+        }
+      }
+      return out.sort((a, b) => a.unitPrice - b.unitPrice);
+    }
+    return quotations
+      .map((q) => ({
+        quotation: q,
+        key: q.id,
+        unitPrice: q.unitPriceAvg ?? q.total,
+        total: q.total,
+      }))
+      .sort((a, b) => a.unitPrice - b.unitPrice);
+  }, [rfqLineItems, quotations]);
+
+  const currency = rows[0]?.quotation.currency ?? "USD";
+  const unitPrices = rows.map((r) => r.unitPrice);
+  const lowestUnit = unitPrices.length ? Math.min(...unitPrices) : 0;
+  const highestUnit = unitPrices.length ? Math.max(...unitPrices) : 0;
+  const avgUnit = unitPrices.length ? unitPrices.reduce((a, b) => a + b, 0) / unitPrices.length : 0;
+  const priceDiff = lowestUnit > 0 ? ((highestUnit - lowestUnit) / lowestUnit) * 100 : 0;
+
+  const fastestLead = useMemo(() => {
+    const leads = rows.map((r) => r.quotation.leadTimeDays).filter((d): d is number => d != null);
+    return leads.length ? Math.min(...leads) : null;
+  }, [rows]);
+
+  const bestRow = rows[0];
+
+  const toggleShortlist = (key: string) =>
+    setShortlisted((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+
+  const toggleCompare = (key: string) =>
+    setCompareSel((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else if (next.size < 3) next.add(key);
+      return next;
+    });
+
+  const handleSelect = (q: QuotationRowDTO) => {
+    track("next_action.clicked", { workspaceId, targetId: "select_supplier", meta: { quotationId: q.id } });
+    select.mutate({
+      quotationId: q.id,
+      supplierUserId: q.supplierId,
+      rationale: "Selected from quotation comparison panel",
+    });
+  };
+
+  const closeAwardFlow = () => setAwardRow(null);
+
+  const toggleAwardRow = (row: Row) => {
+    if (awardRow?.key === row.key) {
+      setAwardRow(null);
+      return;
+    }
+    track("next_action.clicked", { workspaceId, targetId: "quotation_award_flow", meta: { quotationId: row.quotation.id } });
+    setAwardRow(row);
+  };
+
+  const visibleRows = useMemo(() => {
+    let r = rows;
+    if (tab === "shortlisted") r = rows.filter((x) => shortlisted.has(x.key));
+    if (tab === "compared") r = rows.filter((x) => compareSel.has(x.key));
+    return r;
+  }, [rows, tab, shortlisted, compareSel]);
+
+  const VISIBLE_DEFAULT = 3;
+  const displayed = showAll || tab !== "all" ? visibleRows : visibleRows.slice(0, VISIBLE_DEFAULT);
+  const hiddenCount = visibleRows.length - displayed.length;
+
+  const TABS = [
+    { id: "all" as const, label: `All Quotations (${rows.length})` },
+    { id: "shortlisted" as const, label: `Shortlisted (${shortlisted.size})` },
+    { id: "compared" as const, label: `Compared (${compareSel.size})` },
+  ];
+
+  return (
+    <div data-testid="quotations-panel-matrix" className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-5 items-start">
+      {/* ── Main column ── */}
+      <div className="space-y-4">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Supplier Quotations</p>
+            <h2 className="text-lg font-semibold text-ink-900 mt-1">
+              Review and compare quotations from verified suppliers.
+            </h2>
+          </div>
+          <Badge tone={state === "UNDER_EVALUATION" ? "accent" : "neutral"} dot className="shrink-0">
+            {state === "UNDER_EVALUATION" ? "Evaluation open" : "Ready to evaluate"}
+          </Badge>
+        </div>
+
+        {/* Product summary */}
+        {productSummary && <ProductSummaryCard summary={productSummary} />}
+
+        {/* Tabs + compare */}
+        <div className="flex items-center justify-between gap-3 flex-wrap border-b border-paper-200">
+          <div className="flex items-center gap-1">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setTab(t.id)}
+                className={cn(
+                  "px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors",
+                  tab === t.id
+                    ? "border-accent-900 text-accent-900"
+                    : "border-transparent text-zinc-500 hover:text-ink-900",
+                )}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          {compareSel.size >= 2 && (
+            <Button variant="secondary" size="sm" className="gap-1.5 mb-1" onClick={() => setTab("compared")}>
+              <Scale className="h-3.5 w-3.5" />
+              Compare Suppliers ({compareSel.size})
+            </Button>
+          )}
+        </div>
+
+        {/* Info bar */}
+        <div className="flex items-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50/60 px-4 py-2.5 text-xs text-emerald-800">
+          <Info className="h-3.5 w-3.5 shrink-0" />
+          All prices are in {currency}. You can select up to 3 suppliers to compare.
+        </div>
+
+        {/* Rows */}
+        <div className="space-y-3" data-testid="quotation-matrix">
+          {displayed.length === 0 ? (
+            <p className="text-sm text-zinc-500 rounded-xl border border-dashed border-paper-200 bg-paper-50/60 px-4 py-8 text-center">
+              {tab === "shortlisted" ? "No shortlisted quotations yet." : tab === "compared" ? "Select suppliers to compare." : "No quotations yet."}
+            </p>
+          ) : (
+            displayed.map((r, idx) => {
+              const q = r.quotation;
+              const isLowest = r.unitPrice === lowestUnit;
+              const isFastest = q.leadTimeDays === fastestLead && fastestLead != null;
+              return (
+                <QuotationCard
+                  key={r.key}
+                  row={r}
+                  rank={idx}
+                  currency={currency}
+                  isLowest={isLowest}
+                  isFastest={isFastest}
+                  canSelect={canSelect}
+                  canAwardFromCheckbox={canAwardFromCheckbox}
+                  awardChecked={awardRow?.key === r.key}
+                  selectPending={select.isPending && select.variables?.quotationId === q.id}
+                  shortlisted={shortlisted.has(r.key)}
+                  comparing={compareSel.has(r.key)}
+                  onSelect={() => handleSelect(q)}
+                  onAwardCheckbox={() => toggleAwardRow(r)}
+                  onToggleShortlist={() => toggleShortlist(r.key)}
+                  onToggleCompare={() => toggleCompare(r.key)}
+                />
+              );
+            })
+          )}
+        </div>
+
+        {/* Show more */}
+        {tab === "all" && hiddenCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowAll(true)}
+            className="w-full flex items-center justify-center gap-2 py-3 text-sm font-medium text-accent-900 hover:underline"
+          >
+            Show {hiddenCount} more quotation{hiddenCount > 1 ? "s" : ""}
+            <ChevronDown className="h-4 w-4" />
+          </button>
+        )}
+        {tab === "all" && showAll && rows.length > VISIBLE_DEFAULT && (
+          <button
+            type="button"
+            onClick={() => setShowAll(false)}
+            className="w-full flex items-center justify-center gap-2 py-3 text-sm font-medium text-zinc-500 hover:underline"
+          >
+            Show fewer
+            <ChevronDown className="h-4 w-4 rotate-180" />
+          </button>
+        )}
+
+        {/* Compare banner */}
+        {rows.length >= 2 && (
+          <div className="rounded-xl border border-paper-200 bg-paper-50 px-4 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="h-10 w-10 rounded-full bg-accent-900/10 flex items-center justify-center text-accent-900 shrink-0">
+                <Scale className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-ink-900">Compare up to 3 suppliers side by side</p>
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  Select suppliers and compare their prices, lead times, payment terms, and other conditions.
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="shrink-0 w-full sm:w-auto gap-1.5"
+              disabled={compareSel.size < 2}
+              onClick={() => setTab("compared")}
+            >
+              <Scale className="h-3.5 w-3.5" />
+              Compare Suppliers
+            </Button>
+          </div>
+        )}
+      </div>
+
+      <QuotationAwardFlowModal
+        open={!!awardRow}
+        onClose={closeAwardFlow}
+        workspaceId={workspaceId}
+        state={state}
+        quotation={awardRow?.quotation ?? null}
+        unitPrice={awardRow?.unitPrice}
+        currency={currency}
+        onSuccess={() => {
+          void qc.invalidateQueries({ queryKey: ["rfq", workspaceId] });
+          void qc.invalidateQueries({ queryKey: ["rfq", workspaceId, "quotations"] });
+          setAwardRow(null);
+        }}
+      />
+
+      {/* ── Right sidebar ── */}
+      {rows.length > 0 && (
+        <aside className="space-y-4">
+          {/* Quotation Summary */}
+          <div className="rounded-xl border border-paper-200 bg-white p-5 space-y-4">
+            <div>
+              <h3 className="text-base font-semibold text-ink-900">Quotation Summary</h3>
+              <p className="text-xs text-zinc-400 mt-0.5">All amounts in {currency}</p>
+            </div>
+            <SummaryRow label="Quotes Received" value={String(rows.length)} valueClass="text-ink-900 font-bold text-base" />
+            <SummaryRow
+              label="Lowest Quote"
+              value={fmt(currency, lowestUnit)}
+              sub={bestRow?.quotation.supplierName}
+              valueClass="text-emerald-600 font-bold"
+            />
+            <SummaryRow
+              label="Highest Quote"
+              value={fmt(currency, highestUnit)}
+              sub={rows[rows.length - 1]?.quotation.supplierName}
+              valueClass="text-red-500 font-bold"
+            />
+            <SummaryRow label="Average Quote" value={fmt(currency, avgUnit)} valueClass="text-ink-700 font-semibold" />
+            <div className="flex items-center justify-between border-t border-paper-100 pt-3">
+              <span className="text-sm text-zinc-500">Price Difference</span>
+              <span className={cn("text-sm font-bold", priceDiff > 20 ? "text-red-500" : "text-orange-500")}>
+                {priceDiff.toFixed(1)}%
+              </span>
+            </div>
+            <p className="text-[11px] text-zinc-400 flex items-center gap-1.5 pt-1">
+              <Lock className="h-3 w-3 shrink-0" />
+              Currency is locked after submission.
+            </p>
+          </div>
+
+          {/* Price Distribution */}
+          {unitPrices.length >= 2 && (
+            <PriceDistribution prices={unitPrices} currency={currency} uom={rows[0]?.lineUom ?? "container"} />
+          )}
+
+          {/* Best Overall Choice */}
+          {bestRow && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 space-y-3">
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-full bg-white flex items-center justify-center shrink-0">
+                  <Trophy className="h-4 w-4 text-yellow-500" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700">Best Overall Choice</p>
+                  <p className="text-sm font-semibold text-ink-900 leading-snug">{bestRow.quotation.supplierName}</p>
+                </div>
+              </div>
+              <ul className="space-y-1.5">
+                {[
+                  "Lowest Price",
+                  fastestLead != null && bestRow.quotation.leadTimeDays === fastestLead ? "Fastest Lead Time" : "Good Lead Time",
+                  "Verified Supplier",
+                  "High Export Experience",
+                ].map((tag) => (
+                  <li key={tag} className="flex items-center gap-2 text-sm text-emerald-800">
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                    {tag}
+                  </li>
+                ))}
+              </ul>
+              {canSelect && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="w-full mt-1 bg-emerald-600 hover:bg-emerald-700 border-emerald-700"
+                  onClick={() => handleSelect(bestRow.quotation)}
+                  loading={select.isPending && select.variables?.quotationId === bestRow.quotation.id}
+                >
+                  Select as Preferred Supplier
+                </Button>
+              )}
+            </div>
+          )}
+        </aside>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sipariş ürününe göre otomatik seçilen görsel teması (anahtar kelime eşleşmesi)
+const PRODUCT_VISUALS: Array<{ icon: LucideIcon; tint: string; keywords: string[] }> = [
+  { icon: Wheat,          tint: "bg-amber-50 text-amber-600 border-amber-200",     keywords: ["spaghetti", "pasta", "macaroni", "noodle", "makarna", "flour", "un", "wheat", "grain", "rice", "pirinc", "bulgur", "cereal", "tahil"] },
+  { icon: Coffee,         tint: "bg-orange-50 text-orange-700 border-orange-200",   keywords: ["coffee", "kahve", "tea", "cay", "cocoa", "kakao"] },
+  { icon: Milk,           tint: "bg-sky-50 text-sky-600 border-sky-200",           keywords: ["milk", "sut", "dairy", "cheese", "peynir", "yogurt", "yoghurt"] },
+  { icon: Beef,           tint: "bg-red-50 text-red-600 border-red-200",           keywords: ["meat", "beef", "et", "chicken", "tavuk", "lamb", "kuzu", "poultry"] },
+  { icon: Fish,           tint: "bg-cyan-50 text-cyan-600 border-cyan-200",         keywords: ["fish", "balik", "seafood", "tuna", "shrimp", "karides"] },
+  { icon: Apple,          tint: "bg-green-50 text-green-600 border-green-200",       keywords: ["fruit", "meyve", "vegetable", "sebze", "apple", "elma", "tomato", "domates", "fresh"] },
+  { icon: Cookie,         tint: "bg-yellow-50 text-yellow-700 border-yellow-200",   keywords: ["popcorn", "mikrodalga", "microwave", "biscuit", "cookie", "biskuvi", "snack", "chocolate", "cikolata", "candy", "seker", "sugar", "confection", "chips", "cips"] },
+  { icon: Droplet,        tint: "bg-lime-50 text-lime-700 border-lime-200",         keywords: ["oil", "yag", "olive", "zeytin", "liquid", "juice", "meyve suyu", "beverage", "icecek", "water", "su"] },
+  { icon: Shirt,          tint: "bg-violet-50 text-violet-600 border-violet-200",   keywords: ["textile", "tekstil", "fabric", "kumas", "cotton", "pamuk", "garment", "giyim", "apparel", "clothing", "shirt", "tshirt"] },
+  { icon: FlaskConical,   tint: "bg-teal-50 text-teal-600 border-teal-200",         keywords: ["chemical", "kimyasal", "detergent", "deterjan", "cleaning", "temizlik", "cosmetic", "kozmetik"] },
+  { icon: Pill,           tint: "bg-emerald-50 text-emerald-600 border-emerald-200", keywords: ["pharma", "ilac", "medicine", "medical", "medikal", "supplement", "vitamin", "health", "saglik"] },
+  { icon: Cpu,            tint: "bg-indigo-50 text-indigo-600 border-indigo-200",   keywords: ["electronic", "elektronik", "device", "cihaz", "phone", "telefon", "computer", "bilgisayar", "gadget", "chip"] },
+  { icon: Sofa,           tint: "bg-rose-50 text-rose-600 border-rose-200",         keywords: ["furniture", "mobilya", "chair", "sandalye", "table", "masa", "sofa", "koltuk", "home", "ev"] },
+  { icon: Car,            tint: "bg-slate-50 text-slate-600 border-slate-200",       keywords: ["auto", "otomotiv", "car", "araba", "vehicle", "arac", "spare", "yedek parca", "tire", "lastik"] },
+  { icon: Wrench,         tint: "bg-zinc-100 text-zinc-600 border-zinc-300",         keywords: ["tool", "alet", "hardware", "hirdavat", "machine", "makine", "industrial", "endustriyel", "equipment", "ekipman"] },
+  { icon: FileText,       tint: "bg-blue-50 text-blue-600 border-blue-200",         keywords: ["paper", "kagit", "a4", "stationery", "kirtasiye", "book", "kitap", "notebook", "defter"] },
+];
+
+function resolveProductVisual(summary: QuotationProductSummary): { icon: LucideIcon; tint: string } {
+  const haystack = `${summary.category ?? ""} ${summary.name ?? ""}`.toLowerCase();
+  for (const v of PRODUCT_VISUALS) {
+    if (v.keywords.some((k) => haystack.includes(k))) return { icon: v.icon, tint: v.tint };
+  }
+  return { icon: Package, tint: "bg-paper-50 text-zinc-400 border-paper-200" };
+}
+
+// ---------------------------------------------------------------------------
+function ProductThumb(props: {
+  name: string;
+  category?: string;
+  imageUrl?: string | null;
+  size?: "sm" | "md";
+}) {
+  const [imgFailed, setImgFailed] = useState(false);
+  const visual = resolveProductVisual({ name: props.name, category: props.category });
+  const VisualIcon = visual.icon;
+  const showImage = Boolean(props.imageUrl) && !imgFailed;
+  const sizeCls = props.size === "sm" ? "h-12 w-12" : "h-16 w-16";
+  const iconCls = props.size === "sm" ? "h-5 w-5" : "h-7 w-7";
+
+  if (showImage) {
+    return (
+      <img
+        src={props.imageUrl!}
+        alt={props.name}
+        className={cn("shrink-0 rounded-lg border border-paper-200 object-cover bg-paper-50", sizeCls)}
+        onError={() => setImgFailed(true)}
+      />
+    );
+  }
+
+  return (
+    <div className={cn("shrink-0 rounded-lg border flex items-center justify-center", sizeCls, visual.tint)}>
+      <VisualIcon className={iconCls} />
+    </div>
+  );
+}
+
+function ProductSummaryCard(props: { summary: QuotationProductSummary }) {
+  const { summary } = props;
+  const multi = (summary.products?.length ?? 0) > 1;
+  const fields = [
+    { icon: Package,       label: "Quantity",     value: summary.quantity },
+    { icon: MapPin,        label: "Destination",  value: summary.destination },
+    { icon: FileText,      label: "Incoterm",     value: summary.incoterm },
+    {
+      icon: CalendarClock,
+      label: "RFQ Deadline",
+      value: summary.deadline ? new Date(summary.deadline).toLocaleDateString("tr-TR") : undefined,
+    },
+  ].filter((f) => f.value);
+
+  return (
+    <div className="rounded-xl border border-paper-200 bg-white p-4 sm:p-5">
+      <div className="flex items-start gap-4">
+        {multi ? (
+          <div className="flex flex-wrap gap-2 shrink-0 max-w-[220px]">
+            {summary.products!.map((p) => (
+              <div key={p.name} className="flex flex-col items-center gap-1 w-14">
+                <ProductThumb name={p.name} category={p.category} imageUrl={p.imageUrl} size="sm" />
+                <span className="text-[10px] text-zinc-600 text-center leading-tight line-clamp-2">{p.name}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <ProductThumb
+            name={summary.name}
+            category={summary.category}
+            imageUrl={summary.imageUrl}
+          />
+        )}
+        <div className="flex-1 min-w-0">
+          <h3 className="text-base font-semibold text-ink-900 leading-snug">{summary.name}</h3>
+          {multi && (
+            <p className="text-xs text-zinc-500 mt-1">
+              {summary.products!.map((p) => p.quantity ? `${p.name} (${p.quantity})` : p.name).join(" · ")}
+            </p>
+          )}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-3 mt-3">
+            {fields.map((f) => (
+              <div key={f.label}>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 flex items-center gap-1" lang="en">
+                  <f.icon className="h-3 w-3" />
+                  {f.label}
+                </p>
+                <p className="text-sm font-medium text-ink-900 mt-0.5">{f.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+function SummaryRow(props: { label: string; value: string; sub?: string; valueClass?: string }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <span className="text-sm text-zinc-500 shrink-0">{props.label}</span>
+      <div className="text-right min-w-0">
+        <span className={cn("text-sm tabular-nums block", props.valueClass)}>{props.value}</span>
+        {props.sub && <p className="text-[11px] text-zinc-400 leading-tight truncate" title={props.sub}>{props.sub}</p>}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+function PriceDistribution(props: { prices: number[]; currency: string; uom: string }) {
+  const { prices } = props;
+  const BUCKETS = 7;
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  const span = max - min || 1;
+  const step = span / BUCKETS;
+
+  const buckets = Array.from({ length: BUCKETS }, () => 0);
+  for (const p of prices) {
+    let idx = Math.floor((p - min) / step);
+    if (idx >= BUCKETS) idx = BUCKETS - 1;
+    if (idx < 0) idx = 0;
+    buckets[idx] += 1;
+  }
+  const peak = Math.max(...buckets, 1);
+
+  return (
+    <div className="rounded-xl border border-paper-200 bg-white p-5 space-y-3">
+      <h3 className="text-base font-semibold text-ink-900">Price Distribution</h3>
+      <div className="flex items-end gap-1.5 h-24">
+        {buckets.map((count, i) => (
+          <div key={i} className="flex-1 flex flex-col items-center justify-end h-full">
+            <div
+              className="w-full rounded-t bg-accent-900/70"
+              style={{ height: `${Math.max((count / peak) * 100, count > 0 ? 8 : 2)}%` }}
+              title={`${count} quote${count === 1 ? "" : "s"}`}
+            />
+          </div>
+        ))}
+      </div>
+      <div className="flex justify-between text-[10px] text-zinc-400 tabular-nums">
+        <span>{min.toFixed(2)}</span>
+        <span>{max.toFixed(2)}</span>
+      </div>
+      <p className="text-[10px] text-zinc-400 text-center">Price ({props.currency}) per {props.uom}</p>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+function QuotationCard(props: {
+  row: Row;
+  rank: number;
   currency: string;
-  revisionHistory: RevisionEntry[];
   isLowest: boolean;
   isFastest: boolean;
   canSelect: boolean;
+  canAwardFromCheckbox: boolean;
+  awardChecked: boolean;
   selectPending: boolean;
+  shortlisted: boolean;
+  comparing: boolean;
   onSelect: () => void;
+  onAwardCheckbox: () => void;
+  onToggleShortlist: () => void;
+  onToggleCompare: () => void;
 }) {
-  const { quotation: q, currency, revisionHistory, isLowest, isFastest, canSelect, selectPending, onSelect } = props;
+  const { t } = useT();
+  const {
+    row, rank, currency, isLowest, isFastest, canSelect, canAwardFromCheckbox, awardChecked, selectPending,
+    shortlisted, comparing, onSelect, onAwardCheckbox, onToggleShortlist, onToggleCompare,
+  } = props;
+  const q = row.quotation;
+  const rankCfg = RANK_CONFIG[rank] ?? null;
+  const RankIcon = rankCfg?.icon;
+  const uomLabel = row.lineUom ?? "container";
 
   return (
     <article
+      data-testid={`quotation-row-${q.id}`}
       className={cn(
-        "rounded-xl border bg-white p-4 flex flex-col min-h-[220px] transition-shadow",
-        isLowest ? "border-accent-900/30 shadow-sm ring-1 ring-accent-900/10" : "border-paper-200",
+        "rounded-xl border bg-white p-4 transition-shadow hover:shadow-sm",
+        isLowest ? "border-accent-900/25 ring-1 ring-accent-900/10" : "border-paper-200",
       )}
     >
-      <div className="flex items-start justify-between gap-2">
-        <h4 className="text-sm font-semibold text-ink-900 leading-snug pr-1">{q.supplierName}</h4>
-        <div className="flex flex-col items-end gap-1 shrink-0">
-          {isLowest && (
-            <Badge tone="success" className="whitespace-nowrap">
-              Lowest
-            </Badge>
-          )}
-          {isFastest && (
-            <Badge tone="info" className="whitespace-nowrap">
-              Fastest
-            </Badge>
+      {/* Top: supplier identity */}
+      <div className="flex items-start gap-3">
+        <label className="shrink-0 pt-0.5 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={canAwardFromCheckbox ? awardChecked : comparing}
+            onChange={() => {
+              if (canAwardFromCheckbox) onAwardCheckbox();
+              else onToggleCompare();
+            }}
+            className="h-4 w-4 rounded border-paper-300 text-accent-900 focus:ring-accent-900/40"
+            aria-label={
+              canAwardFromCheckbox
+                ? t("rfq.quotation.award.checkboxSelect", undefined, { supplier: q.supplierName })
+                : t("rfq.quotation.compare.checkbox", undefined, { supplier: q.supplierName })
+            }
+            data-testid={canAwardFromCheckbox ? `quote-award-checkbox-${q.id}` : `quote-compare-checkbox-${q.id}`}
+          />
+        </label>
+
+        {rankCfg && RankIcon && (
+          <div className={cn("shrink-0 h-8 w-8 rounded-full border flex items-center justify-center", rankCfg.bg)}>
+            <RankIcon className={cn("h-4 w-4", rankCfg.color)} />
+          </div>
+        )}
+
+        <div className="flex-1 min-w-0">
+          <h4 className="text-sm font-semibold text-ink-900 leading-snug">{q.supplierName}</h4>
+          <p className="text-[11px] text-emerald-600 font-medium mt-0.5 flex items-center gap-1">
+            <CheckCircle2 className="h-3 w-3 shrink-0" />
+            Verified Manufacturer
+          </p>
+          {row.productTitle && (
+            <p className="text-[11px] text-zinc-400 mt-0.5 truncate" title={row.productTitle}>{row.productTitle}</p>
           )}
         </div>
-      </div>
 
-      <div
-        data-testid={`quote-total-${q.id}`}
-        className={cn(
-          "mt-3 font-display text-2xl font-semibold tabular-nums tracking-tight",
-          isLowest && "text-accent-900",
-        )}
-      >
-        {formatMoney(currency, q.total)}
-        {isLowest && (
-          <span className="sr-only"> lowest</span>
-        )}
-      </div>
-
-      {revisionHistory.length > 1 && (
-        <div data-testid={`quote-history-${q.id}`} className="mt-3 rounded-lg bg-paper-50 border border-paper-200 px-3 py-2">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5">Bid history</p>
-          <ul className="space-y-1">
-            {revisionHistory.map((entry, idx) => (
-              <li key={`${entry.at}-${idx}`} className="flex justify-between gap-2 text-xs text-zinc-600">
-                <span>{entry.kind === "REVISED" ? "Revised" : "Submitted"}</span>
-                <span className="tabular-nums font-medium text-ink-900">
-                  {entry.currency} {entry.total.toLocaleString()}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <dl className="mt-4 space-y-2 text-sm flex-1">
-        <MetricLine label="Unit price" value={q.unitPriceAvg != null ? q.unitPriceAvg.toLocaleString() : "—"} />
-        <MetricLine
-          label="Lead time"
-          value={q.leadTimeDays != null ? `${q.leadTimeDays} days` : "—"}
-          highlight={isFastest}
-        />
-        <MetricLine label="Incoterm" value={q.incoterm ?? "—"} />
-        <MetricLine
-          label="Sample"
-          value={q.sampleAvail == null ? "—" : q.sampleAvail ? "Available" : "Not offered"}
-        />
-        <MetricLine
-          label="Valid until"
-          value={q.validUntil ? new Date(q.validUntil).toLocaleDateString() : "—"}
-        />
-      </dl>
-
-      {canSelect && (
-        <Button
-          data-testid={`quote-select-${q.id}`}
-          className="mt-4 w-full"
-          size="sm"
-          variant={isLowest ? "primary" : "secondary"}
-          onClick={onSelect}
-          loading={selectPending}
+        {/* Unit price — compact */}
+        <div
+          data-testid={`quote-total-${q.id}`}
+          className={cn(
+            "shrink-0 rounded-lg border px-3 py-2 text-right min-w-[128px]",
+            isLowest ? "border-accent-900/20 bg-accent-50/60" : "border-paper-200 bg-paper-50",
+          )}
         >
-          Select {q.supplierName.split(" ")[0]}
-        </Button>
-      )}
+          <p className="text-[9px] font-semibold uppercase tracking-wider text-zinc-500" lang="en">Unit Price</p>
+          <p className={cn(
+            "text-base font-bold tabular-nums leading-tight mt-0.5",
+            isLowest ? "text-accent-900" : "text-ink-900",
+          )}>
+            {fmt(currency, row.unitPrice)}
+            {isLowest && <span className="sr-only"> lowest</span>}
+          </p>
+          <p className="text-[10px] text-zinc-500">/ {uomLabel}</p>
+        </div>
+      </div>
+
+      {/* Middle: terms grid — wraps cleanly, never overlaps */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-4 gap-y-2 mt-3 pt-3 border-t border-paper-100 text-xs">
+        <TermRow label="Lead Time" value={q.leadTimeDays != null ? `${q.leadTimeDays} Days` : "—"} dot={isFastest ? "green" : q.leadTimeDays != null && q.leadTimeDays <= 20 ? "green" : q.leadTimeDays != null ? "yellow" : undefined} />
+        <TermRow label="MOQ" value={q.moq != null ? `${q.moq} Container${q.moq > 1 ? "s" : ""}` : "1 Container"} />
+        <TermRow label="Incoterm" value={q.incoterm ?? "—"} />
+        <TermRow label="Sample" value={q.sampleAvail == null ? "—" : q.sampleAvail ? "Available" : "Not offered"} valueClass={q.sampleAvail ? "text-emerald-600" : undefined} />
+        <TermRow label="Valid Until" value={q.validUntil ? new Date(q.validUntil).toLocaleDateString("tr-TR") : "—"} />
+      </div>
+
+      {/* Bottom: attributes + actions */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mt-3 pt-3 border-t border-paper-100">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          {ATTRIBUTES.map(({ icon: Icon, label }) => (
+            <span key={label} className="inline-flex items-center gap-1 text-[11px] text-zinc-500">
+              <Icon className="h-3.5 w-3.5 text-zinc-400" />
+              {label}
+            </span>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {isLowest && (
+            <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+              Lowest Price
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={onToggleShortlist}
+            className={cn(
+              "inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
+              shortlisted
+                ? "border-amber-300 bg-amber-50 text-amber-700"
+                : "border-paper-200 bg-white text-zinc-600 hover:bg-paper-50",
+            )}
+          >
+            <Star className={cn("h-3.5 w-3.5", shortlisted && "fill-amber-500 text-amber-500")} />
+            {shortlisted ? "Shortlisted" : "Shortlist"}
+          </button>
+          {canAwardFromCheckbox && (
+            <button
+              type="button"
+              onClick={onToggleCompare}
+              className={cn(
+                "inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
+                comparing
+                  ? "border-accent-900/30 bg-accent-50 text-accent-900"
+                  : "border-paper-200 bg-white text-zinc-600 hover:bg-paper-50",
+              )}
+              data-testid={`quote-compare-toggle-${q.id}`}
+            >
+              <Scale className="h-3.5 w-3.5" />
+              {comparing ? "Comparing" : "Compare"}
+            </button>
+          )}
+          {canSelect ? (
+            <Button
+              data-testid={`quote-select-${q.id}`}
+              variant={isLowest ? "primary" : "secondary"}
+              size="sm"
+              onClick={onSelect}
+              loading={selectPending}
+            >
+              Select Supplier
+            </Button>
+          ) : (
+            <Button variant="secondary" size="sm">
+              View Details
+            </Button>
+          )}
+        </div>
+      </div>
     </article>
   );
 }
 
-function MetricLine(props: { label: string; value: string; highlight?: boolean }) {
+function TermRow(props: { label: string; value: string; valueClass?: string; dot?: "green" | "yellow" }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 border-b border-paper-100 pb-2 last:border-0 last:pb-0">
-      <dt className="text-xs uppercase tracking-wider text-zinc-500">{props.label}</dt>
-      <dd
-        className={cn(
-          "tabular-nums text-ink-900 font-medium",
-          props.highlight && "text-accent-900",
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-zinc-400" lang="en">{props.label}</span>
+      <span className={cn("font-medium text-ink-900 flex items-center gap-1", props.valueClass)}>
+        {props.dot && (
+          <span className={cn("inline-block h-2 w-2 rounded-full shrink-0", props.dot === "green" ? "bg-emerald-500" : "bg-yellow-400")} />
         )}
-      >
         {props.value}
-      </dd>
+      </span>
     </div>
   );
-}
-
-function InsightChip(props: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-}) {
-  const Icon = props.icon;
-  return (
-    <div className="rounded-lg bg-white border border-paper-200 px-3 py-2.5">
-      <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-        <Icon className="h-3 w-3" />
-        {props.label}
-      </div>
-      <p className="mt-1 text-sm text-ink-900 leading-snug">{props.value}</p>
-    </div>
-  );
-}
-
-function formatMoney(currency: string, amount: number) {
-  return `${currency} ${amount.toLocaleString()}`;
 }
 
 // ---------------------------------------------------------------------------
-function CollapsedPanel(props: {
-  quotations: QuotationRowDTO[];
-  selectedId: string;
-  workspaceId: string;
-  state: RfqState;
-  isOwner: boolean;
-}) {
+function CollapsedPanel(props: { quotations: QuotationRowDTO[]; selectedId: string }) {
   const { quotations, selectedId } = props;
-  const [expanded, setExpanded] = useState(false);
   const winner = quotations.find((q) => q.id === selectedId);
-  const others = quotations.filter((q) => q.id !== selectedId);
-
   if (!winner) return null;
 
   return (
@@ -527,39 +906,10 @@ function CollapsedPanel(props: {
         </div>
         <Badge tone="accent" dot>Winner</Badge>
       </CardHeader>
-      <CardBody className="space-y-3">
-        <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
-          <span data-testid="winner-total" className="font-display text-2xl font-semibold tabular-nums">
-            {winner.currency} {winner.total.toLocaleString()}
-          </span>
-          {winner.leadTimeDays != null && <span className="text-sm text-zinc-600">{winner.leadTimeDays} days lead</span>}
-          {winner.incoterm && <span className="text-sm text-zinc-600">· {winner.incoterm}</span>}
-        </div>
-
-        {others.length > 0 && (
-          <button
-            data-testid="quotations-collapsed-toggle"
-            onClick={() => setExpanded((v) => !v)}
-            className="inline-flex items-center gap-1 text-xs text-accent-900 font-medium hover:underline"
-          >
-            <ChevronRight className={cn("h-3 w-3 transition-transform", expanded && "rotate-90")} />
-            {expanded ? "Hide" : "Show"} other quotations ({others.length})
-          </button>
-        )}
-
-        {expanded && (
-          <ul data-testid="quotations-collapsed-others" className="divide-y divide-paper-200 -mx-2">
-            {others.map((q) => (
-              <li key={q.id} className="px-2 py-2.5 flex items-baseline justify-between gap-3 text-sm text-zinc-500">
-                <span className="truncate">{q.supplierName}</span>
-                <span className="tabular-nums shrink-0">
-                  {q.currency} {q.total.toLocaleString()}
-                  {q.leadTimeDays != null && <span className="ml-2 text-xs text-zinc-400">{q.leadTimeDays}d</span>}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
+      <CardBody>
+        <span data-testid="winner-total" className="font-display text-2xl font-semibold tabular-nums">
+          {fmt(winner.currency, winner.total)}
+        </span>
       </CardBody>
     </Card>
   );

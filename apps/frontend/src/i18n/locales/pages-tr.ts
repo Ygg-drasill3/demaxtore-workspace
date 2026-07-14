@@ -155,6 +155,16 @@ const pagesTr: TranslationDict = {
   "rfq.details.field.notes": "Notlar",
   "rfq.details.noExtraInfo": "Ek bilgi yok",
 
+  "rfq.participants.title": "Katılımcılar",
+  "rfq.participants.empty": "Henüz katılımcı yok.",
+  "rfq.participants.maskedHint": "Tedarikçi isimleri, DeMaxtore RFQ'yu yayınladıktan sonra görünür.",
+
+  "rfq.procurement.cbNotEligible.title": "CommodityBid bu RFQ için kullanılamaz",
+  "rfq.procurement.cbNotEligible.body": "Commodity olmayan bir ürün seçtiniz. Yalnızca şu ürünlerden CommodityBid oluşturulabilir: {{products}}.",
+  "rfq.procurement.cbEligible.hint": "Bu ürünler CommodityBid ile uyumludur: {{products}}.",
+  "rfq.procurement.cbCard.disabled": "Ürünler CommodityBid kapsamında değil",
+  "rfq.procurement.cbCard.enabled": "Canlı açık artırma ile fiyat keşfi",
+
   "rfq.catalog.mandatoryHint": "* ile işaretli alanlar zorunludur.",
   "rfq.catalog.requestSection": "Katalog talebi",
   "rfq.catalog.contactSection": "İletişim bilgileriniz",
@@ -232,6 +242,25 @@ const pagesTr: TranslationDict = {
   "documents.dc.filterRfq": "RFQ",
   "documents.dc.allSources": "Tüm kaynaklar",
   "documents.dc.allRfqs": "Tüm RFQ'lar",
+
+  "rfq.quotation.award.closeOpen.title": "Teklifleri kapatıp devam edelim mi?",
+  "rfq.quotation.award.closeClosed.title": "Değerlendirmeye geçelim mi?",
+  "rfq.quotation.award.closeOpen.description": "Yeni teklif alımını durdurup tedarikçi seçimine geçmek istiyor musunuz? Bu adımdan sonra tedarikçiler yeni teklif gönderemez.",
+  "rfq.quotation.award.closeClosed.description": "Teklifler toplandı. Değerlendirmeye geçip seçtiğiniz tedarikçiyi onaylamak ister misiniz?",
+  "rfq.quotation.award.decline": "Hayır, vazgeç",
+  "rfq.quotation.award.confirmContinue": "Evet, devam et",
+  "rfq.quotation.award.pendingQuote": "Seçmek üzere olduğunuz teklif: {price}",
+  "rfq.quotation.award.select.title": "Tedarikçiyi seç",
+  "rfq.quotation.award.select.description": "Kazanan tedarikçiyi onaylayın ve karar gerekçenizi belirtin.",
+  "rfq.quotation.award.selectConfirm": "Tedarikçiyi seç",
+  "rfq.quotation.award.verifiedManufacturer": "Doğrulanmış Üretici",
+  "rfq.quotation.award.leadTime": "{days} gün termin",
+  "rfq.quotation.award.rationalePlaceholder": "En az 15 karakter — bu tedarikçiyi neden seçiyorsunuz?",
+  "rfq.quotation.award.selectFootnote": "Onayladığınızda teklifler kapatılır (gerekirse), değerlendirme tamamlanır ve seçilen tedarikçi bilgilendirilir.",
+  "rfq.quotation.award.success": "Tedarikçi başarıyla seçildi",
+  "rfq.quotation.award.error": "Tedarikçi seçimi tamamlanamadı",
+  "rfq.quotation.award.checkboxSelect": "{supplier} tedarikçisini seç",
+  "rfq.quotation.compare.checkbox": "{supplier} ile karşılaştır",
 };
 
 export default pagesTr;

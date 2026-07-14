@@ -80,8 +80,8 @@ export default function ExceptionHubPage() {
             <AlertTriangle className="h-6 w-6 text-red-300" />
           </div>
           <div>
-            <div className="text-[11px] uppercase tracking-[0.16em] text-white/50">Buyer Exception Hub</div>
-            <h1 className="font-display text-3xl font-semibold mt-1">Exceptions</h1>
+            <div className="text-[11px] uppercase tracking-[0.16em] text-white/50">Alert Hub</div>
+            <h1 className="font-display text-3xl font-semibold mt-1">Alert</h1>
             <p className="text-sm text-white/60 mt-2 max-w-xl">
               What needs attention, what is delayed, what is missing, and what action is required.
             </p>
@@ -90,7 +90,7 @@ export default function ExceptionHubPage() {
       </header>
 
       <section data-testid="eh-kpis" className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-        <Kpi testId="eh-kpi-open" label="Open Exceptions" value={data.kpis.openExceptions} />
+        <Kpi testId="eh-kpi-open" label="Open Alerts" value={data.kpis.openExceptions} />
         <Kpi testId="eh-kpi-critical" label="Critical" value={data.kpis.criticalExceptions} accent="border-red-200 bg-red-50/30" />
         <Kpi testId="eh-kpi-pending" label="My Pending Actions" value={data.kpis.myPendingActions} />
         <Kpi testId="eh-kpi-resolved" label="Resolved This Week" value={data.kpis.resolvedThisWeek} />

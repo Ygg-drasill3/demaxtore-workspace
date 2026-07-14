@@ -12,6 +12,7 @@ import type {
   SupplyGap,
 } from "@dmx/contracts/market-intelligence";
 import { resolveFreightRoute } from "../freightiq/commercial/freight-route.util.js";
+import { findLedgerWithOffers } from "../freightiq/commercial/freight-ledger.query.js";
 import {
   categoryTrend,
   classifyForwarder,
@@ -418,9 +419,9 @@ export class MarketService {
       byFwd.set(id, slot);
     }
 
-    const ledger = await this.db.freightRevenueLedger.findMany({
+    const ledger = await findLedgerWithOffers(this.db, {
       where: { status: { in: ["PENDING", "REALIZED"] } },
-      include: { offer: { select: { forwarderContactId: true } } },
+      offerInclude: {},
     });
     for (const row of ledger) {
       const fid = row.offer.forwarderContactId;

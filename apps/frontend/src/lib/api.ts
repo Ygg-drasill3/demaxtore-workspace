@@ -4,6 +4,7 @@ import { useAuth } from "@/store/auth.store";
 import { useToast } from "@/store/toast.store";
 import type { ApiError } from "@dmx/contracts/api";
 import { waitForAuthReady } from "@/lib/wait-for-auth";
+import { isOnLoginPage, redirectToLogin } from "@/lib/login-redirect";
 
 export const api: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
@@ -41,6 +42,12 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // Passwordless sessions cannot refresh — surface expiry on the access page.
+    if (useAuth.getState().accessMode === "passwordless") {
+      useAuth.getState().logoutLocal();
+      return Promise.reject(error);
+    }
+
     original._retried = true;
 
     if (isRefreshing) {
@@ -59,9 +66,8 @@ api.interceptors.response.use(
       pendingQueue = [];
       const returnPath = `${window.location.pathname}${window.location.search}`;
       useAuth.getState().logoutLocal();
-      const loginUrl = `/login?${new URLSearchParams({ from: returnPath }).toString()}`;
-      if (window.location.pathname !== "/login") {
-        window.location.replace(loginUrl);
+      if (!isOnLoginPage()) {
+        redirectToLogin(returnPath);
       }
       return Promise.reject(e);
     } finally {

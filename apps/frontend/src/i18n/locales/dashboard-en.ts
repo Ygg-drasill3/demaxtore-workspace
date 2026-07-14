@@ -12,7 +12,7 @@ const dashboardEn: TranslationDict = {
   "dash.common.loadingDocuments": "Loading documents…",
   "dash.common.loadingConversations": "Loading conversations…",
   "dash.common.loadingEvents": "Loading events…",
-  "dash.common.loadingExceptions": "Loading exceptions…",
+  "dash.common.loadingExceptions": "Loading alerts…",
   "dash.common.item": "item",
   "dash.common.items": "items",
   "dash.common.urgent": "Urgent · ",
@@ -69,7 +69,7 @@ const dashboardEn: TranslationDict = {
   "dash.eyebrow.workload": "Workload",
   "dash.eyebrow.freightiq": "FreightIQ",
   "dash.eyebrow.tradeLifecycle": "Trade lifecycle",
-  "dash.eyebrow.exceptionHub": "Exception Hub",
+  "dash.eyebrow.exceptionHub": "Alert Hub",
 
   "dash.actionInbox.title": "Required Actions",
   "dash.actionInbox.empty": "No pending actions — you're caught up.",
@@ -83,12 +83,12 @@ const dashboardEn: TranslationDict = {
   "dash.shipments.title": "My Shipments",
   "dash.shipments.empty": "No active shipments.",
 
-  "dash.exceptions.title": "My Exceptions",
+  "dash.exceptions.title": "My Alerts",
   "dash.exceptions.open": "Open",
   "dash.exceptions.critical": "Critical",
   "dash.exceptions.waitingForMe": "Waiting For Me",
   "dash.exceptions.resolvedWeek": "Resolved This Week",
-  "dash.exceptions.empty": "No exceptions waiting for you.",
+  "dash.exceptions.empty": "No alerts waiting for you.",
 
   "dash.communication.title": "Communication Center",
   "dash.communication.empty": "No recent conversations.",

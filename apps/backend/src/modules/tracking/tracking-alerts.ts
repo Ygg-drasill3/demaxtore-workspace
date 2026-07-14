@@ -2,7 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import { AlertKey } from "@dmx/contracts/control-tower";
 import { SocketEvents } from "@dmx/contracts/socket-events";
 import { socketBus } from "../../realtime/socket-bus.js";
-import { toAlertDto } from "../control-tower/control-tower.mapper.js";
+import { broadcastControlTowerAlertCreated } from "../control-tower/control-tower.socket.js";
 import { isTestWorkspace } from "../control-tower/test-workspace.js";
 
 const TRACKING_ALERT_KEYS = [
@@ -42,7 +42,7 @@ export async function upsertControlTowerAlert(
       },
       include: { workspace: { select: { externalRef: true } } },
     });
-    socketBus.emitToRole("ADMIN", SocketEvents.CONTROL_TOWER_ALERT_CREATED, { alert: toAlertDto(row) });
+    await broadcastControlTowerAlertCreated(db, row);
     return true;
   } catch {
     return false;

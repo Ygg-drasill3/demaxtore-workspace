@@ -38,6 +38,10 @@ const ALLOWED_MIMES = new Set([
   "image/png",
   "image/jpeg",
   "image/jpg",
+  "image/webp",
+  "video/mp4",
+  "video/quicktime",
+  "video/webm",
   "application/zip",
   "application/x-zip-compressed",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -292,28 +296,55 @@ export class CommunicationService {
         mentionIds,
       );
       const link = this.workspaceLink(workspaceType, workspaceId);
+      const authorRole = actor.role;
       await notifyCommEvent(tx, {
         userIds: notifyIds,
         auditWorkspaceId: resolved.auditWorkspaceId,
+        commWorkspaceType: workspaceType,
+        commWorkspaceId: workspaceId,
         eventType: input.messageType === "INTERNAL_NOTE"
           ? "communication.internal_note"
           : "communication.message.created",
-        title: "New workspace message",
+        title: authorRole === "SUPPLIER" ? "New supplier message" : "New workspace message",
         message: input.body.slice(0, 120),
         link,
+        centerType: authorRole === "SUPPLIER" ? "NEW_SUPPLIER_MESSAGE" : undefined,
+        metadata: {
+          messageId: msg.id,
+          sensitiveContent: input.messageType === "INTERNAL_NOTE",
+          messageVisibility: input.visibility,
+        },
       });
 
       for (const uid of mentionIds) {
         if (uid === actor.id) continue;
+        const mentionedUser = await tx.user.findUnique({ where: { id: uid }, select: { role: true } });
+        const isBuyer = mentionedUser?.role === "BUYER" || mentionedUser?.role === "ADMIN";
         await notifyCommEvent(tx, {
           userIds: [uid],
           auditWorkspaceId: resolved.auditWorkspaceId,
-          eventType: "communication.mentioned",
-          title: "You were mentioned",
+          commWorkspaceType: workspaceType,
+          commWorkspaceId: workspaceId,
+          eventType: isBuyer ? "communication.mentioned.buyer" : "communication.mentioned.supplier",
+          title: isBuyer ? "Buyer mentioned in conversation" : "Supplier mentioned in conversation",
           message: input.body.slice(0, 120),
           link,
+          centerType: isBuyer ? "BUYER_MENTIONED" : "SUPPLIER_MENTIONED",
+          metadata: { messageId: msg.id },
         });
         await this.audit(tx, resolved, actor, "communication.mentioned", { messageId: msg.id, userId: uid }, ctx);
+      }
+
+      const parts = await tx.workspaceParticipant.findMany({
+        where: { workspaceId: resolved.auditWorkspaceId, leftAt: null },
+        select: { userId: true },
+      });
+      const now = new Date();
+      for (const p of parts) {
+        if (p.userId === actor.id) continue;
+        await tx.workspaceMessageDelivery.create({
+          data: { messageId: msg.id, userId: p.userId, sentAt: now },
+        });
       }
 
       return msg.id;
@@ -519,6 +550,29 @@ export class CommunicationService {
   ): Promise<string[]> {
     const ids = new Set<string>(explicitIds);
     const handles = [...body.matchAll(/@([a-zA-Z0-9._-]+)/g)].map((m) => m[1].toLowerCase());
+    if (handles.length) {
+      const roleMap: Record<string, keyof Pick<VisibilityContext, "buyerUserIds" | "supplierUserIds">> = {
+        buyer: "buyerUserIds",
+        supplier: "supplierUserIds",
+        demaxtore: "buyerUserIds",
+      };
+      for (const h of handles) {
+        if (h === "demaxtore") {
+          const admins = await this.db.user.findMany({
+            where: { id: { in: ctx.participantUserIds }, role: "ADMIN" },
+            select: { id: true },
+          });
+          for (const a of admins) ids.add(a.id);
+          continue;
+        }
+        const key = roleMap[h];
+        if (key) {
+          for (const uid of ctx[key]) {
+            if (ctx.participantUserIds.includes(uid)) ids.add(uid);
+          }
+        }
+      }
+    }
     if (!handles.length) return [...ids];
 
     const users = await this.db.user.findMany({
@@ -543,7 +597,7 @@ export class CommunicationService {
   ): Promise<WorkspaceMessage[]> {
     const userIds = new Set<string>();
     for (const r of rows) {
-      userIds.add(r.authorUserId);
+      if (r.authorUserId) userIds.add(r.authorUserId);
       for (const rr of r.readReceipts) userIds.add(rr.userId);
       for (const m of r.mentions) userIds.add(m.mentionedUserId);
     }
@@ -554,13 +608,14 @@ export class CommunicationService {
     const byId = new Map(users.map((u) => [u.id, u]));
 
     return rows.map((r) => {
-      const author = byId.get(r.authorUserId);
+      const author = r.authorUserId ? byId.get(r.authorUserId) : null;
       const readByMe = r.readReceipts.some((rr) => rr.userId === actor.id);
+      const isSystem = r.messageType === "SYSTEM_EVENT";
       return {
         id: r.id,
         conversationId: r.conversationId,
         authorUserId: r.authorUserId,
-        authorName: author?.displayName ?? "User",
+        authorName: isSystem ? "DeMaxtore System" : author?.displayName ?? "User",
         authorRole: author?.role ?? "BUYER",
         messageType: r.messageType as WorkspaceMessage["messageType"],
         visibility: r.visibility as WorkspaceMessage["visibility"],

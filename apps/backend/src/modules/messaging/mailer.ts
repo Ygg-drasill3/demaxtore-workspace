@@ -4,6 +4,8 @@
 // Fire-and-forget by default — never blocks the HTTP response.
 
 import { logger } from "../../config/logger.js";
+import { env } from "../../config/env.js";
+import { redactPasswordlessTokens } from "../../lib/log-redaction.js";
 import { getEmailProvider, type EmailMessage } from "./provider.js";
 
 /**
@@ -14,6 +16,13 @@ import { getEmailProvider, type EmailMessage } from "./provider.js";
  *   awaiting so the HTTP response isn't blocked by SMTP/HTTP latency.
  */
 export async function send(msg: EmailMessage): Promise<{ ok: boolean }> {
+  if (!env.OUTBOUND_MESSAGING_ENABLED) {
+    logger.info(
+      { to: msg.to, subject: msg.subject },
+      "📧 outbound email suppressed (OUTBOUND_MESSAGING_ENABLED=false)",
+    );
+    return { ok: true };
+  }
   try {
     const provider = await getEmailProvider();
     await provider.send(msg);

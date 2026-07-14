@@ -7,8 +7,10 @@ import App from "./App";
 import { queryClient } from "./lib/queryClient";
 import { ToastHost } from "./components/ui/ToastHost";
 import { ErrorBoundary } from "./components/system/ErrorBoundary";
+import { MotionProvider } from "./motion";
 import { clearChunkReloadFlag } from "./lib/lazyWithRetry";
 import "./index.css";
+import "./motion/motion.css";
 
 // Expose build provenance for deploy verification (console, E2E, ops tooling).
 window.__DMX_BUILD_INFO__ = __DMX_BUILD_INFO__;
@@ -34,12 +36,14 @@ import "@fontsource/fraunces/700.css";
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <ErrorBoundary>
-          <App />
-        </ErrorBoundary>
-        <ToastHost />
-      </BrowserRouter>
+      <MotionProvider>
+        <BrowserRouter>
+          <ErrorBoundary>
+            <App />
+          </ErrorBoundary>
+          <ToastHost />
+        </BrowserRouter>
+      </MotionProvider>
     </QueryClientProvider>
   </React.StrictMode>,
 );

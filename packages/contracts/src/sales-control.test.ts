@@ -2,26 +2,19 @@ import { describe, expect, it } from "vitest";
 import { canCreateSupplierCustomerAccount } from "./sales-control";
 
 describe("canCreateSupplierCustomerAccount", () => {
-  it("blocks ilham from creating supplier accounts", () => {
+  it("allows sales control users to create supplier accounts", () => {
     expect(
       canCreateSupplierCustomerAccount({
-        email: "ilham@demaxtore.com",
-        role: "SALES_CONTROL",
-      }),
-    ).toBe(false);
-  });
-
-  it("still allows buyer creation users and admins", () => {
-    expect(
-      canCreateSupplierCustomerAccount({
-        email: "someone@demaxtore.com",
+        email: "sales@demaxtore.com",
         role: "SALES_CONTROL",
       }),
     ).toBe(true);
+  });
 
+  it("allows admins regardless of email", () => {
     expect(
       canCreateSupplierCustomerAccount({
-        email: "ilham@demaxtore.com",
+        email: "admin@demaxtore.com",
         role: "ADMIN",
       }),
     ).toBe(true);

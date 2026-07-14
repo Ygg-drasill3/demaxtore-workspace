@@ -1,8 +1,16 @@
 // apps/frontend/src/components/ui/Card.tsx
 import { type HTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
+import { MotionCard } from "@/motion/primitives/MotionCard";
 
-export function Card({ className, ...rest }: HTMLAttributes<HTMLDivElement>) {
+interface CardProps extends HTMLAttributes<HTMLDivElement> {
+  interactive?: boolean;
+}
+
+export function Card({ className, interactive = false, ...rest }: CardProps) {
+  if (interactive) {
+    return <MotionCard className={className} interactive {...rest} />;
+  }
   return <div className={cn("dmx-card", className)} {...rest} />;
 }
 

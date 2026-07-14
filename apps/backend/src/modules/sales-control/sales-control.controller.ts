@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import { env } from "../../config/env.js";
 import { prisma } from "../../db.js";
 import { CreateCustomerAccountInput, ResetCustomerPasswordInput } from "@dmx/contracts/sales-control";
 import { SalesControlService } from "./sales-control.service.js";
@@ -7,10 +8,12 @@ const service = new SalesControlService(prisma);
 
 function loginUrl(req: Request): string {
   const origin = req.get("origin");
-  if (origin) return `${origin}/login`;
+  if (origin) return `${origin.replace(/\/$/, "")}/login/`;
+  const base = env.APP_BASE_URL.replace(/\/$/, "");
+  if (base) return `${base}/login/`;
   const host = req.get("host");
-  const proto = req.protocol;
-  return host ? `${proto}://${host}/login` : "/login";
+  const proto = req.get("x-forwarded-proto") ?? req.protocol;
+  return host ? `${proto}://${host}/login/` : "/login/";
 }
 
 export const salesControlController = {

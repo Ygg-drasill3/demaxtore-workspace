@@ -21,7 +21,7 @@ import { useTelemetry } from "@/features/telemetry/useTelemetry";
 import { RfqStateBadge } from "../components/RfqStateBadge";
 import { RfqProgressBar } from "../components/RfqProgressBar";
 import { RfqTimeline } from "../components/RfqTimeline";
-import { RfqWhatsAppChatPanel } from "@/features/chat/components/RfqWhatsAppChatPanel";
+import ConversationHubPanel from "@/features/conversation-hub/components/ConversationHubPanel";
 import { RfqNextActions } from "../components/RfqNextActions";
 import { RfqParticipants } from "../components/RfqParticipants";
 import { RfqDocumentsPanel } from "../components/RfqDocumentsPanel";
@@ -29,9 +29,9 @@ import { WhatHappensNextCard } from "../components/WhatHappensNextCard";
 import { WaitingStateCard } from "../components/WaitingStateCard";
 import { SupplierActivityStrip } from "../components/SupplierActivityStrip";
 import { QuotationComparisonPanel } from "../components/QuotationComparisonPanel";
+import { productSectionTitle, type RfqLineRef } from "../lib/quotations-by-product";
 import { SupplierQuoteForm } from "../components/SupplierQuoteForm";
 import { SupplierProformaForm } from "../components/SupplierProformaForm";
-import { MoneySummaryPanel } from "../components/MoneySummaryPanel";
 import { WorkspaceSkeleton } from "@/components/ui/SkeletonLoader";
 import { Badge } from "@/components/ui/Badge";
 import { waitingScriptFor } from "../lib/rfq.scripts";
@@ -45,7 +45,7 @@ import { EstimatedCifPanel } from "@/features/freight-estimate/components/Estima
 import { FreightBookingPanel } from "@/features/freight-booking/components/FreightBookingPanel";
 import { RfqDetailsPanel } from "../components/RfqDetailsPanel";
 import { RfqPdfButton } from "../components/RfqPdfButton";
-import { Lock } from "lucide-react";
+import { Lock, CheckCircle2 } from "lucide-react";
 import type { RfqState } from "@dmx/contracts/rfq.fsm";
 import { showQueryFatalError } from "@/lib/query-guards";
 import { getApiErrorMessage } from "@/lib/api-errors";
@@ -120,15 +120,83 @@ export default function RfqWorkspacePage() {
     return sum > 0 ? sum : null;
   }, [rfq]);
 
+  const hasQuotationFromUser = useMemo(() => {
+    if (!user?.id || !quotations.data?.length) return false;
+    return quotations.data.some(
+      (q) => q.supplierId === user.id && q.status !== "WITHDRAWN",
+    );
+  }, [quotations.data, user?.id]);
+
+  const productSummary = useMemo(() => {
+    if (!rfq) return undefined;
+    const r = rfq as {
+      title?: string;
+      productCategory?: string;
+      productImageUrl?: string | null;
+      targetMarket?: string;
+      incoterm?: string;
+      deadlineAt?: string | null;
+      lineItems?: Array<{ quantity?: number; uom?: string }>;
+    };
+    const items = (r.lineItems ?? []) as Array<{
+      quantity?: number;
+      uom?: string;
+      description?: string;
+      imageUrl?: string | null;
+    }>;
+    let quantity: string | undefined;
+    if (items.length === 1) {
+      const li = items[0];
+      quantity = `${li.quantity ?? 1} ${li.uom ?? ""}`.trim();
+    } else if (items.length > 1) {
+      quantity = `${items.length} products`;
+    }
+
+    const products = items.length > 1
+      ? items.map((li) => ({
+          name: productSectionTitle(li.description ?? "Product"),
+          category: li.description,
+          imageUrl: li.imageUrl ?? undefined,
+          quantity: `${li.quantity ?? 1} ${li.uom ?? ""}`.trim(),
+        }))
+      : undefined;
+
+    const primary = items[0];
+    const category = primary?.description || r.productCategory || r.title || "";
+
+    return {
+      name: r.title || r.productCategory || "Product",
+      category,
+      imageUrl: items.length === 1 ? (primary?.imageUrl ?? r.productImageUrl ?? undefined) : undefined,
+      products,
+      quantity,
+      destination: r.targetMarket || undefined,
+      incoterm: r.incoterm || undefined,
+      deadline: r.deadlineAt ?? undefined,
+    };
+  }, [rfq]);
+
   if (!user) return <WorkspaceSkeleton />;
 
   if (isLoading && !rfq) return <WorkspaceSkeleton />;
 
   if (showQueryFatalError({ isLoading, isError, data: rfq })) {
+    const listPath =
+      user?.role === "SUPPLIER" ? "/supplier/rfq"
+      : user?.role === "ADMIN" || user?.role === "SUPER_ADMIN" ? "/admin/rfq"
+      : "/buyer/rfq";
+
     return (
-      <div data-testid="query-state-error" className="max-w-lg mx-auto p-8 text-center space-y-3">
+      <div data-testid="query-state-error" className="max-w-lg mx-auto p-8 text-center space-y-4">
         <p className="text-sm text-red-600">{getApiErrorMessage(error, t("rfq.workspace.error"))}</p>
-        <button type="button" className="dmx-btn-secondary text-sm" onClick={() => void refetch()}>Retry</button>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <button type="button" className="dmx-btn-secondary text-sm" onClick={() => void refetch()}>
+            {t("common.retry")}
+          </button>
+          <Link to={listPath} className="dmx-btn-primary text-sm">
+            {t("rfq.list.title")}
+          </Link>
+        </div>
       </div>
     );
   }
@@ -194,6 +262,7 @@ export default function RfqWorkspacePage() {
       ? user.role : "BUYER",
   };
 
+  const isSupplier = user.role === "SUPPLIER";
   const isPureWaitingState = !!waitingScriptFor(state, actor.role);
   const youAre = isOwner ? "Owner" : isCounterparty ? "Counterparty" : "Observer";
 
@@ -212,8 +281,9 @@ export default function RfqWorkspacePage() {
               {rfq.title}
             </h1>
             <div className="text-xs text-zinc-500 mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span>{rfq.ownerName}</span>
-              <span>· Created {new Date(rfq.createdAt).toLocaleDateString()}</span>
+              {!isSupplier && <span>{rfq.ownerName}</span>}
+              {!isSupplier && <span>·</span>}
+              <span>Created {new Date(rfq.createdAt).toLocaleDateString()}</span>
               <span className="inline-flex items-center gap-1">
                 · {rfq.currency} <Lock className="h-3 w-3 text-zinc-400" aria-label="Currency is locked after submission" />
               </span>
@@ -221,7 +291,13 @@ export default function RfqWorkspacePage() {
           </div>
           <div className="flex flex-col items-end gap-2">
             <div className="flex items-center gap-3 flex-wrap justify-end">
-              <RfqPdfButton rfq={rfq} />
+              {!isSupplier && <RfqPdfButton rfq={rfq} />}
+              {isSupplier && hasQuotationFromUser && state === "RFQ_OPEN" && (
+                <Badge tone="success" data-testid="rfq-my-quote-submitted">
+                  <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
+                  Quote submitted
+                </Badge>
+              )}
               <RfqStateBadge state={rfq.state} />
             </div>
             {rfq.deadlineAt && (
@@ -257,6 +333,7 @@ export default function RfqWorkspacePage() {
         isOwner={isOwner}
         isCounterparty={isCounterparty}
         isSelectedSupplier={isSelectedSupplier}
+        hasQuotationFromUser={hasQuotationFromUser}
       />
 
       {id && ["SUPPLIER_SELECTED", "PROFORMA_REQUESTED", "PROFORMA_RECEIVED", "PROFORMA_APPROVED"].includes(state) && (
@@ -289,7 +366,7 @@ export default function RfqWorkspacePage() {
       )}
 
       {/* ────────  RFQ specification (full details)  ──────── */}
-      <RfqDetailsPanel rfq={rfq} isOwner={isOwner} />
+      <RfqDetailsPanel rfq={rfq} isOwner={isOwner} hideBuyerFields={isSupplier} />
 
       {/* ────────  Secondary actions trigger  ──────── */}
       <RfqNextActions
@@ -299,11 +376,12 @@ export default function RfqWorkspacePage() {
         isOwner={isOwner}
         isCounterparty={isCounterparty}
         isSelectedSupplier={isSelectedSupplier}
+        hasQuotationFromUser={hasQuotationFromUser}
         onFocusCommunication={focusRfqCommunication}
       />
 
       {/* ────────  D · Supplier Activity Strip  ──────── */}
-      <SupplierActivityStrip workspaceId={rfq.id} state={state} />
+      {!isSupplier && <SupplierActivityStrip workspaceId={rfq.id} state={state} />}
 
       {user.role === "SUPPLIER" && (
         <SupplierRfqGuidance state={state} isCounterparty={isCounterparty} isSelectedSupplier={isSelectedSupplier} />
@@ -314,51 +392,46 @@ export default function RfqWorkspacePage() {
         <WaitingStateCard state={state} vars={vars} actorRole={actor.role} />
       )}
 
-      {/* ────────  E · Quotations + F · Side Context  ──────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="lg:col-span-2 space-y-5">
-          {/* Supplier-facing quote form (Sprint 2.8) — only when this user is
-              a supplier-counterparty AND the RFQ is still open for quotes. */}
-          {user.role === "SUPPLIER" && isCounterparty && state === "RFQ_OPEN" && (
-            <SupplierQuoteForm
-              workspaceId={rfq.id}
-              currency={rfq.currency ?? "USD"}
-              rfqLineItems={(rfq as any).lineItems ?? []}
-              defaultIncoterm={(rfq as { incoterm?: string }).incoterm}
-            />
-          )}
-          {user.role === "SUPPLIER" && isSelectedSupplier && state === "PROFORMA_REQUESTED" && (
-            <SupplierProformaForm
-              workspaceId={rfq.id}
-              currency={rfq.currency ?? "USD"}
-              lockedAmount={(rfq as { lockedAmount?: number }).lockedAmount ?? vars.lockedAmount}
-            />
-          )}
+      {/* ────────  E · Supplier forms (supplier-only, full width)  ──────── */}
+      {user.role === "SUPPLIER" && isCounterparty && state === "RFQ_OPEN" && (
+        <SupplierQuoteForm
+          workspaceId={rfq.id}
+          currency={rfq.currency ?? "USD"}
+          rfqLineItems={(rfq as { lineItems?: Array<{ id: string; position: number; description: string; quantity: number; uom: string }> }).lineItems ?? []}
+          allowedQuoteLineItemIds={(rfq as { allowedQuoteLineItemIds?: string[] | null }).allowedQuoteLineItemIds}
+          defaultIncoterm={(rfq as { incoterm?: string }).incoterm}
+        />
+      )}
+      {user.role === "SUPPLIER" && isSelectedSupplier && state === "PROFORMA_REQUESTED" && (
+        <SupplierProformaForm
+          workspaceId={rfq.id}
+          currency={rfq.currency ?? "USD"}
+          lockedAmount={(rfq as { lockedAmount?: number }).lockedAmount ?? vars.lockedAmount}
+        />
+      )}
+
+      {/* ────────  E · Quotations — full width  ──────── */}
           <QuotationComparisonPanel
             workspaceId={rfq.id}
             state={state}
-            buyerTargetTotal={estimatedValue ?? undefined}
+            rfqLineItems={((rfq as { lineItems?: RfqLineRef[] }).lineItems) ?? []}
+            buyerTargetTotal={isSupplier ? undefined : estimatedValue ?? undefined}
             selectedQuotationId={selectedQuotationId}
             isOwner={isOwner}
+            productSummary={productSummary}
           />
-        </div>
-        <div className="space-y-5">
-          <MoneySummaryPanel
-            workspaceId={rfq.id}
-            currency={rfq.currency ?? "USD"}
-            estimatedValue={estimatedValue}
-            selectedQuotationId={selectedQuotationId}
-          />
-          <LazyMount>
-            <RfqDocumentsPanel workspaceId={rfq.id} />
-          </LazyMount>
-          <RfqParticipants workspaceId={rfq.id} />
-        </div>
+
+      {/* ────────  F · Workspace files + participants  ──────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <LazyMount>
+          <RfqDocumentsPanel workspaceId={rfq.id} />
+        </LazyMount>
+        {!isSupplier && <RfqParticipants workspaceId={rfq.id} />}
       </div>
 
-      {/* ────────  G · Clarifications (full width)  ──────── */}
+      {/* ────────  G · Conversation Hub (business timeline)  ──────── */}
       <LazyMount>
-        <RfqWhatsAppChatPanel rfqWorkspaceId={rfq.id} rfqRef={rfq.externalRef} testId="rfq-communication" />
+        <ConversationHubPanel workspaceType="RFQ" workspaceId={rfq.id} testId="rfq-communication" />
       </LazyMount>
 
       {/* ────────  H · Timeline (collapsed)  ──────── */}

@@ -62,12 +62,13 @@ export const QuotationRowDTO = z.object({
   status:        z.enum(["SUBMITTED", "REVISED", "WITHDRAWN"]),
   submittedAt:   z.string().datetime(),
   lineItems:     z.array(z.object({
-    id:          z.string().uuid(),
-    position:    z.number().int().positive(),
-    description: z.string(),
-    quantity:    z.number(),
-    unitPrice:   z.number(),
-    total:       z.number(),
+    id:            z.string().uuid(),
+    rfqLineItemId: z.string().uuid().nullable().optional(),
+    position:      z.number().int().positive(),
+    description:   z.string(),
+    quantity:      z.number(),
+    unitPrice:     z.number(),
+    total:         z.number(),
   })).optional(),
 });
 export type QuotationRowDTO = z.infer<typeof QuotationRowDTO>;

@@ -48,6 +48,13 @@ export const resetBurstLimiter = createRateLimiter({
   label: "auth-reset",
 });
 
+export const consumeBurstLimiter = createRateLimiter({
+  keyPrefix: "passwordless-consume",
+  windowMs: 15 * 60_000,
+  max: BURST_MAX,
+  label: "passwordless-consume",
+});
+
 export const registerBurstLimiter = createRateLimiter({
   keyPrefix: "auth-register",
   windowMs: 15 * 60_000,

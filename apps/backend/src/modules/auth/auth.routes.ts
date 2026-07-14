@@ -18,5 +18,8 @@ router.post("/logout",                               c.logout);
 router.get ("/me",                                   ...c.me);
 router.post("/forgot-password",  forgotBurstLimiter, c.forgotValidator,  c.forgotPassword);
 router.post("/reset-password",   resetBurstLimiter, c.resetValidator,   c.resetPassword);
+router.get ("/google/status",                         c.googleStatus);
+router.get ("/google",                                c.googleStart);
+router.get ("/google/callback",                       c.googleCallback);
 
 export default router;

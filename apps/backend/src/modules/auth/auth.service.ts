@@ -52,6 +52,10 @@ async function issueTokens(user: User): Promise<IssueTokensResult> {
   return { accessToken, refreshToken, expiresInSec: env.ACCESS_TOKEN_TTL_SEC };
 }
 
+export async function issueTokensForUser(user: User): Promise<IssueTokensResult> {
+  return issueTokens(user);
+}
+
 // ── login ────────────────────────────────────────────────────────────────────
 export async function login(
   rawEmail: string,

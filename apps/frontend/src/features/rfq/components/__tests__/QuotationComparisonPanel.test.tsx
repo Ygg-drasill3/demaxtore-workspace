@@ -1,8 +1,14 @@
 // apps/frontend/src/features/rfq/components/__tests__/QuotationComparisonPanel.test.tsx
 import { describe, it, expect, vi } from "vitest";
 import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { renderWithProviders } from "@/test/utils";
+import { useLocale } from "@/i18n/store";
 import { QuotationComparisonPanel } from "../QuotationComparisonPanel";
+
+vi.mock("../../hooks", () => ({
+  useRfqTimeline: () => ({ data: [], isLoading: false }),
+}));
 
 vi.mock("../../hooks/useQuotations", () => ({
   useQuotations: () => ({
@@ -16,6 +22,10 @@ vi.mock("../../hooks/useQuotations", () => ({
 }));
 
 describe("<QuotationComparisonPanel />", () => {
+  beforeEach(() => {
+    useLocale.getState().setLocale("tr");
+  });
+
   it("renders the empty state in RFQ_OPEN with zero quotations", () => {
     // Override the mock to return [] for this case
     vi.doMock("../../hooks/useQuotations", () => ({
@@ -36,7 +46,8 @@ describe("<QuotationComparisonPanel />", () => {
       <QuotationComparisonPanel workspaceId="w1" state="UNDER_EVALUATION" isOwner buyerTargetTotal={50000} />,
     );
     expect(screen.getByTestId("quotation-matrix")).toBeInTheDocument();
-    expect(screen.getByTestId("quote-total-q1")).toHaveTextContent(/48,000/);
+    // Card now surfaces the unit price (16.00) with a "lowest" a11y hint.
+    expect(screen.getByTestId("quote-total-q1")).toHaveTextContent(/16\.00/);
     expect(screen.getByTestId("quote-total-q1")).toHaveTextContent(/lowest/i);
     expect(screen.getByTestId("quote-select-q1")).toBeInTheDocument();
     expect(screen.getByTestId("quote-select-q2")).toBeInTheDocument();
@@ -62,5 +73,38 @@ describe("<QuotationComparisonPanel />", () => {
     );
     expect(screen.getByTestId("quotations-panel-collapsed")).toBeInTheDocument();
     expect(screen.getByTestId("winner-total")).toHaveTextContent(/48,000/);
+  });
+
+  it("opens award flow modal when owner checks quote checkbox in RFQ_OPEN", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <QuotationComparisonPanel workspaceId="w1" state="RFQ_OPEN" isOwner />,
+    );
+
+    expect(screen.queryByTestId("quotation-award-close-modal")).toBeNull();
+    await user.click(screen.getByTestId("quote-award-checkbox-q1"));
+    expect(screen.getByTestId("quotation-award-close-modal")).toBeInTheDocument();
+    expect(screen.getByText(/Teklifleri kapatıp devam edelim mi/i)).toBeInTheDocument();
+  });
+
+  it("closes award flow modal when checkbox is unchecked", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <QuotationComparisonPanel workspaceId="w1" state="RFQ_OPEN" isOwner />,
+    );
+
+    const checkbox = screen.getByTestId("quote-award-checkbox-q1");
+    await user.click(checkbox);
+    expect(screen.getByTestId("quotation-award-close-modal")).toBeInTheDocument();
+    await user.click(checkbox);
+    expect(screen.queryByTestId("quotation-award-close-modal")).toBeNull();
+  });
+
+  it("shows compare toggle instead of award checkbox when not owner", () => {
+    renderWithProviders(
+      <QuotationComparisonPanel workspaceId="w1" state="RFQ_OPEN" isOwner={false} />,
+    );
+    expect(screen.queryByTestId("quote-award-checkbox-q1")).toBeNull();
+    expect(screen.getByTestId("quote-compare-checkbox-q1")).toBeInTheDocument();
   });
 });

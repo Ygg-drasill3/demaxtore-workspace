@@ -130,7 +130,7 @@ export async function fetchSupplierCommandCenter(
 
   const rfqItems = rfqs.items as Array<{
     id: string; externalRef: string; title: string; state: string;
-    lastActivityAt: string; deadlineAt: string | null;
+    lastActivityAt: string; deadlineAt: string | null; hasMyQuotation?: boolean;
   }>;
   const orderItems = orders.items as Array<{
     id: string; externalRef: string; state: string; lastActivityAt: string; buyerName: string;
@@ -253,7 +253,7 @@ function nextOrderAction(state: string): string {
 }
 
 function buildActions(
-  rfqs: Array<{ id: string; externalRef: string; title: string; state: string }>,
+  rfqs: Array<{ id: string; externalRef: string; title: string; state: string; hasMyQuotation?: boolean }>,
   auctions: Array<{ id: string; externalRef: string; title: string; state: string }>,
   pos: Awaited<ReturnType<typeof fetchSupplierPoList>>,
   docs: Awaited<ReturnType<typeof fetchSupplierTradeDocList>>,
@@ -264,14 +264,17 @@ function buildActions(
   const actions: SupplierAction[] = [];
 
   for (const r of rfqs.filter((x) => OPEN_RFQ.has(x.state))) {
+    const hasQuote = (r as { hasMyQuotation?: boolean }).hasMyQuotation === true;
     actions.push({
       id: `rfq-quote-${r.id}`,
-      title: `Submit RFQ response — ${r.externalRef}`,
+      title: hasQuote
+        ? `Revise RFQ response — ${r.externalRef}`
+        : `Submit RFQ response — ${r.externalRef}`,
       priority: "high",
-      dueLabel: "Quotation requested",
+      dueLabel: hasQuote ? "Revision available" : "Quotation requested",
       workspaceUrl: `/workspace/rfq/${r.id}`,
-      actionLabel: "Submit quote",
-      kind: "submit_rfq_response",
+      actionLabel: hasQuote ? "Submit revision" : "Submit quote",
+      kind: hasQuote ? "revise_rfq_response" : "submit_rfq_response",
     });
   }
 

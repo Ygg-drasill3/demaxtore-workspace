@@ -19,6 +19,7 @@ import {
   displayPriceForOffer,
   resolveIntakeCommercial,
 } from "./freight-commercial.util.js";
+import { findLedgerWithOffers } from "./freight-ledger.query.js";
 import { FreightMarginPolicyService } from "./freight-margin-policy.service.js";
 
 export class FreightCommercialService {
@@ -324,18 +325,14 @@ export class FreightCommercialService {
         where: { status: "REALIZED" },
         _sum: { freightiqMarginUsd: true },
       }),
-      this.db.freightRevenueLedger.findMany({
+      findLedgerWithOffers(this.db, {
         where: { status: { in: ["PENDING", "REALIZED"] } },
-        include: {
-          offer: {
-            include: {
-              freightRequest: { select: { pol: true, pod: true, order: { select: { externalRef: true } } } },
-              forwarderContact: { select: { companyName: true } },
-            },
-          },
-        },
         take: 500,
         orderBy: { createdAt: "desc" },
+        offerInclude: {
+          freightRequest: { select: { pol: true, pod: true, order: { select: { externalRef: true } } } },
+          forwarderContact: { select: { companyName: true } },
+        },
       }),
     ]);
 
@@ -382,18 +379,14 @@ export class FreightCommercialService {
 
   async getReport(): Promise<FreightCommercialReport> {
     const metrics = await this.getMetrics();
-    const rows = await this.db.freightRevenueLedger.findMany({
+    const rows = await findLedgerWithOffers(this.db, {
       orderBy: { createdAt: "desc" },
       take: 200,
-      include: {
-        offer: {
-          include: {
-            freightRequest: {
-              select: { pol: true, pod: true, order: { select: { externalRef: true } } },
-            },
-            forwarderContact: { select: { companyName: true } },
-          },
+      offerInclude: {
+        freightRequest: {
+          select: { pol: true, pod: true, order: { select: { externalRef: true } } },
         },
+        forwarderContact: { select: { companyName: true } },
       },
     });
 

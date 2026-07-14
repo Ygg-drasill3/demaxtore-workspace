@@ -68,6 +68,9 @@ export async function submitQuotation(
   if (!(await canAccessRfq(prisma, actor, workspaceId))) throw new AppError(403, "FORBIDDEN");
   await assertWorkspaceOpen(workspaceId);
 
+  const { assertSupplierQuoteLinesAllowed } = await import("../rfq/supplier-line-scope.service.js");
+  await assertSupplierQuoteLinesAllowed(workspaceId, actor.id, payload);
+
   const existing = await findActiveQuotation(workspaceId, actor.id);
   if (existing) throw new AppError(409, "QUOTATION_ALREADY_SUBMITTED");
 
@@ -138,6 +141,19 @@ export async function submitQuotation(
   const { markQuoted } = await import("../supplier-activity/supplier-activity.service.js");
   await markQuoted(workspaceId, actor.id);
 
+  void (async () => {
+    const { emitConversationSystemEvent } = await import("../conversation-hub/conversation-hub.hooks.js");
+    emitConversationSystemEvent(
+      prisma,
+      "RFQ",
+      workspaceId,
+      "QUOTATION_SUBMITTED",
+      actor.id,
+      created.currency,
+      { quotationId: created.id, dedupeKey: created.id },
+    );
+  })();
+
   return await getQuotationDTO(created.id);
 }
 
@@ -155,6 +171,9 @@ export async function reviseQuotation(
   if (!existing || existing.workspaceId !== workspaceId) throw new AppError(404, "QUOTATION_NOT_FOUND");
   if (existing.supplierUserId !== actor.id) throw new AppError(403, "FORBIDDEN");
   if (existing.withdrawnAt) throw new AppError(409, "QUOTATION_WITHDRAWN");
+
+  const { assertSupplierQuoteLinesAllowed } = await import("../rfq/supplier-line-scope.service.js");
+  await assertSupplierQuoteLinesAllowed(workspaceId, actor.id, payload);
 
   await prisma.$transaction(async (tx) => {
     await tx.quotationLineItem.deleteMany({ where: { quotationId } });
@@ -246,7 +265,7 @@ async function getQuotationDTO(id: string) {
     id: q.id,
     workspaceId:    q.workspaceId,
     supplierUserId: q.supplierUserId,
-    supplierName:   supplier?.displayName ?? null,
+    supplierName:   supplier?.organisation?.name ?? supplier?.displayName ?? null,
     supplierOrg:    supplier?.organisation?.name ?? null,
     total:          Number(q.total),
     currency:       q.currency,

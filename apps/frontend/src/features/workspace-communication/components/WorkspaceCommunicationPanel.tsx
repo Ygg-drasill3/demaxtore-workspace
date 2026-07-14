@@ -15,6 +15,10 @@ const TYPE_LABELS: Record<MessageType, string> = {
   DECISION: "Decision",
   STATUS_UPDATE: "Status update",
   INTERNAL_NOTE: "Internal note",
+  DOCUMENT: "Document",
+  APPROVAL: "Approval",
+  ACTION_REQUIRED: "Action required",
+  SYSTEM_EVENT: "System event",
 };
 
 interface Props {
@@ -127,11 +131,11 @@ export default function WorkspaceCommunicationPanel({
   };
 
   const readState = (m: {
-    authorUserId: string;
+    authorUserId: string | null;
     readReceipts?: Array<{ userId: string }>;
     readByMe: boolean;
   }) => {
-    if (m.authorUserId !== user?.id) return null;
+    if (!m.authorUserId || m.authorUserId !== user?.id) return null;
     const receipts = m.readReceipts ?? [];
     const others = receipts.filter((r) => r.userId !== m.authorUserId);
     return others.length > 0 ? "✓✓ Read" : "✓ Sent";

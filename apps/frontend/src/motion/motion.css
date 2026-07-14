@@ -1,0 +1,151 @@
+/* DeMaxtore Motion Design System — CSS variables & GPU utilities */
+
+:root {
+  --dmx-motion-spring-snappy: 420ms cubic-bezier(0.22, 1, 0.36, 1);
+  --dmx-motion-spring-gentle: 520ms cubic-bezier(0.16, 1, 0.3, 1);
+  --dmx-motion-duration-fast: 220ms;
+  --dmx-motion-duration-normal: 380ms;
+  --dmx-motion-blur-reveal: 6px;
+  --dmx-ambient-opacity: 0.45;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dmx-motion-duration-fast: 1ms;
+    --dmx-motion-duration-normal: 1ms;
+    --dmx-ambient-opacity: 0;
+  }
+  .dmx-motion-shimmer,
+  .dmx-ambient-layer,
+  .dmx-cursor-glow {
+    animation: none !important;
+    opacity: 0 !important;
+  }
+}
+
+/* Premium skeleton shimmer — replaces generic pulse */
+@keyframes dmx-shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.dmx-motion-shimmer {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(90deg, #f4f4f5 0%, #ececef 50%, #f4f4f5 100%);
+}
+
+.dmx-motion-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.72) 50%,
+    transparent 65%
+  );
+  animation: dmx-shimmer 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  will-change: transform;
+}
+
+/* Button shine sweep */
+@keyframes dmx-shine-sweep {
+  0%   { transform: translateX(-120%) skewX(-18deg); opacity: 0; }
+  30%  { opacity: 0.55; }
+  100% { transform: translateX(220%) skewX(-18deg); opacity: 0; }
+}
+
+.dmx-btn-shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+  animation: dmx-shine-sweep 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Ambient aurora mesh */
+@keyframes dmx-aurora-drift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  33%      { transform: translate3d(2%, -1.5%, 0) scale(1.04); }
+  66%      { transform: translate3d(-1.5%, 2%, 0) scale(0.98); }
+}
+
+.dmx-ambient-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: var(--dmx-ambient-opacity);
+  overflow: hidden;
+}
+
+.dmx-ambient-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  will-change: transform;
+  animation: dmx-aurora-drift 22s ease-in-out infinite;
+}
+
+.dmx-ambient-blob--a {
+  width: 42vw;
+  height: 42vw;
+  top: -12%;
+  right: -8%;
+  background: radial-gradient(circle, rgba(26, 35, 126, 0.14) 0%, transparent 70%);
+}
+
+.dmx-ambient-blob--b {
+  width: 36vw;
+  height: 36vw;
+  bottom: -10%;
+  left: -6%;
+  background: radial-gradient(circle, rgba(57, 73, 171, 0.1) 0%, transparent 70%);
+  animation-delay: -8s;
+  animation-duration: 28s;
+}
+
+.dmx-ambient-noise {
+  position: absolute;
+  inset: 0;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* GPU layer promotion for animated surfaces */
+.dmx-motion-gpu {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+.motion-page-root {
+  transform-origin: top center;
+  will-change: opacity;
+}
+
+/* Card 3D tilt container */
+.dmx-card-tilt {
+  transform-style: preserve-3d;
+  perspective: 1200px;
+}
+
+/* Table row highlight */
+.dmx-table-row-motion {
+  position: relative;
+}
+
+.dmx-table-row-motion::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(26, 35, 126, 0.04), transparent 60%);
+  opacity: 0;
+  transition: opacity var(--dmx-motion-duration-fast) cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+
+.dmx-table-row-motion:hover::before {
+  opacity: 1;
+}

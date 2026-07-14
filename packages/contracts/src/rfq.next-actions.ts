@@ -50,7 +50,7 @@ const LABELS: Record<RfqAction, { label: string; description: string; variant: N
   publish_rfq:              { label: "Publish RFQ", description: "Open the RFQ to assigned suppliers", variant: "primary" },
   revise_rejected_rfq:      { label: "Revise & Re-submit", description: "Fix issues and submit again", variant: "primary" },
   submit_quotation:         { label: "Submit Quotation", description: "Send your bid to the buyer", variant: "primary" },
-  revise_quotation:         { label: "Revise Quotation", description: "Update your existing bid", variant: "secondary" },
+  revise_quotation:         { label: "Submit revision", description: "Update your existing bid", variant: "secondary" },
   withdraw_quotation:       { label: "Withdraw Quotation", description: "Remove your bid before deadline", variant: "destructive" },
   post_clarification:       { label: "Post Question", description: "Ask a clarification", variant: "secondary" },
   extend_deadline:          { label: "Extend Deadline", description: "Give suppliers more time (max 2× / +14 days)", variant: "secondary" },

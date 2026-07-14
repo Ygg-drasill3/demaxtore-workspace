@@ -40,8 +40,8 @@ const launchTr: TranslationDict = {
   "launch.supplier.ctaRfq": "Açık fırsatları gör",
 
   "launch.landing.eyebrow": "B2B Tedarik ve İthalat İşletim Platformu",
-  "launch.landing.headline": "Küresel tedariki bir gelen kutusu değil, bir işletim sistemi gibi yönetin.",
-  "launch.landing.subhead": "RFQ'lar, ters ihaleler, karma konteynerler, satın alma siparişleri, navlun ve sevkiyat takibi — tek çalışma alanı, tek zaman çizelgesi, tek durum makinesi.",
+  "launch.landing.headline": "Türkiye'den Tedarik Yapan Şirketler için İthalat İşletim Sistemi.",
+  "launch.landing.subhead": "RFQ'ları, tedarikçi tekliflerini, CommodityBid™'i, satın alma siparişlerini, denetimleri, navlun ve sevkiyat takibini tek akıllı çalışma alanında yönetin.",
   "launch.landing.pillar1.title": "Yapılandırılmış tedarik",
   "launch.landing.pillar1.body": "RFQ, CommodityBid, SmartContainer ve BulkContainer programları tedarikçi yönetişimiyle birlikte.",
   "launch.landing.pillar2.title": "Ödülden operasyona",

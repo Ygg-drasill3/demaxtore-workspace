@@ -10,6 +10,10 @@ import { RfqService } from "./rfq.service.js";
 import { CommodityBidService } from "../commoditybid/commoditybid.service.js";
 import { AppError } from "../../utils/httpErrors.js";
 import type { AuthUser } from "./rfq.policy.js";
+import {
+  assessRfqCommodityBidEligibility,
+  commodityBidEligibilityErrorMessage,
+} from "@dmx/contracts/commoditybid-rfq-eligibility";
 
 declare module "./rfq.service" {
   interface RfqService {
@@ -67,7 +71,7 @@ RfqService.prototype.selectProcurementStrategy = async function (wsId, input, ac
     });
   });
 
-  return this.fetchDTO(wsId);
+  return this.fetchDTO(wsId, actor);
 };
 
 RfqService.prototype.spawnCommodityBidFromRfq = async function (wsId, input, actor) {
@@ -83,6 +87,19 @@ RfqService.prototype.spawnCommodityBidFromRfq = async function (wsId, input, act
   if (ws.createdById !== actor.id) throw new AppError(403, "FORBIDDEN");
   if (ws.rfqDetails?.procurementMethod) throw new AppError(409, "PROCUREMENT_METHOD_ALREADY_SET");
   if (ws.rfqDetails?.linkedCommoditybidId) throw new AppError(409, "COMMODITYBID_ALREADY_LINKED");
+
+  const eligibility = assessRfqCommodityBidEligibility({
+    productCategory: ws.rfqDetails?.productCategory,
+    lineItems: ws.rfqLineItems.map((li) => ({ description: li.description })),
+  });
+  if (!eligibility.eligible) {
+    throw new AppError(409, "COMMODITYBID_PRODUCT_NOT_ELIGIBLE", {
+      message: commodityBidEligibilityErrorMessage(eligibility, "en"),
+      blockingLineItems: eligibility.blockingLineItems,
+      blockingCategory: eligibility.blockingCategory,
+      allowedProducts: eligibility.matchedSlugs,
+    });
+  }
 
   const d = ws.rfqDetails!;
   const cbService = new CommodityBidService(this.prisma);
@@ -168,7 +185,7 @@ RfqService.prototype.spawnCommodityBidFromRfq = async function (wsId, input, act
   });
 
   const [rfq, commodityBid] = await Promise.all([
-    this.fetchDTO(wsId),
+    this.fetchDTO(wsId, actor),
     cbService.fetchDTO(cbId, actor),
   ]);
 

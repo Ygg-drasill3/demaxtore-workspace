@@ -120,7 +120,7 @@ export const TOUR_STEPS_BY_ROLE: Record<OnboardingRole, readonly { id: string; t
     { id: "admin-alerts",    title: "Alerts",        body: "Act on stalled trades and missing docs.",    route: "/operations" },
   ],
   SALES_CONTROL: [
-    { id: "sales-customers", title: "Customer accounts", body: "Review buyer organisations and account ownership.", route: "/sales/dashboard" },
+    { id: "sales-customers", title: "User accounts", body: "Review buyer organisations and account ownership.", route: "/sales/dashboard" },
     { id: "sales-learning",  title: "Learning Center",   body: "Product guides to support customer onboarding.",    route: "/learning" },
   ],
 };

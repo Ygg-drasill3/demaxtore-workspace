@@ -12,6 +12,8 @@ import { startCommodityBidScheduler } from "./modules/commoditybid/commoditybid.
 import { startRfqScheduler } from "./modules/rfq/rfq.scheduler.js";
 import { startControlTowerScheduler } from "./modules/control-tower/control-tower.scheduler.js";
 import { startTrackingScheduler } from "./modules/tracking/tracking.scheduler.js";
+import { startWhatsAppBridgeRetryWorker } from "./modules/whatsapp-notification-bridge/whatsapp-bridge.scheduler.js";
+import { startEmailBridgeRetryWorker } from "./modules/email-notification-bridge/email-bridge.scheduler.js";
 import { prisma } from "./db/prisma.js";
 import { reconcileStaleRunningJobs } from "./modules/jobs/job-reconciler.js";
 import { closeSchedulerPool } from "./db/scheduler-lock.js";
@@ -73,6 +75,8 @@ async function main(): Promise<void> {
   startRfqScheduler();
   startControlTowerScheduler();
   startTrackingScheduler();
+  startWhatsAppBridgeRetryWorker();
+  startEmailBridgeRetryWorker();
 
   setInterval(() => {
     void reconcileStaleRunningJobs(prisma, env.JOB_STALE_RUNNING_MS);

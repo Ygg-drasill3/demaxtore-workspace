@@ -10,7 +10,7 @@ import { MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ActionDrawer } from "./ActionDrawer";
 import { computeRfqNextActions } from "@dmx/contracts/rfq.next-actions";
-import { rfqScriptFor, RFQ_SCRIPTS } from "../lib/rfq.scripts";
+import { rfqHeroActions } from "../lib/rfq.scripts";
 import { toWorkspaceScriptRole } from "@dmx/contracts/workspace-scripts";
 import type { RfqState, ActorRole } from "@dmx/contracts/rfq.fsm";
 
@@ -34,8 +34,8 @@ export function RfqNextActions(props: Props) {
     state, actorRole: actor.role, isOwner, isCounterparty, isSelectedSupplier, hasQuotationFromUser,
   });
   const scriptRole = toWorkspaceScriptRole(actor.role === "SYSTEM" ? "ADMIN" : actor.role) ?? "ADMIN";
-  const primary = rfqScriptFor(state, scriptRole)?.primaryAction ?? RFQ_SCRIPTS[state]?.primaryAction;
-  const others = allowed.filter((a) => a.action !== primary);
+  const heroActions = new Set(rfqHeroActions(state, scriptRole));
+  const others = allowed.filter((a) => !heroActions.has(a.action));
 
   if (others.length === 0) return null;
 

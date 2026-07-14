@@ -5,27 +5,19 @@ import type {
   FreightEstimateStatusDto,
 } from "@dmx/contracts/freight-estimate";
 import { FREIGHT_ESTIMATE_TIMELINE_EVENTS } from "@dmx/contracts/freight-estimate";
+import { REFERENCE_FREIGHT_MISSING_MESSAGE_TR } from "@dmx/contracts/reference-freight";
 import type { CreateFreightEstimatePayload } from "@dmx/contracts/freight-estimate.zod";
+import { ErrorCodes } from "@dmx/contracts";
 import { AppError } from "../../utils/httpErrors.js";
 import { resolveFreightRoute } from "../freightiq/commercial/freight-route.util.js";
+import { ReferenceFreightService } from "../reference-freight/reference-freight.service.js";
+import { resolveDestinationPortFromMarket } from "../reference-freight/port-normalize.js";
 import { canAccessFreightEstimate, type AuthUser } from "./freight-estimate.policy.js";
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
 const ESTIMATE_TTL_DAYS = 7;
 const EXPIRING_SOON_MS = 48 * 3_600_000;
-
-const ROUTE_FREIGHT_USD: Record<string, number> = {
-  "China→Netherlands": 2800,
-  "China→USA": 3200,
-  "China→UK": 2900,
-  "Turkey→Netherlands": 1800,
-  "Turkey→UAE": 1200,
-  "Turkey→Nigeria": 2400,
-  "Turkey→USA": 3500,
-  "UAE→Netherlands": 2100,
-  "UAE→Nigeria": 1900,
-};
 
 type TradeContext = {
   tradeId: string;
@@ -50,6 +42,7 @@ function toDto(row: {
   estimatedFreight: Prisma.Decimal;
   currency: string;
   estimatedCifValue: Prisma.Decimal;
+  referenceFreightRateId: string | null;
   estimatedAt: Date;
   expiresAt: Date;
   lastRefreshedAt: Date | null;
@@ -68,17 +61,12 @@ function toDto(row: {
     estimatedFreight: Number(row.estimatedFreight),
     currency: row.currency,
     estimatedCifValue: Number(row.estimatedCifValue),
+    referenceFreightRateId: row.referenceFreightRateId,
     estimatedAt: row.estimatedAt.toISOString(),
     expiresAt: row.expiresAt.toISOString(),
     status: row.status as FreightEstimateDto["status"],
     lastRefreshedAt: row.lastRefreshedAt?.toISOString() ?? null,
   };
-}
-
-function indicativeFreightUsd(route: string, containerType: string): number {
-  const base = ROUTE_FREIGHT_USD[route] ?? 2500;
-  const multiplier = containerType.includes("40") ? 1.55 : containerType.includes("LCL") ? 0.45 : 1;
-  return Math.round(base * multiplier);
 }
 
 function expirationStatus(
@@ -157,12 +145,23 @@ export class FreightEstimateService {
     });
     const dtos = rows.map((r) => toDto(r));
     const current = dtos.find((d) => d.status === "ACTIVE") ?? null;
+    const referenceFreight = await this.buildReferenceFreightContext(tradeId, current);
+
     if (actor.role === "SUPPLIER") {
       return {
         current: null,
         history: [],
         expirationStatus: current ? expirationStatus(current) : "NONE",
         lastRefresh: current?.lastRefreshedAt ?? current?.estimatedAt ?? null,
+        referenceFreight: {
+          status: "UNKNOWN",
+          originPort: null,
+          destinationPort: null,
+          containerType: null,
+          validFrom: null,
+          validUntil: null,
+          message: null,
+        },
       };
     }
     return {
@@ -170,6 +169,7 @@ export class FreightEstimateService {
       history: dtos.filter((d) => d.id !== current?.id),
       expirationStatus: expirationStatus(current),
       lastRefresh: current?.lastRefreshedAt ?? current?.estimatedAt ?? null,
+      referenceFreight,
     };
   }
 
@@ -218,7 +218,8 @@ export class FreightEstimateService {
     });
     if (!active) {
       throw new AppError(409, "FREIGHT_ESTIMATE_REQUIRED", {
-        message: "An active FreightIQ estimate is required before Purchase Order approval.",
+        message:
+          "An active reference-freight-based CIF estimate is required before Purchase Order approval.",
       });
     }
     return toDto(active);
@@ -230,13 +231,20 @@ export class FreightEstimateService {
     actorUserId: string | null,
     overrides?: Partial<CreateFreightEstimatePayload>,
   ) {
-    const ctx = await this.resolveTradeContext(db, tradeId, { tradeId, ...overrides });
-    await this.generateEstimate(
-      db,
-      { id: actorUserId ?? "system", role: "SYSTEM", email: "system@demaxtore.local" },
-      ctx,
-      FREIGHT_ESTIMATE_TIMELINE_EVENTS.CREATED,
-    );
+    try {
+      const ctx = await this.resolveTradeContext(db, tradeId, { tradeId, ...overrides });
+      await this.generateEstimate(
+        db,
+        { id: actorUserId ?? "system", role: "SYSTEM", email: "system@demaxtore.local" },
+        ctx,
+        FREIGHT_ESTIMATE_TIMELINE_EVENTS.CREATED,
+      );
+    } catch (err) {
+      if (err instanceof AppError && err.code === ErrorCodes.REFERENCE_FREIGHT_NOT_FOUND) {
+        return;
+      }
+      throw err;
+    }
   }
 
   async expireStaleEstimates(tradeId?: string) {
@@ -320,6 +328,7 @@ export class FreightEstimateService {
             expiresAt: panel.current.expiresAt,
             status: panel.current.status,
             lastRefreshedAt: panel.current.lastRefreshedAt,
+            referenceFreightRateId: panel.current.referenceFreightRateId,
           }
         : null,
       history: panel.history.map((h) => ({
@@ -333,7 +342,69 @@ export class FreightEstimateService {
       })),
       expirationStatus: panel.expirationStatus,
       lastRefresh: panel.lastRefresh,
+      referenceFreight: panel.referenceFreight,
     };
+  }
+
+  private async buildReferenceFreightContext(
+    tradeId: string,
+    current: FreightEstimateDto | null,
+  ): Promise<FreightEstimatePanelDto["referenceFreight"]> {
+    if (current?.referenceFreightRateId) {
+      const rate = await this.db.referenceFreightRate.findUnique({
+        where: { id: current.referenceFreightRateId },
+      });
+      if (rate) {
+        return {
+          status: "APPLIED",
+          originPort: rate.originPort,
+          destinationPort: rate.destinationPort,
+          containerType: rate.containerType,
+          validFrom: rate.validFrom.toISOString(),
+          validUntil: rate.validUntil.toISOString(),
+          message: null,
+        };
+      }
+    }
+
+    try {
+      const ctx = await this.resolveTradeContext(this.db, tradeId, { tradeId });
+      const lookup = await new ReferenceFreightService(this.db).lookupActiveRate(
+        ctx.originPort,
+        ctx.destinationPort,
+        ctx.containerType,
+      );
+      if (lookup) {
+        return {
+          status: current ? "APPLIED" : "UNKNOWN",
+          originPort: lookup.originPort,
+          destinationPort: lookup.destinationPort,
+          containerType: lookup.containerType,
+          validFrom: lookup.validFrom,
+          validUntil: lookup.validUntil,
+          message: null,
+        };
+      }
+      return {
+        status: "MISSING",
+        originPort: ctx.originPort,
+        destinationPort: ctx.destinationPort,
+        containerType: ctx.containerType,
+        validFrom: null,
+        validUntil: null,
+        message: REFERENCE_FREIGHT_MISSING_MESSAGE_TR,
+      };
+    } catch {
+      return {
+        status: "UNKNOWN",
+        originPort: null,
+        destinationPort: null,
+        containerType: null,
+        validFrom: null,
+        validUntil: null,
+        message: null,
+      };
+    }
   }
 
   private mapForRole(
@@ -392,7 +463,10 @@ export class FreightEstimateService {
         ? ws.quotations.find((x) => x.id === ws.rfqDetails!.selectedQuotationId)
         : ws.quotations.find((x) => x.supplierUserId === supplierId);
       if (q?.total != null) fobValue = fobValue ?? Number(q.total);
-      destinationPort = overrides.destinationPort ?? ws.rfqDetails.targetMarket?.slice(0, 20) ?? destinationPort;
+      destinationPort =
+        overrides.destinationPort ??
+        resolveDestinationPortFromMarket(ws.rfqDetails.targetMarket) ??
+        destinationPort;
     }
 
     if (ws.type === "COMMODITYBID") {
@@ -441,7 +515,12 @@ export class FreightEstimateService {
     refreshFromId?: string,
   ): Promise<FreightEstimateDto> {
     const routeInfo = resolveFreightRoute(ctx.originPort, ctx.destinationPort);
-    const estimatedFreight = indicativeFreightUsd(routeInfo.lane, ctx.containerType);
+    const referenceRate = await new ReferenceFreightService(db).requireActiveRate(
+      routeInfo.pol,
+      routeInfo.pod,
+      ctx.containerType,
+    );
+    const estimatedFreight = referenceRate.referenceFreight;
     const estimatedCifValue = ctx.fobValue + estimatedFreight;
     const now = new Date();
     const expiresAt = new Date(now.getTime() + ESTIMATE_TTL_DAYS * 86_400_000);
@@ -463,8 +542,9 @@ export class FreightEstimateService {
           containerType: ctx.containerType,
           fobValue: ctx.fobValue,
           estimatedFreight,
-          currency: ctx.currency,
+          currency: referenceRate.currency || ctx.currency,
           estimatedCifValue,
+          referenceFreightRateId: referenceRate.id,
           estimatedAt: now,
           expiresAt,
           lastRefreshedAt: refreshFromId ? now : null,
@@ -477,6 +557,7 @@ export class FreightEstimateService {
         fobValue: ctx.fobValue,
         estimatedFreight,
         estimatedCifValue,
+        referenceFreightRateId: referenceRate.id,
         refreshedFrom: refreshFromId ?? null,
       });
 

@@ -43,6 +43,82 @@ function escape(s: string): string {
     .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
+// ── Supplier account welcome (Sales Control) ─────────────────────────────────
+export function supplierAccountWelcomeTemplate(p: {
+  displayName: string;
+  organisationName: string;
+  email: string;
+  password: string;
+  loginUrl: string;
+  createdByName?: string | null;
+}) {
+  const subject = `DeMaxtore tedarikçi hesabınız hazır`;
+  const invitedBy = p.createdByName
+    ? `<p>Hesabınız DeMaxtore ekibinden <strong>${escape(p.createdByName)}</strong> tarafından oluşturuldu.</p>`
+    : `<p>Hesabınız DeMaxtore Sales Control üzerinden oluşturuldu.</p>`;
+
+  const credentialRow = (label: string, value: string, mono = false) =>
+    `<tr><td style="padding:10px 16px;border-top:1px solid #E2E8F0;width:38%;color:${MUTED};vertical-align:top;"><strong>${escape(label)}</strong></td>` +
+    `<td style="padding:10px 16px;border-top:1px solid #E2E8F0;${mono ? "font-family:ui-monospace,monospace;font-size:13px;" : ""}">${escape(value)}</td></tr>`;
+
+  const html = shell(
+    "Tedarikçi hesabınız hazır",
+    `<p>Merhaba ${escape(p.displayName)},</p>
+     ${invitedBy}
+     <p>Aşağıdaki bilgilerle DeMaxtore tedarikçi paneline giriş yapabilirsiniz.
+     RFQ davetlerini görüntüleyebilir, teklif verebilir ve sipariş süreçlerinizi tek yerden yönetebilirsiniz.</p>
+     <table role="presentation" cellspacing="0" cellpadding="0" border="0"
+       style="margin:16px 0;font-size:14px;line-height:1.5;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;width:100%;">
+       <tr><td style="padding:10px 16px;width:38%;color:${MUTED};"><strong>Ad Soyad</strong></td>
+           <td style="padding:10px 16px;">${escape(p.displayName)}</td></tr>
+       ${credentialRow("Şirket", p.organisationName)}
+       ${credentialRow("Kullanıcı adı (e-posta)", p.email, true)}
+       ${credentialRow("Şifre", p.password, true)}
+       ${credentialRow("Hesap türü", "Tedarikçi (Supplier)")}
+       ${credentialRow("Giriş adresi", p.loginUrl, true)}
+     </table>
+     <p><strong>Buradan giriş yapın:</strong> <a href="${escape(p.loginUrl)}" style="color:${ACCENT_COLOR};">${escape(p.loginUrl)}</a></p>
+     <p style="font-size:12px;color:${MUTED};">Bu bilgileri güvenli tutun. İlk girişten sonra şifrenizi değiştirebilirsiniz.</p>`,
+    btn(p.loginUrl, "DeMaxtore'a giriş yap"),
+  );
+
+  const text = `Merhaba ${p.displayName},
+
+DeMaxtore tedarikçi hesabınız hazır. Aşağıdaki bilgilerle giriş yapabilirsiniz:
+
+Ad Soyad: ${p.displayName}
+Şirket: ${p.organisationName}
+Kullanıcı adı (e-posta): ${p.email}
+Şifre: ${p.password}
+Hesap türü: Tedarikçi (Supplier)
+Giriş adresi: ${p.loginUrl}
+
+Buradan giriş yapın: ${p.loginUrl}
+
+RFQ davetleri ve sipariş güncellemeleri bu panel üzerinden iletilecektir.`;
+  return { subject, html, text };
+}
+
+/** Plain-text welcome for WhatsApp (primary + secondary contacts). */
+export function supplierAccountWelcomeWhatsApp(p: {
+  displayName: string;
+  organisationName: string;
+  email: string;
+  password: string;
+  loginUrl: string;
+}) {
+  return `Merhaba ${p.displayName},
+
+DeMaxtore hesabınız hazır.
+
+Şirket: ${p.organisationName}
+E-posta: ${p.email}
+Şifre: ${p.password}
+Giriş: ${p.loginUrl}
+
+RFQ davetleri ve sipariş güncellemeleri bu panel üzerinden iletilecektir.`;
+}
+
 // ── Forgot password ──────────────────────────────────────────────────────────
 export function forgotPasswordTemplate(p: { displayName: string; resetUrl: string }) {
   const subject = `Reset your ${BRAND} password`;

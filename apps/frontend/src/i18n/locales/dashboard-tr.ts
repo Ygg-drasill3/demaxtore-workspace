@@ -11,7 +11,7 @@ const dashboardTr: TranslationDict = {
   "dash.common.loadingDocuments": "Belgeler yükleniyor…",
   "dash.common.loadingConversations": "Konuşmalar yükleniyor…",
   "dash.common.loadingEvents": "Etkinlikler yükleniyor…",
-  "dash.common.loadingExceptions": "İstisnalar yükleniyor…",
+  "dash.common.loadingExceptions": "Uyarılar yükleniyor…",
   "dash.common.item": "öğe",
   "dash.common.items": "öğe",
   "dash.common.urgent": "Acil · ",
@@ -68,7 +68,7 @@ const dashboardTr: TranslationDict = {
   "dash.eyebrow.workload": "İş yükü",
   "dash.eyebrow.freightiq": "FreightIQ",
   "dash.eyebrow.tradeLifecycle": "Ticaret yaşam döngüsü",
-  "dash.eyebrow.exceptionHub": "İstisna Merkezi",
+  "dash.eyebrow.exceptionHub": "Uyarı Merkezi",
 
   "dash.actionInbox.title": "Gerekli İşlemler",
   "dash.actionInbox.empty": "Bekleyen işlem yok — her şey güncel.",
@@ -82,12 +82,12 @@ const dashboardTr: TranslationDict = {
   "dash.shipments.title": "Sevkiyatlarım",
   "dash.shipments.empty": "Aktif sevkiyat yok.",
 
-  "dash.exceptions.title": "İstisnalarım",
+  "dash.exceptions.title": "Uyarılarım",
   "dash.exceptions.open": "Açık",
   "dash.exceptions.critical": "Kritik",
   "dash.exceptions.waitingForMe": "Benden Beklenen",
   "dash.exceptions.resolvedWeek": "Bu Hafta Çözülen",
-  "dash.exceptions.empty": "Sizi bekleyen istisna yok.",
+  "dash.exceptions.empty": "Sizi bekleyen uyarı yok.",
 
   "dash.communication.title": "İletişim Merkezi",
   "dash.communication.empty": "Son konuşma yok.",

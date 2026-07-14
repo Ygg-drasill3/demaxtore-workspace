@@ -74,7 +74,7 @@ export type LoginResponse = z.infer<typeof LoginResponse>;
 
 /** Dashboard route for each role — single source of truth for redirects. */
 export const ROLE_DASHBOARD: Record<Role, string> = {
-  BUYER:              "/buyer/control-tower",
+  BUYER:              "/buyer/inbox",
   SUPPLIER:           "/supplier/dashboard",
   ADMIN:              "/admin/dashboard",
   SALES_CONTROL:      "/sales/dashboard",

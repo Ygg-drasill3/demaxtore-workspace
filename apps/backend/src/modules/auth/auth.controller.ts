@@ -5,6 +5,13 @@ import { asyncHandler } from "../../middleware/asyncHandler.js";
 import { validateBody } from "../../middleware/validate.js";
 import { requireAuth } from "../../middleware/auth.js";
 import * as authService from "./auth.service.js";
+import {
+  GOOGLE_STATE_COOKIE,
+  buildGoogleAuthUrl,
+  completeGoogleOAuth,
+  isGoogleAuthEnabled,
+  newGoogleOAuthState,
+} from "./google-oauth.js";
 import { env, isProd } from "../../config/env.js";
 import { Unauthorized } from "../../lib/errors.js";
 
@@ -90,4 +97,70 @@ export const resetPassword = asyncHandler(async (req, res) => {
   const { token, newPassword } = req.body as { token: string; newPassword: string };
   await authService.resetPassword(token, newPassword);
   res.json({ ok: true });
+});
+
+function loginPageUrl(query = ""): string {
+  const base = `${env.APP_BASE_URL.replace(/\/$/, "")}/login/`;
+  return query ? `${base}?${query}` : base;
+}
+
+export const googleStatus = asyncHandler(async (_req, res) => {
+  res.json({ enabled: isGoogleAuthEnabled() });
+});
+
+export const googleStart = asyncHandler(async (req, res) => {
+  if (!isGoogleAuthEnabled()) {
+    res.redirect(loginPageUrl("error=google_not_configured"));
+    return;
+  }
+
+  const state = newGoogleOAuthState();
+  res.cookie(GOOGLE_STATE_COOKIE, state, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: isProd,
+    path: "/api/auth",
+    maxAge: 10 * 60 * 1000,
+  });
+
+  const returnTo = typeof req.query.returnTo === "string" ? req.query.returnTo : null;
+  if (returnTo?.startsWith("/")) {
+    res.cookie("dmx_oauth_return", returnTo, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: isProd,
+      path: "/api/auth",
+      maxAge: 10 * 60 * 1000,
+    });
+  }
+
+  res.redirect(buildGoogleAuthUrl(state));
+});
+
+export const googleCallback = asyncHandler(async (req, res) => {
+  const oauthError = typeof req.query.error === "string" ? req.query.error : null;
+  if (oauthError) {
+    res.redirect(loginPageUrl("error=google_auth_cancelled"));
+    return;
+  }
+
+  const code = typeof req.query.code === "string" ? req.query.code : null;
+  const state = typeof req.query.state === "string" ? req.query.state : null;
+  const savedState = (req.cookies as Record<string, string> | undefined)?.[GOOGLE_STATE_COOKIE];
+
+  res.clearCookie(GOOGLE_STATE_COOKIE, { path: "/api/auth" });
+
+  if (!code || !state || !savedState || state !== savedState) {
+    res.redirect(loginPageUrl("error=google_auth_failed"));
+    return;
+  }
+
+  try {
+    const result = await completeGoogleOAuth(code);
+    setRefreshCookie(res, result.refreshToken);
+    res.clearCookie("dmx_oauth_return", { path: "/api/auth" });
+    res.redirect(`${env.APP_BASE_URL.replace(/\/$/, "")}/login/oauth-callback`);
+  } catch {
+    res.redirect(loginPageUrl("error=google_auth_failed"));
+  }
 });

@@ -8,16 +8,28 @@ export type ResetCustomerPasswordInput = z.infer<typeof ResetCustomerPasswordInp
 export const CustomerAccountRole = z.enum(["BUYER", "SUPPLIER"]);
 export type CustomerAccountRole = z.infer<typeof CustomerAccountRole>;
 
-const SUPPLIER_CREATION_BLOCKLIST = new Set(["ilham@demaxtore.com"]);
-
 export function canCreateSupplierCustomerAccount(actor: {
   email?: string | null;
   role?: string | null;
 }): boolean {
   if (actor.role === "ADMIN") return true;
-  const email = actor.email?.trim().toLowerCase();
-  return email ? !SUPPLIER_CREATION_BLOCKLIST.has(email) : true;
+  return true;
 }
+
+const optionalPhone = z
+  .union([z.string().trim().min(8).max(32), z.literal("")])
+  .optional()
+  .transform((v) => (v?.trim() ? v.trim() : undefined));
+
+const optionalEmail = z
+  .union([z.string().email().max(200), z.literal("")])
+  .optional()
+  .transform((v) => (v?.trim() ? v.trim().toLowerCase() : undefined));
+
+const optionalName = z
+  .union([z.string().trim().min(2).max(120), z.literal("")])
+  .optional()
+  .transform((v) => (v?.trim() ? v.trim() : undefined));
 
 export const CreateCustomerAccountInput = z.object({
   displayName: z.string().trim().min(2).max(120),
@@ -25,6 +37,10 @@ export const CreateCustomerAccountInput = z.object({
   password: z.string().min(8).max(200),
   role: CustomerAccountRole,
   organisationName: z.string().trim().min(2).max(160),
+  whatsappPhone: optionalPhone,
+  secondaryContactName: optionalName,
+  secondaryContactEmail: optionalEmail,
+  secondaryContactWhatsapp: optionalPhone,
 });
 export type CreateCustomerAccountInput = z.infer<typeof CreateCustomerAccountInput>;
 

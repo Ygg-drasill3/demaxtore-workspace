@@ -10,7 +10,7 @@ import ShipmentTrackingPanel from "../components/ShipmentTrackingPanel";
 import TradeDocumentsTab from "@/features/trade-documents/components/TradeDocumentsTab";
 import { SocketEvents } from "@dmx/contracts/socket-events";
 import { useWorkspaceSocket } from "@/lib/socket";
-import WorkspaceCommunicationPanel from "@/features/workspace-communication/components/WorkspaceCommunicationPanel";
+import ConversationHubPanel from "@/features/conversation-hub/components/ConversationHubPanel";
 import { focusTradeDocuments } from "@/features/workspace-communication/lib/focus-communication";
 import { useWorkspaceFocus } from "@/features/workspace/lib/useWorkspaceFocus";
 import { useT } from "@/i18n/useT";
@@ -251,7 +251,7 @@ export default function ShipmentWorkspacePage() {
         isDelayed={shipment.hasOpenException || shipState === "EXCEPTION"}
       />
 
-      <WorkspaceCommunicationPanel workspaceType="SHIPMENT" workspaceId={id!} testId="shipment-communication" />
+      <ConversationHubPanel workspaceType="SHIPMENT" workspaceId={id!} testId="shipment-communication" />
 
       <section data-testid="shipment-tracking-section" className="dmx-card p-4">
         <h2 className="font-medium mb-3">{t("shipment.tracking")}</h2>

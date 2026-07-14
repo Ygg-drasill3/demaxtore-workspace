@@ -6,6 +6,26 @@
 //
 import type { RfqState } from "@dmx/contracts/rfq.fsm";
 
+/** Compact labels for dense table rows (RFQ list). */
+export const STATE_LIST_LABEL: Record<RfqState, string> = {
+  RFQ_DRAFT:           "Draft",
+  RFQ_SUBMITTED:       "Under review",
+  REJECTED_BY_ADMIN:   "Needs revision",
+  SUPPLIERS_ASSIGNED:  "Suppliers assigned",
+  RFQ_OPEN:            "Awaiting quotes",
+  QUOTATIONS_CLOSED:   "Quotes closed",
+  UNDER_EVALUATION:    "Evaluating",
+  SUPPLIER_SELECTED:   "Supplier selected",
+  PROFORMA_REQUESTED:  "Awaiting proforma",
+  PROFORMA_RECEIVED:   "Proforma received",
+  PROFORMA_APPROVED:   "Proforma approved",
+  PO_ISSUED:           "Order placed",
+  CLOSED:              "Completed",
+  CANCELLED:           "Cancelled",
+  EXPIRED:             "Expired",
+  CLOSED_NO_AWARD:     "No award",
+};
+
 /** Compact label used by RfqStateBadge and storyline tooltips. */
 export const STATE_LABEL: Record<RfqState, string> = {
   RFQ_DRAFT:           "Draft",

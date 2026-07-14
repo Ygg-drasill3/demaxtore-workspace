@@ -23,6 +23,7 @@ export const CatalogRfqIngestBody = z
     unit: z.string().max(64).optional(),
     deadline: z.string().max(128).optional(),
     session_id: z.string().max(80).optional(),
+    product_image: z.string().max(2000).optional(),
   })
   .merge(CatalogRfqFormFields)
   .superRefine((v, ctx) => {
@@ -79,6 +80,22 @@ function parseLineItems(
           description: clip(simple[1], 500),
           quantity: Math.max(0.01, Number(simple[2]) || 1),
           uom: "containers",
+        });
+      }
+    }
+  }
+  if (!items.length) {
+    const details = description.match(/Request details:\n([\s\S]*?)(?:\n\n[A-Za-z][^\n]*:|$)/i);
+    if (details?.[1]) {
+      for (const line of details[1].split("\n")) {
+        if (!line.startsWith("- ")) continue;
+        const text = clip(line.slice(2).trim(), 500);
+        if (!text) continue;
+        const numQty = typeof qty === "number" ? qty : Number(qty);
+        items.push({
+          description: text,
+          quantity: numQty > 0 ? numQty : 1,
+          uom: unit || "PCS",
         });
       }
     }
@@ -225,9 +242,19 @@ export async function ingestCatalogRfq(raw: unknown) {
   const { draft, catalogIntake } = toDraftInput(body);
   const created = (await service.createDraft(draft, actor)) as { id: string };
 
+  const productImageUrl = body.product_image?.trim() || catalogIntake.productImageUrl?.trim() || undefined;
+  const catalogIntakeStored = productImageUrl
+    ? { ...catalogIntake, productImageUrl }
+    : catalogIntake;
+
   await prisma.workspace.update({
     where: { id: created.id },
-    data: { metadata: { catalogIntake } },
+    data: {
+      metadata: {
+        catalogIntake: catalogIntakeStored,
+        ...(productImageUrl ? { productImageUrl } : {}),
+      },
+    },
   });
 
   if (body.session_id) {

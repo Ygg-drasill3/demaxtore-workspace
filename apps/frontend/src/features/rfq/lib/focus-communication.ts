@@ -1,6 +1,6 @@
-import { focusWorkspaceCommunication } from "@/features/workspace-communication/lib/focus-communication";
+import { focusConversationHub } from "@/features/conversation-hub/lib/focus-conversation-hub";
 
-/** Scroll to RFQ workspace communication composer and focus the input. */
+/** Scroll to RFQ Conversation Hub composer and focus the input. */
 export function focusRfqCommunication() {
-  focusWorkspaceCommunication("rfq-communication");
+  focusConversationHub("rfq-communication");
 }

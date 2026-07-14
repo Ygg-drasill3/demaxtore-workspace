@@ -21,11 +21,8 @@ export const useToast = create<ToastState>((set, get) => ({
   toasts: [],
   push: (t) => {
     const id = crypto.randomUUID();
-    const entry: ToastEntry = { id, ttl: 5000, ...t };
+    const entry: ToastEntry = { id, ttl: 5200, ...t };
     set({ toasts: [...get().toasts, entry] });
-    if (entry.ttl && entry.ttl > 0) {
-      setTimeout(() => get().remove(id), entry.ttl);
-    }
     return id;
   },
   remove: (id) => set({ toasts: get().toasts.filter((t) => t.id !== id) }),

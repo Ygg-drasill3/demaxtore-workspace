@@ -293,37 +293,13 @@ export class RfqService {
           if (n.role)   socketBus.emitToRole(n.role as Role, "notification:new", { notification: dto });
         }
 
-        // ── Critical notification → email fallback (Sprint 2.9) ──────────
-        //   Allowlist (intentionally tight to avoid mail noise):
-        //     rfq.published · rfq.supplier.selected · proforma.requested ·
-        //     po.issued · password.reset
-        const FALLBACK_EVENTS = new Set([
-          "rfq.published",
-          "rfq.supplier.selected",
-          "proforma.requested",
-          "po.issued",
-        ]);
-        if (FALLBACK_EVENTS.has(transition.auditEvent)) {
-          void (async () => {
-            const { mailer } = await import("../messaging/mailer.js");
-            const { notificationFallbackTemplate } = await import("../messaging/templates.js");
-            for (const n of createdNotifications) {
-              if (!n.userId) continue;
-              const user = await this.prisma.user.findUnique({ where: { id: n.userId } });
-              if (!user) continue;
-              const tpl = notificationFallbackTemplate({
-                displayName:  user.displayName,
-                title:        n.title,
-                body:         n.message ?? null,
-                eventType:    transition.auditEvent,
-                workspaceUrl: n.workspaceId
-                  ? `${process.env.APP_BASE_URL ?? "http://localhost:3000"}/workspace/rfq/${n.workspaceId}`
-                  : null,
-              });
-              mailer.sendAsync({ to: user.email, ...tpl });
-            }
-          })();
-        }
+        void import("../notification-center/delivery.dispatcher.js").then(({ scheduleNotificationChannelDeliveries }) => {
+          scheduleNotificationChannelDeliveries(
+            createdNotifications
+              .filter((n) => n.userId)
+              .map((n) => ({ id: n.id, userId: n.userId! })),
+          );
+        });
       });
 
       return {
@@ -346,6 +322,18 @@ export class RfqService {
         }
       })();
     }
+
+    void (async () => {
+      const { emitFromRfqAuditEvent, bootstrapSpawnedOrdersForParent } =
+        await import("../conversation-hub/conversation-hub.hooks.js");
+      const transition = findRfqTransition(result.fromState, action);
+      if (transition?.auditEvent) {
+        emitFromRfqAuditEvent(this.prisma, workspaceId, transition.auditEvent, actor.id);
+      }
+      if (action === "issue_po") {
+        bootstrapSpawnedOrdersForParent(this.prisma, workspaceId, actor.id);
+      }
+    })();
 
     return result;
   }

@@ -7,11 +7,20 @@ import jwt from "jsonwebtoken";
 import type { Role } from "@prisma/client";
 import { env } from "../../config/env.js";
 
+export interface PasswordlessScopeClaim {
+  workspaceType: string;
+  workspaceId:   string;
+  conversationId: string;
+  tokenJti:      string;
+}
+
 export interface AccessTokenPayload {
   sub:   string; // userId
   email: string;
   role:  Role;
   type:  "access";
+  accessMode?: "passwordless" | "full";
+  pwa?:  PasswordlessScopeClaim;
 }
 export interface RefreshTokenPayload {
   sub:  string; // userId
@@ -24,6 +33,17 @@ export function signAccessToken(p: Omit<AccessTokenPayload, "type">): string {
     algorithm: "HS256",
     expiresIn: env.ACCESS_TOKEN_TTL_SEC,
   });
+}
+
+export function signPasswordlessSessionToken(
+  p: Omit<AccessTokenPayload, "type" | "accessMode"> & { pwa: PasswordlessScopeClaim },
+  expiresInSec: number,
+): string {
+  return jwt.sign(
+    { ...p, type: "access", accessMode: "passwordless" },
+    env.JWT_SECRET,
+    { algorithm: "HS256", expiresIn: expiresInSec },
+  );
 }
 
 export function signRefreshToken(p: Omit<RefreshTokenPayload, "type">): string {

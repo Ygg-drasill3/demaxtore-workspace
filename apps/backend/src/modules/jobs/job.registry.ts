@@ -40,6 +40,24 @@ export const JOB_REGISTRY: JobRegistryEntry[] = [
     enabled: true,
     category: "sync",
   },
+  {
+    name: "whatsapp_bridge_retry",
+    label: "WhatsApp bridge retry",
+    description: "Retries failed WhatsApp Notification Bridge deliveries with exponential backoff",
+    intervalMs: env.WHATSAPP_BRIDGE_RETRY_INTERVAL_MS,
+    advisoryLockId: String(SchedulerLockId.WHATSAPP_BRIDGE),
+    enabled: true,
+    category: "email",
+  },
+  {
+    name: "email_bridge_retry",
+    label: "Email bridge retry",
+    description: "Retries failed Email Notification Bridge deliveries with exponential backoff",
+    intervalMs: env.EMAIL_BRIDGE_RETRY_INTERVAL_MS,
+    advisoryLockId: String(SchedulerLockId.EMAIL_BRIDGE),
+    enabled: true,
+    category: "email",
+  },
 ];
 
 export function getJobDefinition(name: string): JobRegistryEntry | undefined {

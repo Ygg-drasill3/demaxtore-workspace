@@ -5,7 +5,7 @@ import { notificationsApi } from "./lib/notifications.api";
 import { getSocket } from "@/lib/socket";
 import { SocketEvents } from "@dmx/contracts/socket-events";
 import type { NotificationNewPayload } from "@dmx/contracts/socket-events";
-import type { ListNotificationsQuery } from "@dmx/contracts/notifications";
+import type { ListNotificationsQuery, SnoozeOption } from "@dmx/contracts/notifications";
 import { useAuth } from "@/store/auth.store";
 import { useToast } from "@/store/toast.store";
 
@@ -34,7 +34,6 @@ export function useUnreadNotificationCount(): number {
     staleTime: 30_000,
   });
 
-  // Subscribe to personal channel for live count updates.
   useEffect(() => {
     if (!enabled) return;
     const sock = getSocket();
@@ -71,6 +70,27 @@ export function useMarkAllRead() {
     onSuccess: () => {
       qc.setQueryData<{ count: number }>(KEY_COUNT, { count: 0 });
       qc.invalidateQueries({ queryKey: ["notifications", "list"] });
+    },
+  });
+}
+
+export function useDismissNotification() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => notificationsApi.dismiss(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["notifications"] });
+    },
+  });
+}
+
+export function useSnoozeNotification() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, option }: { id: string; option: SnoozeOption }) =>
+      notificationsApi.snooze(id, option),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 }

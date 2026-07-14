@@ -25,8 +25,20 @@ const EnvSchema = z.object({
   LOG_LEVEL:          z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
   ACCESS_TOKEN_TTL_SEC:  z.coerce.number().int().positive().default(15 * 60),         // 15 min
   REFRESH_TOKEN_TTL_SEC: z.coerce.number().int().positive().default(7 * 24 * 60 * 60), // 7 d
+  PASSWORDLESS_ACCESS_DEFAULT_TTL_MIN: z.coerce.number().int().positive().default(30),
+  PASSWORDLESS_ACCESS_SECRET: z.string().min(32).optional(),
+  WHATSAPP_BRIDGE_ENABLED: z.coerce.boolean().default(true),
+  WHATSAPP_BRIDGE_PROVIDER: z.enum(["meta_cloud", "twilio", "dialog360"]).default("meta_cloud"),
+  WHATSAPP_BRIDGE_RETRY_INTERVAL_MS: z.coerce.number().int().positive().default(60_000),
+  EMAIL_BRIDGE_ENABLED: z.coerce.boolean().default(true),
+  EMAIL_BRIDGE_PROVIDER: z.enum(["console", "smtp", "resend"]).default("console"),
+  EMAIL_BRIDGE_RETRY_INTERVAL_MS: z.coerce.number().int().positive().default(60_000),
+  EMAIL_BRIDGE_OPEN_TRACKING_ENABLED: z.coerce.boolean().default(true),
+  /** Public backend origin for email open-tracking pixels (must reach /api). */
+  API_PUBLIC_BASE_URL: z.string().default("http://localhost:3001"),
 
   // ── Messaging & Delivery (Sprint 2.9) ─────────────────────────────────────
+  OUTBOUND_MESSAGING_ENABLED: z.coerce.boolean().default(true),
   EMAIL_PROVIDER:    z.enum(["console", "resend", "smtp"]).default("console"),
   EMAIL_FROM:        z.string().default("DeMaxtore <no-reply@mail.demaxtore.com>"),
   EMAIL_REPLY_TO:    z.string().default("ops@mail.demaxtore.com"),
@@ -95,6 +107,14 @@ const EnvSchema = z.object({
   WHATSAPP_APP_SECRET:       z.string().optional(),
   WHATSAPP_API_VERSION:      z.string().default("v21.0"),
 
+  // ── Google OAuth (optional) ─────────────────────────────────────────────────
+  GOOGLE_CLIENT_ID:     z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+
+  // ── Catalog product images (RFQ line items) ─────────────────────────────────
+  CATALOG_FALLBACK_JSON_PATH: z.string().optional(),
+  DEMAXTORE_CATALOG_API_URL:  z.string().optional(),
+
   /** Server-side E2E bypass — requests must send X-E2E-Test-Secret matching this value. */
   E2E_TEST_SECRET: z.string().min(32).optional(),
 });
@@ -122,6 +142,10 @@ if (parsed.data.NODE_ENV === "production") {
 
 export const env = parsed.data;
 export const isProd = env.NODE_ENV === "production";
+
+export function passwordlessAccessSecret(): string {
+  return env.PASSWORDLESS_ACCESS_SECRET ?? env.JWT_SECRET;
+}
 
 /** CORS origins — workspace app + embedded external panels (FreightIQ, CommodityBid). */
 export const corsOrigins = [

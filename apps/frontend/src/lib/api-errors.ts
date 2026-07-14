@@ -12,9 +12,10 @@ export function getApiErrorMessage(
   if (ax.code === "ECONNABORTED") return "Request timed out. Please try again.";
   if (status === 401) return "Your session expired. Sign in again.";
   if (status === 403) return body?.error?.message ?? body?.message ?? "You do not have access to this resource.";
-  if (status === 404) return body?.error?.message ?? body?.message ?? "Not found.";
+  if (status === 404) return body?.error?.message ?? body?.message ?? "This workspace was not found. It may have been deleted.";
   if (status === 429) return "Too many requests. Wait a moment and retry.";
-  if (status === 503) return body?.message ?? "Service temporarily unavailable.";
+  if (status === 502 || status === 503 || status === 504) return body?.message ?? "Service temporarily unavailable. Please retry in a moment.";
+  if (!status && ax.message === "Network Error") return "Could not reach the server. Check your connection and retry.";
 
   return body?.error?.message ?? body?.message ?? ax.message ?? fallback;
 }

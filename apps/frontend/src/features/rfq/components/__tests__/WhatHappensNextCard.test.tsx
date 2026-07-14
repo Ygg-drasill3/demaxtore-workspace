@@ -67,6 +67,17 @@ describe("<WhatHappensNextCard />", () => {
     expect(screen.getByTestId("whn-stat-right")).toHaveTextContent(/2\/5 quotations/);
   });
 
+  it("surfaces Close Quotations in the hero card for BUYER owner @ RFQ_OPEN", () => {
+    renderWithProviders(
+      <WhatHappensNextCard
+        {...baseProps}
+        state="RFQ_OPEN"
+        vars={{ invited: 5, quoted: 2, deadlineCountdown: "2d 4h left" }}
+      />,
+    );
+    expect(screen.getByTestId("whn-promoted-cta-close_quotations_early")).toHaveTextContent(/close quotations/i);
+  });
+
   it("falls back gracefully for unknown state", () => {
     renderWithProviders(
       <WhatHappensNextCard

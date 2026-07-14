@@ -25,6 +25,8 @@ export interface RfqScript {
   primaryLabel?:  string;
   /** When primaryAction is null and we still want one fallback button (e.g. Withdraw, Clone). */
   fallbackPrimary?: { label: string; href?: string; action?: RfqAction; tone?: "secondary" | "ghost" };
+  /** Secondary actions surfaced inline in the hero card (excluded from More actions). */
+  promotedSecondaryActions?: RfqAction[];
 }
 
 /**
@@ -88,6 +90,7 @@ export const RFQ_SCRIPTS: Record<RfqState, RfqScript> = {
     statR:  { label: "Received", value: "{{quoted}}/{{invited}} quotations" },
     primaryAction: "post_clarification",
     primaryLabel: "Post Clarification",
+    promotedSecondaryActions: ["close_quotations_early"],
   },
 
   QUOTATIONS_CLOSED: {
@@ -370,6 +373,15 @@ export function rfqScriptFor(state: RfqState, role: WorkspaceScriptRole): RfqScr
   if (role === "ADMIN" && ADMIN_RFQ_SCRIPTS[state]) return ADMIN_RFQ_SCRIPTS[state];
   if (role === "SUPPLIER" && SUPPLIER_RFQ_SCRIPTS[state]) return SUPPLIER_RFQ_SCRIPTS[state];
   return RFQ_SCRIPTS[state];
+}
+
+/** Actions rendered in the hero card — excluded from the More actions drawer. */
+export function rfqHeroActions(state: RfqState, role: WorkspaceScriptRole): RfqAction[] {
+  const script = rfqScriptFor(state, role) ?? RFQ_SCRIPTS[state];
+  const actions: RfqAction[] = [];
+  if (script?.primaryAction) actions.push(script.primaryAction);
+  if (script?.promotedSecondaryActions?.length) actions.push(...script.promotedSecondaryActions);
+  return actions;
 }
 
 export function waitingScriptFor(state: RfqState, role: WorkspaceScriptRole): WaitingScript | undefined {

@@ -1,6 +1,6 @@
 // apps/frontend/src/features/auth/pages/ResetPasswordPage.tsx
 import { useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -66,9 +66,9 @@ export default function ResetPasswordPage() {
           <h1 className="font-display text-2xl font-semibold tracking-tight">{t("reset.successTitle")}</h1>
           <p className="text-sm text-zinc-500 mt-1.5">{t("reset.successBody")}</p>
         </div>
-        <Link to="/login" className="inline-block text-sm font-medium text-accent-900 hover:underline">
+        <a href="/login/" className="inline-block text-sm font-medium text-accent-900 hover:underline">
           {t("reset.signInLink")}
-        </Link>
+        </a>
       </div>
     );
   }
@@ -123,9 +123,9 @@ export default function ResetPasswordPage() {
         {t("reset.submit")}
       </Button>
 
-      <Link to="/login" className="block text-center text-sm text-zinc-500 hover:text-ink-900">
+      <a href="/login/" className="block text-center text-sm text-zinc-500 hover:text-ink-900">
         {t("reset.backToSignIn")}
-      </Link>
+      </a>
     </form>
   );
 }

@@ -39,7 +39,8 @@ export const BUYER_NAV_GROUPS: NavGroup[] = [
   {
     id: "home", label: "Home", testId: "nav-group-home",
     items: [
-      { to: "/buyer/dashboard", label: "Dashboard", icon: LayoutDashboard, testId: "buyer-dashboard", end: true },
+      { to: "/buyer/inbox", label: "Workspace Inbox", icon: Inbox, testId: "buyer-inbox", end: true },
+      { to: "/buyer/dashboard", label: "Dashboard", icon: LayoutDashboard, testId: "buyer-dashboard" },
     ],
   },
   {

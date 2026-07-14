@@ -44,13 +44,23 @@ export const PRECONDITIONS: Record<string, PreconditionFn> = {
   },
 
   assertAssignable: ({ payload }) => {
+    const assignments = (payload.assignments as { supplierUserId: string; rfqLineItemIds?: string[] }[]) ?? [];
     const ids = (payload.supplierUserIds as string[]) ?? [];
-    if (!Array.isArray(ids) || ids.length === 0)
+    if (!assignments.length && !ids.length)
       throw new AppError(400, "RFQ_ASSIGN_NO_SUPPLIERS");
+    if (assignments.length) {
+      for (const a of assignments) {
+        if (!a.rfqLineItemIds?.length)
+          throw new AppError(400, "RFQ_ASSIGN_NO_PRODUCTS", { supplierUserId: a.supplierUserId });
+      }
+    }
     const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    const invalid = ids.filter((id) => typeof id !== "string" || !uuidRe.test(id));
+    const allIds = assignments.length
+      ? assignments.map((a) => a.supplierUserId)
+      : ids;
+    const invalid = allIds.filter((id) => typeof id !== "string" || !uuidRe.test(id));
     if (invalid.length) throw new AppError(400, "RFQ_INVALID_SUPPLIER_ID", { invalid });
-    if (new Set(ids).size !== ids.length)
+    if (new Set(allIds).size !== allIds.length)
       throw new AppError(400, "RFQ_DUPLICATE_SUPPLIER_IDS");
   },
 
@@ -58,7 +68,10 @@ export const PRECONDITIONS: Record<string, PreconditionFn> = {
     const existing = new Set(
       (workspace.supplierAssignments ?? []).map((a: any) => a.supplierUserId),
     );
-    const incoming = (payload.supplierUserIds as string[]) ?? [];
+    const incoming =
+      ((payload.assignments as { supplierUserId: string }[]) ?? []).map((a) => a.supplierUserId).length
+        ? (payload.assignments as { supplierUserId: string }[]).map((a) => a.supplierUserId)
+        : (payload.supplierUserIds as string[]) ?? [];
     const dupes = incoming.filter((id) => existing.has(id));
     if (dupes.length) throw new AppError(409, "RFQ_SUPPLIERS_ALREADY_ASSIGNED", { dupes });
   },

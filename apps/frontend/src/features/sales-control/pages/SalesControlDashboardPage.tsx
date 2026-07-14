@@ -49,6 +49,10 @@ export default function SalesControlDashboardPage() {
       password: generatePassword(),
       role: "BUYER",
       organisationName: "",
+      whatsappPhone: "",
+      secondaryContactName: "",
+      secondaryContactEmail: "",
+      secondaryContactWhatsapp: "",
     },
   });
 
@@ -71,6 +75,10 @@ export default function SalesControlDashboardPage() {
         password: generatePassword(),
         role: form.getValues("role"),
         organisationName: "",
+        whatsappPhone: "",
+        secondaryContactName: "",
+        secondaryContactEmail: "",
+        secondaryContactWhatsapp: "",
       });
       void qc.invalidateQueries({ queryKey: ["sales-control", "customers"] });
     },
@@ -161,7 +169,7 @@ export default function SalesControlDashboardPage() {
               <Field label={t("salesControl.fieldCompany")} error={form.formState.errors.organisationName?.message}>
                 <Input data-testid="sales-create-company" {...form.register("organisationName")} />
               </Field>
-              <Field label={t("salesControl.fieldEmail")} error={form.formState.errors.email?.message}>
+              <Field label={t("salesControl.fieldEmail")} labelLang="en" error={form.formState.errors.email?.message}>
                 <Input data-testid="sales-create-email" type="email" autoComplete="off" {...form.register("email")} />
               </Field>
               <Field label={t("salesControl.fieldPassword")} error={form.formState.errors.password?.message}>
@@ -176,6 +184,37 @@ export default function SalesControlDashboardPage() {
                   </button>
                 </div>
               </Field>
+              <Field label={t("salesControl.fieldWhatsapp")} error={form.formState.errors.whatsappPhone?.message}>
+                <Input
+                  data-testid="sales-create-whatsapp"
+                  type="tel"
+                  autoComplete="off"
+                  placeholder="+90 5xx xxx xx xx"
+                  {...form.register("whatsappPhone")}
+                />
+              </Field>
+            </div>
+
+            <div className="rounded-lg border border-paper-200 bg-paper-50/60 p-4 space-y-3">
+              <div className="text-sm font-semibold text-ink-900">{t("salesControl.secondaryContactTitle")}</div>
+              <p className="text-xs text-zinc-500">{t("salesControl.secondaryContactHint")}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Field label={t("salesControl.fieldSecondaryName")} error={form.formState.errors.secondaryContactName?.message}>
+                  <Input data-testid="sales-create-secondary-name" {...form.register("secondaryContactName")} />
+                </Field>
+                <Field label={t("salesControl.fieldSecondaryEmail")} labelLang="en" error={form.formState.errors.secondaryContactEmail?.message}>
+                  <Input data-testid="sales-create-secondary-email" type="email" autoComplete="off" {...form.register("secondaryContactEmail")} />
+                </Field>
+                <Field label={t("salesControl.fieldSecondaryWhatsapp")} error={form.formState.errors.secondaryContactWhatsapp?.message}>
+                  <Input
+                    data-testid="sales-create-secondary-whatsapp"
+                    type="tel"
+                    autoComplete="off"
+                    placeholder="+90 5xx xxx xx xx"
+                    {...form.register("secondaryContactWhatsapp")}
+                  />
+                </Field>
+              </div>
             </div>
 
             <div>

@@ -24,9 +24,13 @@ export type MessageVisibility = (typeof MessageVisibility)[number];
 
 export const MessageType = [
   "MESSAGE",
+  "DOCUMENT",
   "QUESTION",
   "ANSWER",
   "DECISION",
+  "APPROVAL",
+  "ACTION_REQUIRED",
+  "SYSTEM_EVENT",
   "STATUS_UPDATE",
   "INTERNAL_NOTE",
 ] as const;
@@ -48,7 +52,11 @@ export const TIMELINE_MESSAGE_TYPES: MessageType[] = [
   "QUESTION",
   "ANSWER",
   "DECISION",
+  "APPROVAL",
+  "ACTION_REQUIRED",
+  "SYSTEM_EVENT",
   "STATUS_UPDATE",
+  "DOCUMENT",
 ];
 
 export interface WorkspaceParticipant {
@@ -80,7 +88,7 @@ export interface MessageAttachment {
 export interface WorkspaceMessage {
   id: string;
   conversationId: string;
-  authorUserId: string;
+  authorUserId: string | null;
   authorName: string;
   authorRole: string;
   messageType: MessageType;

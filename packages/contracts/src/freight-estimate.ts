@@ -27,6 +27,7 @@ export interface FreightEstimateDto {
   expiresAt: string;
   status: FreightEstimateStatus;
   lastRefreshedAt: string | null;
+  referenceFreightRateId: string | null;
 }
 
 /** Supplier-facing view — status only (no freight/CIF amounts). */
@@ -43,6 +44,15 @@ export interface FreightEstimatePanelDto {
   history: FreightEstimateDto[];
   expirationStatus: "ACTIVE" | "EXPIRING_SOON" | "EXPIRED" | "NONE";
   lastRefresh: string | null;
+  referenceFreight: {
+    status: "APPLIED" | "MISSING" | "UNKNOWN";
+    originPort: string | null;
+    destinationPort: string | null;
+    containerType: string | null;
+    validFrom: string | null;
+    validUntil: string | null;
+    message: string | null;
+  };
 }
 
 export interface FreightEstimateListQuery {

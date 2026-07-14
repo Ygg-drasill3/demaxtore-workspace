@@ -116,8 +116,22 @@ export type WithdrawQuotationPayload = z.infer<typeof WithdrawQuotationPayload>;
 export type EditRfqDraftInput = z.infer<typeof EditRfqDraftInput>;
 
 // Per-action payload schemas — used by controllers + service
+export const SupplierAssignmentInput = z.object({
+  supplierUserId: z.string().uuid(),
+  rfqLineItemIds: z.array(z.string().uuid()).min(1).max(50),
+});
+
 export const AssignSuppliersPayload = z.object({
-  supplierUserIds: z.array(z.string().uuid()).min(1).max(50),
+  supplierUserIds: z.array(z.string().uuid()).min(1).max(50).optional(),
+  assignments:     z.array(SupplierAssignmentInput).min(1).max(50).optional(),
+}).superRefine((v, ctx) => {
+  if (!v.supplierUserIds?.length && !v.assignments?.length) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "supplierUserIds or assignments is required",
+      path: ["supplierUserIds"],
+    });
+  }
 });
 export const RemoveSupplierPayload = z.object({
   supplierUserId: z.string().uuid(),
@@ -195,6 +209,7 @@ export const RfqLineItemDTO = z.object({
   quantity:   z.number(),
   uom:        z.string(),
   notes:      z.string().nullable(),
+  imageUrl:   z.string().nullable().optional(),
 });
 export const RfqDTO = z.object({
   id:                 z.string().uuid(),
@@ -214,11 +229,15 @@ export const RfqDTO = z.object({
   createdAt:          z.string().datetime(),
   updatedAt:          z.string().datetime(),
   lineItems:          z.array(RfqLineItemDTO),
+  /** Supplier-only: allowed RFQ line IDs; null/omitted = all lines. */
+  allowedQuoteLineItemIds: z.array(z.string().uuid()).nullable().optional(),
   selectedSupplierUserId: z.string().uuid().nullable().optional(),
   poNumber:           z.string().nullable().optional(),
   procurementMethod:  ProcurementMethod.nullable().optional(),
   linkedCommoditybidId: z.string().uuid().nullable().optional(),
   catalogIntake:        CatalogIntakeDTO.optional(),
+  /** Resolved product hero image (demaxtore.com catalog or mixed-container). */
+  productImageUrl:      z.string().nullable().optional(),
   trashedAt:          z.string().datetime().nullable().optional(),
 });
 export type RfqDTO = z.infer<typeof RfqDTO>;

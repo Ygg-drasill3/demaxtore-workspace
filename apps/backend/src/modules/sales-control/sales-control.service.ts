@@ -94,15 +94,74 @@ export class SalesControlService {
           displayName: input.displayName.trim(),
           role: input.role as Role,
           organisationId: organisation.id,
+          whatsappPhone: input.whatsappPhone?.trim() || null,
         },
         include: { organisation: { select: { name: true } } },
       });
+    });
+
+    await this.sendAccountWelcomeNotifications({
+      displayName: input.displayName.trim(),
+      organisationName: input.organisationName.trim(),
+      email,
+      password: input.password,
+      loginUrl,
+      createdByName: actor.displayName,
+      whatsappPhone: input.whatsappPhone,
+      secondaryContactName: input.secondaryContactName,
+      secondaryContactEmail: input.secondaryContactEmail,
+      secondaryContactWhatsapp: input.secondaryContactWhatsapp,
     });
 
     return {
       account: toDto(user),
       loginUrl,
     };
+  }
+
+  private async sendAccountWelcomeNotifications(args: {
+    displayName: string;
+    organisationName: string;
+    email: string;
+    password: string;
+    loginUrl: string;
+    createdByName: string;
+    whatsappPhone?: string;
+    secondaryContactName?: string;
+    secondaryContactEmail?: string;
+    secondaryContactWhatsapp?: string;
+  }) {
+    const { mailer } = await import("../messaging/mailer.js");
+    const { supplierAccountWelcomeTemplate, supplierAccountWelcomeWhatsApp } = await import("../messaging/templates.js");
+    const { sendTextMessage } = await import("../chat/whatsapp.service.js");
+
+    const welcomeArgs = {
+      displayName: args.displayName,
+      organisationName: args.organisationName,
+      email: args.email,
+      password: args.password,
+      loginUrl: args.loginUrl,
+      createdByName: args.createdByName,
+    };
+
+    const tpl = supplierAccountWelcomeTemplate(welcomeArgs);
+    mailer.sendAsync({ to: args.email, ...tpl });
+
+    if (args.secondaryContactEmail) {
+      const secondaryTpl = supplierAccountWelcomeTemplate({
+        ...welcomeArgs,
+        displayName: args.secondaryContactName || args.secondaryContactEmail,
+      });
+      mailer.sendAsync({ to: args.secondaryContactEmail, ...secondaryTpl });
+    }
+
+    const waText = supplierAccountWelcomeWhatsApp(welcomeArgs);
+    if (args.whatsappPhone) {
+      void sendTextMessage(args.whatsappPhone, waText);
+    }
+    if (args.secondaryContactWhatsapp) {
+      void sendTextMessage(args.secondaryContactWhatsapp, waText);
+    }
   }
 
   async resetCustomerPassword(customerId: string, newPassword?: string) {

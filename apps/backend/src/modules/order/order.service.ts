@@ -15,6 +15,7 @@ import { spawnShipmentFromOrder, backfillFreightSelectionForOrder } from "../shi
 import { autoAcknowledgePoOnSupplierConfirm } from "../purchase-order/purchase-order.sync.js";
 import { closeParentRfqWhenOrderCloses } from "../rfq/rfq-order.sync.js";
 import { socketBus } from "../../realtime/socket-bus";
+import { buildFsmNotificationMetadata } from "../notification-engine/fsm-notification-metadata.js";
 import type { ListOrderQuery } from "@dmx/contracts/order.zod";
 import type { AuthUser } from "./order.policy.js";
 import { AppError } from "../../utils/httpErrors.js";
@@ -238,9 +239,9 @@ export class OrderService {
       });
 
       const recipients = await resolveRecipients(tx, transition, workspaceFull, actor);
-      let notificationsCreated = 0;
+      const createdNotifications: Array<{ id: string; userId: string | null }> = [];
       for (const r of recipients) {
-        await tx.notification.create({
+        const n = await tx.notification.create({
           data: {
             userId: r.userId,
             role: r.broadcastRole ?? null,
@@ -250,9 +251,15 @@ export class OrderService {
             title: r.title,
             message: r.message,
             link: `/workspace/order/${workspaceId}`,
+            metadata: buildFsmNotificationMetadata({
+              auditEvent: transition.auditEvent,
+              commWorkspaceType: "ORDER",
+              commWorkspaceId: workspaceId,
+              workspaceRef: workspaceFull.externalRef,
+            }),
           },
         });
-        notificationsCreated++;
+        if (n.userId) createdNotifications.push({ id: n.id, userId: n.userId });
       }
 
       const timelineEventDTO = {
@@ -282,6 +289,14 @@ export class OrderService {
         });
         socketBus.emitToWorkspace(workspaceId, "timeline:new", { workspaceId, event: timelineEventDTO });
         socketBus.emitToWorkspace(workspaceId, "workspace:update", { workspaceId, state: newState, action });
+
+        if (createdNotifications.length) {
+          void import("../notification-center/delivery.dispatcher.js").then(({ scheduleNotificationChannelDeliveries }) => {
+            scheduleNotificationChannelDeliveries(
+              createdNotifications.filter((n): n is { id: string; userId: string } => Boolean(n.userId)),
+            );
+          });
+        }
       });
 
       return {
@@ -290,17 +305,44 @@ export class OrderService {
         toState: newState,
         timelineEventId: timelineEvent.id,
         auditLogId: auditLog.id,
-        notificationsCreated,
+        notificationsCreated: createdNotifications.length,
       };
     });
 
-    if (!idempotencyKey) return txnPromise;
+    if (!idempotencyKey) {
+      const result = await txnPromise;
+      void this.emitConversationHubEvent(workspaceId, action, actor, payload, result).catch(() => {});
+      return result;
+    }
     try {
-      return await txnPromise;
+      const result = await txnPromise;
+      void this.emitConversationHubEvent(workspaceId, action, actor, payload, result).catch(() => {});
+      return result;
     } catch (err) {
       // Transaction rolled back — release the claim so a retry is not bricked.
       await releaseProcessedEvent(this.prisma, "fsm:order", `${workspaceId}:${idempotencyKey}`).catch(() => {});
       throw err;
+    }
+  }
+
+  private async emitConversationHubEvent(
+    workspaceId: string,
+    action: OrderAction,
+    actor: ApplyTransitionInput["actor"],
+    payload: Record<string, unknown>,
+    result: ApplyTransitionResult,
+  ): Promise<void> {
+    if (result.timelineEventId === "(idempotent-replay)") return;
+    const { emitFromFsmAuditEvent } = await import("../conversation-hub/conversation-hub.hooks.js");
+    const transition = this.resolveTransition(result.fromState, action, actor.role, payload);
+    if (transition?.auditEvent) {
+      emitFromFsmAuditEvent(
+        this.prisma,
+        "ORDER",
+        workspaceId,
+        transition.auditEvent,
+        actor.role === "SYSTEM" ? null : actor.id,
+      );
     }
   }
 

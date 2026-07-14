@@ -9,6 +9,8 @@ export const SchedulerLockId = {
   CONTROL_TOWER: 903903n,
   TRACKING:      903904n,
   RFQ_DEADLINE:  903905n,
+  WHATSAPP_BRIDGE: 903906n,
+  EMAIL_BRIDGE:    903907n,
 } as const;
 
 type PgModule = typeof import("pg");

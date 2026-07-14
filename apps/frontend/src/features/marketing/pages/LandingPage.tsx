@@ -1,4 +1,3 @@
-import { Link } from "react-router-dom";
 import { ArrowRight, Container, Gavel, Package, Radar, Ship } from "lucide-react";
 import { useT } from "@/i18n/useT";
 import { LanguageSwitcher } from "@/i18n/LanguageSwitcher";
@@ -23,12 +22,12 @@ export default function LandingPage() {
           </div>
           <div className="flex items-center gap-2">
             <LanguageSwitcher />
-            <Link to="/login" data-testid="landing-sign-in" className="dmx-btn-secondary text-sm">
+            <a href="/login/" data-testid="landing-sign-in" className="dmx-btn-secondary text-sm">
               {t("landing.signIn")}
-            </Link>
-            <Link to="/login" data-testid="landing-demo-cta" className="dmx-btn-primary text-sm">
+            </a>
+            <a href="/login/" data-testid="landing-demo-cta" className="dmx-btn-primary text-sm">
               {t("landing.launchDemo")} <ArrowRight className="h-4 w-4" />
-            </Link>
+            </a>
           </div>
         </div>
       </header>
@@ -51,12 +50,12 @@ export default function LandingPage() {
             {t("launch.landing.subhead")}
           </p>
           <div className="mt-10 flex flex-wrap gap-3">
-            <Link to="/login" className="dmx-btn-primary bg-white text-ink-950 hover:bg-zinc-100 border-0">
+            <a href="/login/" className="dmx-btn-primary bg-white text-ink-950 hover:bg-zinc-100 border-0">
               {t("launch.landing.ctaPrimary")}
-            </Link>
-            <Link to="/login" className="dmx-btn-secondary border-white/20 text-white hover:bg-white/10">
+            </a>
+            <a href="/login/" className="dmx-btn-secondary border-white/20 text-white hover:bg-white/10">
               {t("launch.landing.ctaSecondary")}
-            </Link>
+            </a>
           </div>
           <p className="text-xs text-zinc-500 mt-4">{t("launch.landing.demoNote")}</p>
         </div>
@@ -85,9 +84,9 @@ export default function LandingPage() {
             <h2 className="font-display text-2xl font-semibold tracking-tight">{t("landing.walkthrough.title")}</h2>
             <p className="text-sm text-zinc-600 mt-2 max-w-lg">{t("landing.walkthrough.body")}</p>
           </div>
-          <Link to="/login" className="dmx-btn-primary shrink-0">
+          <a href="/login/" className="dmx-btn-primary shrink-0">
             {t("landing.goToSignIn")} <ArrowRight className="h-4 w-4" />
-          </Link>
+          </a>
         </div>
       </section>
 

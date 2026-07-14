@@ -21,6 +21,8 @@ type LineItemForm = {
 type Props = {
   rfq: RfqDTO;
   isOwner: boolean;
+  /** Supplier view — hide buyer identity and contact intake. */
+  hideBuyerFields?: boolean;
 };
 
 const CURRENCIES = ["USD", "EUR", "GBP"] as const;
@@ -47,7 +49,7 @@ function emptyLineItem(): LineItemForm {
   return { description: "", quantity: "1", uom: "PCS", notes: "" };
 }
 
-export function RfqDetailsPanel({ rfq, isOwner }: Props) {
+export function RfqDetailsPanel({ rfq, isOwner, hideBuyerFields = false }: Props) {
   const { t } = useT();
   const qc = useQueryClient();
   const canEdit = isOwner && rfq.state === "RFQ_DRAFT";
@@ -284,11 +286,12 @@ export function RfqDetailsPanel({ rfq, isOwner }: Props) {
               <Detail label={t("rfq.details.field.targetMarket")} value={rfq.targetMarket || "—"} />
               <Detail label={t("rfq.details.field.incoterm")} value={rfq.incoterm} />
               <Detail label={t("rfq.details.field.currency")} value={rfq.currency ?? "—"} />
-              <Detail
-                label={t("rfq.details.field.deadline")}
+              <Detail label={t("rfq.details.field.deadline")}
                 value={rfq.deadlineAt ? new Date(rfq.deadlineAt).toLocaleString() : "—"}
               />
-              <Detail label={t("rfq.details.field.owner")} value={rfq.ownerName || "—"} />
+              {!hideBuyerFields && (
+                <Detail label={t("rfq.details.field.owner")} value={rfq.ownerName || "—"} />
+              )}
               <Detail
                 label={t("rfq.details.field.procurement")}
                 value={rfq.procurementMethod?.replace(/_/g, " ") ?? "—"}
@@ -299,7 +302,7 @@ export function RfqDetailsPanel({ rfq, isOwner }: Props) {
               />
             </div>
 
-            <RfqCatalogIntakePanel rfq={rfq} />
+            {!hideBuyerFields && <RfqCatalogIntakePanel rfq={rfq} />}
 
             <div>
               <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">
@@ -317,7 +320,7 @@ export function RfqDetailsPanel({ rfq, isOwner }: Props) {
               ) : (
                 <div className="overflow-x-auto rounded-lg border border-zinc-100">
                   <table className="w-full text-sm" data-testid="rfq-details-line-items">
-                    <thead className="bg-zinc-50 text-xs uppercase tracking-wider text-zinc-500">
+                    <thead lang="en" className="bg-zinc-50 text-xs uppercase tracking-wider text-zinc-500">
                       <tr>
                         <th className="text-left px-3 py-2 w-10">#</th>
                         <th className="text-left px-3 py-2">{t("rfq.details.field.lineDescription")}</th>

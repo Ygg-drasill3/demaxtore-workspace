@@ -36,7 +36,7 @@ const LABELS: Partial<Record<OrderAction, { label: string; description: string; 
   start_production:          { label: "Start Production", description: "Begin manufacturing for this order", variant: "primary" },
   report_production_progress:{ label: "Update Production", description: "Report progress — below 100% the order stays in production; 100% completes it", variant: "secondary" },
   mark_production_completed: { label: "Complete Production", description: "Mark all goods produced", variant: "primary" },
-  request_inspection:        { label: "Request Inspection", description: "Schedule third-party inspection", variant: "primary" },
+  request_inspection:        { label: "Request Inspection", description: "Schedule Demaxtore Inspection", variant: "primary" },
   skip_inspection:           { label: "Skip Inspection", description: "Proceed directly to freight", variant: "secondary" },
   record_inspection_result:  { label: "Complete Inspection", description: "Record PASS/FAIL inspection report", variant: "primary" },
   proceed_to_freight:        { label: "Request Freight", description: "Proceed to freight booking", variant: "primary" },

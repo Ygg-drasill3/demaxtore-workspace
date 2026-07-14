@@ -22,6 +22,10 @@ import { controlTowerRouter } from "./modules/control-tower/control-tower.routes
 import { freightiqRouter } from "./modules/freightiq/freightiq.routes.js";
 import { tradeDocumentsRouter } from "./modules/trade-documents/documents.routes.js";
 import { purchaseOrderRouter } from "./modules/purchase-order/purchase-order.routes.js";
+import { conversationHubRouter } from "./modules/conversation-hub/conversation-hub.routes.js";
+import passwordlessAccessRoutes from "./modules/passwordless-access/passwordless-access.routes.js";
+import emailBridgeRoutes from "./modules/email-notification-bridge/email-bridge.routes.js";
+import { workspaceInboxRouter } from "./modules/workspace-inbox/workspace-inbox.routes.js";
 import { workspaceCommunicationRouter } from "./modules/workspace-communication/communication.routes.js";
 import { scaleRouter } from "./modules/scale-readiness/scale.routes.js";
 import { growthRouter } from "./modules/growth-engine/growth.routes.js";
@@ -65,6 +69,8 @@ api.use("/healthz",       healthRoutes);
 api.use("/version",       versionRoutes);
 api.get("/ready", asyncHandler(readinessHandler));
 api.use("/auth",          authRoutes);
+api.use("/passwordless-access", passwordlessAccessRoutes);
+api.use("/email-bridge", emailBridgeRoutes);
 api.use("/notifications", notificationsRoutes);
 api.use("/rfq/:id/attachments", attachmentsRoutes);  // Phase G1
 api.use("/rfq/:id/quotations",  quotationsRoutes);   // Sprint 2.7
@@ -113,6 +119,11 @@ api.use("/freight-estimates", freightEstimateRouter);
 api.use("/freight-bookings", freightBookingRouter);
 api.use("/trade-timeline", tradeTimelineRoutes);
 api.use("/sales", salesControlRouter);
+api.use("/workspace-inbox", workspaceInboxRouter);
+api.use(
+  "/workspaces/:workspaceType/:workspaceId/conversation",
+  conversationHubRouter,
+);
 api.use(
   "/workspace-communication/:workspaceType/:workspaceId",
   workspaceCommunicationRouter,

@@ -10,14 +10,13 @@ import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Input";
 import { AlertTriangle, ChevronRight } from "lucide-react";
 import { computeRfqNextActions, type NextAction } from "@dmx/contracts/rfq.next-actions";
-import { RFQ_SCRIPTS } from "../lib/rfq.scripts";
+import { rfqHeroActions } from "../lib/rfq.scripts";
 import { useApplyRfqAction } from "../hooks";
 import { useTelemetry } from "@/features/telemetry/useTelemetry";
 import type { RfqState, ActorRole } from "@dmx/contracts/rfq.fsm";
 import {
   PICKER_ACTIONS, AssignSuppliersPicker, SelectSupplierPicker, SubmitProformaPicker, IssuePoPicker,
 } from "./ActionPickers";
-import { rfqScriptFor } from "../lib/rfq.scripts";
 import { toWorkspaceScriptRole } from "@dmx/contracts/workspace-scripts";
 import { focusRfqCommunication } from "../lib/focus-communication";
 import { toast } from "@/store/toast.store";
@@ -56,10 +55,10 @@ export function ActionDrawer(props: Props) {
     state, actorRole: actor.role, isOwner, isCounterparty, isSelectedSupplier, hasQuotationFromUser,
   });
 
-  // Exclude the state's primary action — it lives in the hero card, not here.
+  // Exclude hero-card actions — primary + promoted secondary live in WhatHappensNextCard.
   const scriptRole = toWorkspaceScriptRole(actor.role === "SYSTEM" ? "ADMIN" : actor.role) ?? "ADMIN";
-  const primaryAction = rfqScriptFor(state, scriptRole)?.primaryAction ?? RFQ_SCRIPTS[state]?.primaryAction;
-  const otherActions = allowed.filter((a) => a.action !== primaryAction);
+  const heroActions = new Set(rfqHeroActions(state, scriptRole));
+  const otherActions = allowed.filter((a) => !heroActions.has(a.action));
 
   const critical = otherActions.filter((a) => a.variant === "destructive");
   const secondary = otherActions.filter((a) => a.variant !== "destructive");

@@ -47,6 +47,30 @@ test.describe("Sprint 11A — Procurement Strategy Architecture", () => {
     await expect(page.getByTestId("rfq-workspace")).toBeVisible({ timeout: 15_000 });
   });
 
+  test("02b — Non-commodity RFQ blocks CommodityBid option", async ({ page }) => {
+    await uiLogin(page, USERS.buyer1);
+    await page.goto("/buyer/rfq/new");
+    const ts = Date.now();
+    await page.getByTestId("rfq-title").fill(`Non-commodity RFQ ${ts}`);
+    await page.getByTestId("rfq-category").fill("Industrial");
+    await page.getByTestId("rfq-market").fill("EU");
+    await page.getByTestId("rfq-description").fill("Non-commodity procurement strategy test");
+    await page.getByTestId("rfq-incoterm").selectOption("FOB");
+    await page.getByTestId("rfq-currency").selectOption("USD");
+    const deadline = new Date(Date.now() + 10 * 86_400_000).toISOString().slice(0, 16);
+    await page.getByTestId("rfq-deadline").fill(deadline);
+    await page.locator('[data-testid="rfq-line-0"] input').first().fill("steel beams");
+    await page.locator('[data-testid="rfq-line-0"] input').nth(1).fill("10");
+    await page.locator('[data-testid="rfq-line-0"] input').nth(2).fill("MT");
+    await page.getByTestId("rfq-submit").click();
+    await page.waitForURL(/procurement-strategy/, { timeout: 15_000 });
+    await expect(page.getByTestId("procurement-cb-ineligible-banner")).toBeVisible();
+    await expect(page.getByTestId("procurement-commoditybid-auction")).toBeDisabled();
+    await page.getByTestId("procurement-direct-rfq").click();
+    await page.getByTestId("procurement-direct-confirm").click();
+    await page.waitForURL(/\/workspace\/rfq\/[^/]+$/, { timeout: 15_000 });
+  });
+
   test("03 — CommodityBid path spawns auction from RFQ", async ({ page }) => {
     await uiLogin(page, USERS.buyer1);
     await page.goto("/buyer/rfq/new");
@@ -59,7 +83,7 @@ test.describe("Sprint 11A — Procurement Strategy Architecture", () => {
     await page.getByTestId("rfq-currency").selectOption("USD");
     const deadline = new Date(Date.now() + 10 * 86_400_000).toISOString().slice(0, 16);
     await page.getByTestId("rfq-deadline").fill(deadline);
-    await page.locator('[data-testid="rfq-line-0"] input').first().fill("copper");
+    await page.locator('[data-testid="rfq-line-0"] input').first().fill("Spaghetti");
     await page.locator('[data-testid="rfq-line-0"] input').nth(1).fill("100");
     await page.locator('[data-testid="rfq-line-0"] input').nth(2).fill("MT");
     await page.getByTestId("rfq-submit").click();

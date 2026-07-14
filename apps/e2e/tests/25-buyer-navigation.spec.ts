@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { uiLogin, USERS } from "./_helpers";
 
 const BUYER_GROUPS = [
-  "nav-group-home", "nav-group-sourcing", "nav-group-execution",
+  "nav-group-home", "nav-quick-actions", "nav-group-sourcing", "nav-group-execution",
   "nav-group-collaboration", "nav-group-documents", "nav-group-knowledge",
 ];
 

@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/Button";
-import { Link } from "react-router-dom";
+import { loginPageUrl } from "@/lib/login-redirect";
 
 type Props = {
   timedOut?: boolean;
@@ -27,13 +27,13 @@ export function AuthLoadingScreen({ timedOut = false, onRetry }: Props) {
                 Retry
               </Button>
             )}
-            <Link
-              to="/login"
+            <a
+              href={loginPageUrl()}
               data-testid="auth-sign-in-again"
               className="text-sm font-medium text-accent-900 hover:underline"
             >
               Sign in again
-            </Link>
+            </a>
           </div>
         </div>
       </div>

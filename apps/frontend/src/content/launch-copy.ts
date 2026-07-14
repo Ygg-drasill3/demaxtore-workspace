@@ -46,9 +46,9 @@ export const SUPPLIER_ONBOARDING = {
 
 export const LANDING_COPY = {
   eyebrow: "B2B Sourcing & Import Operating Platform",
-  headline: "Run global sourcing like an operating system — not an inbox.",
+  headline: "The Import Operating System for Companies Sourcing From Turkey.",
   subhead:
-    "RFQs, reverse auctions, mixed containers, purchase orders, freight, and shipment tracking — one workspace, one timeline, one state machine.",
+    "Manage RFQs, supplier quotations, CommodityBid™, purchase orders, inspections, freight and shipment tracking in one intelligent workspace.",
   pillars: [
     {
       title: "Structured sourcing",

@@ -10,7 +10,7 @@ import { SocketEvents } from "@dmx/contracts/socket-events";
 import { useWorkspaceSocket } from "@/lib/socket";
 import { useSingleFlight } from "@/lib/useSingleFlight";
 import TradeDocumentsTab from "@/features/trade-documents/components/TradeDocumentsTab";
-import WorkspaceCommunicationPanel from "@/features/workspace-communication/components/WorkspaceCommunicationPanel";
+import ConversationHubPanel from "@/features/conversation-hub/components/ConversationHubPanel";
 
 export default function PoWorkspacePage() {
   const { id } = useParams<{ id: string }>();
@@ -120,7 +120,7 @@ export default function PoWorkspacePage() {
         </div>
       </header>
 
-      <WorkspaceCommunicationPanel
+      <ConversationHubPanel
         workspaceType="PO"
         workspaceId={po.id}
         socketWorkspaceId={po.orderId}

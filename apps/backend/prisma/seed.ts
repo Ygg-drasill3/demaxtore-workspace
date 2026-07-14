@@ -34,12 +34,7 @@ async function main() {
     update: { displayName: "Uğur Kazancı", role: Role.ADMIN, passwordHash: staffPassword, organisationId: demaxtore.id },
     create: { email: "ugur@demaxtore.com", passwordHash: staffPassword, displayName: "Uğur Kazancı", role: Role.ADMIN, organisationId: demaxtore.id },
   });
-  const salesControl = await prisma.user.upsert({
-    where: { email: "ilham@demaxtore.com" },
-    update: { displayName: "İlham Bellahcene", role: Role.SALES_CONTROL, passwordHash: staffPassword, organisationId: salesOrg.id },
-    create: { email: "ilham@demaxtore.com", passwordHash: staffPassword, displayName: "İlham Bellahcene", role: Role.SALES_CONTROL, organisationId: salesOrg.id },
-  });
-  console.log("  · staff users:", admin.email, salesControl.email);
+  console.log("  · staff users:", admin.email);
 
   // ── Mixed Container catalog (Sprint 12B) ─────────────────────────────────
   const MC_CATEGORIES = [
@@ -396,6 +391,54 @@ async function main() {
   });
 
   console.log("  · packing types:", PACKING_TYPES.length, "types assigned to MC/BC catalog products");
+
+  // ── Monthly reference freight rates (Estimated CIF decision-support) ─────
+  const monthStart = new Date();
+  monthStart.setUTCDate(1);
+  monthStart.setUTCHours(0, 0, 0, 0);
+  const monthEnd = new Date(monthStart);
+  monthEnd.setUTCMonth(monthEnd.getUTCMonth() + 1);
+  monthEnd.setUTCDate(0);
+  monthEnd.setUTCHours(23, 59, 59, 999);
+
+  const REFERENCE_FREIGHT_SEED = [
+    { originPort: "CNSHA", destinationPort: "NLRTM", containerType: "20GP", referenceFreight: 2800 },
+    { originPort: "TRMER", destinationPort: "NGLOS", containerType: "20GP", referenceFreight: 2450 },
+    { originPort: "TRIZM", destinationPort: "GHTEM", containerType: "40HC", referenceFreight: 3300 },
+    { originPort: "TRAMB", destinationPort: "USNYC", containerType: "40HC", referenceFreight: 3850 },
+  ] as const;
+
+  for (const row of REFERENCE_FREIGHT_SEED) {
+    const existing = await prisma.referenceFreightRate.findFirst({
+      where: {
+        originPort: row.originPort,
+        destinationPort: row.destinationPort,
+        containerType: row.containerType,
+        validFrom: monthStart,
+      },
+    });
+    if (existing) {
+      await prisma.referenceFreightRate.update({
+        where: { id: existing.id },
+        data: {
+          referenceFreight: row.referenceFreight,
+          validUntil: monthEnd,
+          createdById: admin.id,
+        },
+      });
+    } else {
+      await prisma.referenceFreightRate.create({
+        data: {
+          ...row,
+          currency: "USD",
+          validFrom: monthStart,
+          validUntil: monthEnd,
+          createdById: admin.id,
+        },
+      });
+    }
+  }
+  console.log("  · reference freight rates:", REFERENCE_FREIGHT_SEED.length, "lanes for current month");
 
   console.log("✓ Seed complete.");
 }

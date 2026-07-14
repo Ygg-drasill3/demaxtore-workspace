@@ -6,6 +6,8 @@ const TEST_PRODUCT_CATEGORY = "E2E";
 
 const TEST_TITLE_PATTERNS = [
   /^E2E\b/i,
+  /^\[TEST\]/i,
+  /^PR QA\b/i,
   /^CT\s+E2E/i,
   /^Pilot\b/i,
   /^Freight\s+\d/i,
@@ -58,6 +60,7 @@ export function workspaceExcludesTestData(): Prisma.WorkspaceWhereInput {
         { externalRef: { startsWith: "SHP-ORD-" } },
         { rfqDetails: { productCategory: TEST_PRODUCT_CATEGORY } },
         { rfqDetails: { title: { startsWith: "E2E", mode: "insensitive" } } },
+        { rfqDetails: { title: { startsWith: "[TEST]", mode: "insensitive" } } },
         { rfqDetails: { title: { startsWith: "CT E2E", mode: "insensitive" } } },
         { rfqDetails: { title: { startsWith: "Pilot", mode: "insensitive" } } },
       ],
@@ -108,6 +111,7 @@ export async function getTestWorkspaceIds(db: PrismaClient): Promise<string[]> {
       OR: [
         { rfqDetails: { productCategory: TEST_PRODUCT_CATEGORY } },
         { rfqDetails: { title: { startsWith: "E2E", mode: "insensitive" } } },
+        { rfqDetails: { title: { startsWith: "[TEST]", mode: "insensitive" } } },
         { rfqDetails: { title: { startsWith: "CT E2E", mode: "insensitive" } } },
         { rfqDetails: { title: { startsWith: "Pilot", mode: "insensitive" } } },
       ],

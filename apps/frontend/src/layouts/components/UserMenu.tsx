@@ -6,6 +6,7 @@ import { useAuth } from "@/store/auth.store";
 import { initials } from "@/lib/utils";
 import { ROLE_DASHBOARD } from "@dmx/contracts/auth";
 import { useT } from "@/i18n/useT";
+import { redirectToLogin } from "@/lib/login-redirect";
 
 export function UserMenu() {
   const user   = useAuth((s) => s.user);
@@ -61,7 +62,7 @@ export function UserMenu() {
           </button>
           <button
             data-testid="user-menu-logout"
-            onClick={async () => { setOpen(false); await logout(); nav("/login"); }}
+            onClick={async () => { setOpen(false); await logout(); redirectToLogin(); }}
             className="w-full text-left px-3 py-2 text-sm hover:bg-paper-50 inline-flex items-center gap-2 text-red-600"
           >
             <LogOut className="h-3.5 w-3.5" /> {t("common.signOut")}

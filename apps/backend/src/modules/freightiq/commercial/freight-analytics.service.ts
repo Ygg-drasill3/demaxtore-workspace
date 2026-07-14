@@ -6,6 +6,7 @@ import type {
   RouteProfitability,
 } from "@dmx/contracts/freight-analytics";
 import { FreightCommercialService } from "./freight-commercial.service.js";
+import { findLedgerWithOffers } from "./freight-ledger.query.js";
 import { resolveFreightRoute } from "./freight-route.util.js";
 
 function monthKey(d: Date): string {
@@ -26,17 +27,13 @@ export class FreightAnalyticsService {
     const thisMonth = monthKey(now);
     const lastMonth = monthKey(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1)));
 
-    const ledger = await this.db.freightRevenueLedger.findMany({
+    const ledger = await findLedgerWithOffers(this.db, {
       where: { status: { in: ["PENDING", "REALIZED"] } },
-      include: {
-        offer: {
-          include: {
-            freightRequest: { select: { pol: true, pod: true } },
-            forwarderContact: { select: { id: true, companyName: true } },
-          },
-        },
-      },
       take: 2000,
+      offerInclude: {
+        freightRequest: { select: { pol: true, pod: true } },
+        forwarderContact: { select: { id: true, companyName: true } },
+      },
     });
 
     const routeAgg = new Map<
@@ -187,9 +184,9 @@ export class FreightAnalyticsService {
       take: 3000,
     });
 
-    const ledger = await this.db.freightRevenueLedger.findMany({
+    const ledger = await findLedgerWithOffers(this.db, {
       where: { status: { in: ["PENDING", "REALIZED"] } },
-      include: { offer: { select: { forwarderContactId: true, providerName: true } } },
+      offerInclude: {},
     });
 
     const byForwarder = new Map<

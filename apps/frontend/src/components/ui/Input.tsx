@@ -4,15 +4,16 @@ import { cn } from "@/lib/utils";
 
 interface FieldProps {
   label?: string;
+  labelLang?: string;
   hint?:  ReactNode;
   error?: ReactNode;
   children: ReactNode;
 }
 
-export function Field({ label, hint, error, children }: FieldProps) {
+export function Field({ label, labelLang, hint, error, children }: FieldProps) {
   return (
     <div className="space-y-1.5">
-      {label && <label className="dmx-eyebrow block">{label}</label>}
+      {label && <label lang={labelLang} className="dmx-eyebrow block">{label}</label>}
       {children}
       {error ? <div className="text-xs text-red-600">{error}</div>
              : hint && <div className="text-xs text-zinc-500">{hint}</div>}

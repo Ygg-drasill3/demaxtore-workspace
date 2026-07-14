@@ -6,7 +6,7 @@ import { useRfqList, rfqQueryKeys } from "../hooks";
 import { rfqApi } from "../lib/rfq.api";
 import { useAuth } from "@/store/auth.store";
 import { RfqStateBadge } from "../components/RfqStateBadge";
-import { Plus, Search, FileText, Trash2, RotateCcw, ChevronRight } from "lucide-react";
+import { Plus, Search, FileText, Trash2, RotateCcw, ChevronRight, CheckCircle2 } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useT } from "@/i18n/useT";
 import { toast } from "@/store/toast.store";
@@ -168,14 +168,14 @@ export default function RfqListPage() {
         <div className="overflow-x-auto dmx-thin-scroll">
           <table className="w-full min-w-[720px] text-sm table-fixed">
             <colgroup>
-              <col className="w-[38%]" />
-              <col className="w-[14%]" />
+              <col className="w-[32%]" />
+              <col className="w-[22%]" />
               <col className="w-[12%]" />
               <col className="w-[12%]" />
-              <col className="w-[14%]" />
+              <col className="w-[12%]" />
               <col className="w-[10%]" />
             </colgroup>
-            <thead className="bg-zinc-50/90 text-[11px] uppercase tracking-[0.08em] text-zinc-500 border-b border-zinc-100">
+            <thead lang="en" className="bg-zinc-50/90 text-[11px] uppercase tracking-[0.08em] text-zinc-500 border-b border-zinc-100">
               <tr>
                 <th className="text-left px-5 py-3 font-semibold">{t("rfq.list.table.title")}</th>
                 <th className="text-left px-4 py-3 font-semibold">{t("rfq.list.table.state")}</th>
@@ -243,8 +243,20 @@ export default function RfqListPage() {
                     </div>
                   </div>
                 </td>
-                <td className="px-4 py-3.5 align-middle whitespace-nowrap">
-                  <RfqStateBadge state={r.state} />
+                <td className="px-4 py-3.5 align-middle">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <RfqStateBadge state={r.state} compact />
+                    {isSupplier && r.hasMyQuotation ? (
+                      <span
+                        className="inline-flex items-center gap-0.5 text-emerald-700 shrink-0"
+                        title="Quotation submitted"
+                        data-testid={`rfq-quoted-${r.id}`}
+                      >
+                        <CheckCircle2 className="h-4 w-4" aria-hidden />
+                        <span className="sr-only">Quotation submitted</span>
+                      </span>
+                    ) : null}
+                  </div>
                 </td>
                 <td className={cn("px-4 py-3.5 align-middle whitespace-nowrap tabular-nums hidden sm:table-cell", deadlineTone(r.deadlineAt))}>
                   {r.deadlineAt ? formatShortDate(r.deadlineAt) : "—"}

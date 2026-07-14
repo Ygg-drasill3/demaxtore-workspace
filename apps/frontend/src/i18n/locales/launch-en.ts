@@ -40,8 +40,8 @@ const launchEn: TranslationDict = {
   "launch.supplier.ctaRfq": "View open opportunities",
 
   "launch.landing.eyebrow": "B2B Sourcing & Import Operating Platform",
-  "launch.landing.headline": "Run global sourcing like an operating system — not an inbox.",
-  "launch.landing.subhead": "RFQs, reverse auctions, mixed containers, purchase orders, freight, and shipment tracking — one workspace, one timeline, one state machine.",
+  "launch.landing.headline": "The Import Operating System for Companies Sourcing From Turkey.",
+  "launch.landing.subhead": "Manage RFQs, supplier quotations, CommodityBid™, purchase orders, inspections, freight and shipment tracking in one intelligent workspace.",
   "launch.landing.pillar1.title": "Structured sourcing",
   "launch.landing.pillar1.body": "RFQ, CommodityBid, SmartContainer, and BulkContainer programmes with supplier governance built in.",
   "launch.landing.pillar2.title": "Award to execution",

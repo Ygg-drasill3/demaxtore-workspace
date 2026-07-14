@@ -19,6 +19,12 @@ async function assertAccess(actor: AuthUser, workspaceId: string) {
   }
 }
 
+function assertBuyerOrAdmin(actor: AuthUser) {
+  if (actor.role !== "BUYER" && actor.role !== "ADMIN") {
+    throw new AppError(403, "FORBIDDEN_ROLE");
+  }
+}
+
 /** Active invite list: assignments first, else COUNTERPARTY participants (seed / legacy). */
 async function invitedSupplierIds(workspaceId: string): Promise<string[]> {
   const assignments = await prisma.supplierAssignment.findMany({
@@ -164,6 +170,7 @@ export async function getSummary(
   actor: AuthUser,
 ): Promise<SupplierActivitySummary> {
   await assertAccess(actor, workspaceId);
+  assertBuyerOrAdmin(actor);
   const data = await loadEngagementData(workspaceId);
   return buildSummary(
     data.invitedIds,
@@ -178,6 +185,7 @@ export async function getDetail(
   actor: AuthUser,
 ): Promise<SupplierActivityDetail> {
   await assertAccess(actor, workspaceId);
+  assertBuyerOrAdmin(actor);
   const data = await loadEngagementData(workspaceId);
   const summary = buildSummary(
     data.invitedIds,

@@ -40,6 +40,16 @@ whatsappWebhookRouter.post("/", async (req, res) => {
     return;
   }
 
+  const { parseWhatsAppStatusWebhook } = await import(
+    "../whatsapp-notification-bridge/whatsapp-bridge.webhook.js"
+  );
+  const { updateDeliveryStatusFromWebhook } = await import(
+    "../whatsapp-notification-bridge/whatsapp-bridge.service.js"
+  );
+  for (const st of parseWhatsAppStatusWebhook(body)) {
+    await updateDeliveryStatusFromWebhook(st.providerMessageId, st.status, st.raw);
+  }
+
   const inbound = parseInboundWebhook(body);
   let processed = 0;
   for (const item of inbound) {

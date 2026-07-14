@@ -4,6 +4,7 @@
 
 import { env } from "../../config/env.js";
 import { logger } from "../../config/logger.js";
+import { redactPasswordlessTokens } from "../../lib/log-redaction.js";
 
 export interface EmailMessage {
   to:        string;
@@ -26,8 +27,11 @@ const consoleProvider: EmailProvider = {
       { to: msg.to, subject: msg.subject, length: msg.html.length },
       "📧 [console] email rendered (no provider configured)",
     );
-    // Print the text body to make debugging trivial. HTML is omitted to keep logs sane.
-    logger.info("\n----- BEGIN EMAIL -----\n" + msg.text + "\n-----  END EMAIL  -----");
+    logger.info(
+      "\n----- BEGIN EMAIL -----\n"
+        + redactPasswordlessTokens(msg.text)
+        + "\n-----  END EMAIL  -----",
+    );
   },
 };
 

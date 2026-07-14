@@ -1,6 +1,9 @@
 // apps/frontend/src/components/ui/Table.tsx
 import { type HTMLAttributes, type ReactNode, type ThHTMLAttributes, type TdHTMLAttributes } from "react";
+import { m } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { useReducedMotion } from "@/motion/hooks/useReducedMotion";
+import { springMicro } from "@/motion/tokens";
 
 export function Table({ className, ...rest }: HTMLAttributes<HTMLTableElement>) {
   return (
@@ -18,8 +21,30 @@ export function TBody({ className, ...rest }: HTMLAttributes<HTMLTableSectionEle
   return <tbody className={className} {...rest} />;
 }
 
-export function TR({ className, ...rest }: HTMLAttributes<HTMLTableRowElement>) {
-  return <tr className={cn("border-t border-paper-200 hover:bg-paper-50/40 transition-colors", className)} {...rest} />;
+export function TR({
+  className,
+  index,
+  ...rest
+}: HTMLAttributes<HTMLTableRowElement> & { index?: number }) {
+  const reduced = useReducedMotion();
+  if (reduced) {
+    return (
+      <tr
+        className={cn("border-t border-paper-200 hover:bg-paper-50/40 transition-colors dmx-table-row-motion", className)}
+        {...rest}
+      />
+    );
+  }
+  return (
+    <m.tr
+      className={cn("border-t border-paper-200 dmx-table-row-motion", className)}
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ ...springMicro, delay: (index ?? 0) * 0.03 }}
+      whileHover={{ backgroundColor: "rgba(250,250,250,0.85)", x: 2 }}
+      {...(rest as object)}
+    />
+  );
 }
 
 export function TH({ className, ...rest }: ThHTMLAttributes<HTMLTableCellElement>) {
@@ -45,7 +70,6 @@ interface DataTableProps<T> {
   testId?: string;
 }
 
-/** Opinionated wrapper for list pages (RFQ list, supplier list, etc.) */
 export function DataTable<T>({ data, columns, rowKey, empty, testId }: DataTableProps<T>) {
   return (
     <Table data-testid={testId}>
@@ -61,8 +85,8 @@ export function DataTable<T>({ data, columns, rowKey, empty, testId }: DataTable
               {empty ?? "No records found."}
             </TD>
           </TR>
-        ) : data.map((row) => (
-          <TR key={rowKey(row)} data-testid={`${testId}-row-${rowKey(row)}`}>
+        ) : data.map((row, i) => (
+          <TR key={rowKey(row)} index={i} data-testid={`${testId}-row-${rowKey(row)}`}>
             {columns.map((c) => <TD key={c.key}>{c.cell(row)}</TD>)}
           </TR>
         ))}

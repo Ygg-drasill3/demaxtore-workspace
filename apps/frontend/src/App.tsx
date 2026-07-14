@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { AppRoutes } from "./routes";
 import { useAuth } from "./store/auth.store";
 import { useAuthHydrated } from "./hooks/useAuthHydrated";
+import { GlobalAlertBridge } from "./features/exception-hub/components/GlobalAlertBridge";
 
 /**
  * Top-level shell. Waits for persist rehydration before validating the session
@@ -16,5 +17,10 @@ export default function App() {
     if (rehydrated) hydrate();
   }, [rehydrated, hydrate]);
 
-  return <AppRoutes />;
+  return (
+    <>
+      <GlobalAlertBridge />
+      <AppRoutes />
+    </>
+  );
 }

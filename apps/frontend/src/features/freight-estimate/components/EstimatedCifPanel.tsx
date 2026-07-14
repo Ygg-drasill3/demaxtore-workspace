@@ -4,6 +4,7 @@ import { useAuth } from "@/store/auth.store";
 import { toast } from "@/store/toast.store";
 import { freightEstimateApi } from "../lib/freight-estimate.api";
 import type { FreightEstimatePanelDto } from "@dmx/contracts/freight-estimate";
+import { REFERENCE_FREIGHT_DISCLAIMER_TR } from "@dmx/contracts/reference-freight";
 
 function fmtMoney(value: number | null | undefined, currency: string | null | undefined) {
   if (value == null) return "—";
@@ -47,10 +48,15 @@ export function EstimatedCifPanel({ tradeId, compact = false, showRefresh = true
       return freightEstimateApi.refresh(data.current.id);
     },
     onSuccess: () => {
-      toast.success("Freight estimate refreshed");
+      toast.success("Reference freight estimate refreshed");
       void qc.invalidateQueries({ queryKey: ["freight-estimate-panel", tradeId] });
     },
-    onError: () => toast.error("Could not refresh freight estimate"),
+    onError: (err: unknown) => {
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+        "Could not refresh reference freight estimate";
+      toast.error(message);
+    },
   });
 
   if (isLoading) {
@@ -71,6 +77,8 @@ export function EstimatedCifPanel({ tradeId, compact = false, showRefresh = true
 
   const current = data?.current;
   const expiration = data?.expirationStatus ?? "NONE";
+  const referenceFreight = data?.referenceFreight;
+  const referenceMissing = referenceFreight?.status === "MISSING";
 
   if (isSupplier) {
     return (
@@ -82,7 +90,7 @@ export function EstimatedCifPanel({ tradeId, compact = false, showRefresh = true
           <p data-testid="estimated-cif-supplier-status">
             Freight estimate status: <span className="font-medium">{expiration.replace(/_/g, " ")}</span>
           </p>
-          <p className="text-xs text-zinc-400 mt-2">Indicative freight and CIF values are visible to the buyer only.</p>
+          <p className="text-xs text-zinc-400 mt-2">Reference freight and CIF values are visible to the buyer only.</p>
         </div>
       </section>
     );
@@ -94,7 +102,7 @@ export function EstimatedCifPanel({ tradeId, compact = false, showRefresh = true
         <div>
           <h2 className="text-sm font-semibold text-ink-900">Estimated CIF Visibility</h2>
           {!compact && (
-            <p className="text-xs text-zinc-500 mt-0.5">Indicative only — not a binding freight rate.</p>
+            <p className="text-xs text-zinc-500 mt-0.5">Reference rate for decision support — final freight via FreightIQ.</p>
           )}
         </div>
         <span
@@ -106,10 +114,23 @@ export function EstimatedCifPanel({ tradeId, compact = false, showRefresh = true
       </div>
 
       <div className="p-5 space-y-4">
+        {referenceMissing && (
+          <div
+            data-testid="estimated-cif-reference-missing"
+            className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
+          >
+            {referenceFreight.message}
+          </div>
+        )}
+
         {!current ? (
           <div className="space-y-3">
-            <p className="text-sm text-zinc-600">No active freight estimate yet.</p>
-            {showRefresh && (user?.role === "BUYER" || user?.role === "ADMIN") && (
+            <p className="text-sm text-zinc-600">
+              {referenceMissing
+                ? "Estimated CIF cannot be calculated without a monthly reference freight rate for this lane."
+                : "No active reference-freight CIF estimate yet."}
+            </p>
+            {showRefresh && !referenceMissing && (user?.role === "BUYER" || user?.role === "ADMIN") && (
               <button
                 type="button"
                 data-testid="estimated-cif-generate"
@@ -126,9 +147,17 @@ export function EstimatedCifPanel({ tradeId, compact = false, showRefresh = true
           <>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Stat label="FOB Price" value={fmtMoney(current.fobValue, current.currency)} testId="estimated-cif-fob" />
-              <Stat label="Estimated Freight" value={fmtMoney(current.estimatedFreight, current.currency)} testId="estimated-cif-freight" />
+              <Stat
+                label="Reference Freight"
+                value={fmtMoney(current.estimatedFreight, current.currency)}
+                testId="estimated-cif-freight"
+                sublabel="Estimated Freight (Reference Rate)"
+              />
               <Stat label="Estimated CIF" value={fmtMoney(current.estimatedCifValue, current.currency)} testId="estimated-cif-total" highlight />
             </div>
+            <p data-testid="estimated-cif-disclaimer" className="text-xs text-zinc-500 leading-relaxed">
+              {REFERENCE_FREIGHT_DISCLAIMER_TR}
+            </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
               <div>
                 <span className="text-zinc-500">Estimate date</span>
@@ -139,6 +168,11 @@ export function EstimatedCifPanel({ tradeId, compact = false, showRefresh = true
                 <div data-testid="estimated-cif-expires" className="font-medium tabular-nums">{fmtDate(current.expiresAt)}</div>
               </div>
             </div>
+            {referenceFreight?.validFrom && referenceFreight.validUntil && (
+              <div className="text-xs text-zinc-500">
+                Reference rate valid: {fmtDate(referenceFreight.validFrom)} – {fmtDate(referenceFreight.validUntil)}
+              </div>
+            )}
             {showRefresh && (user?.role === "BUYER" || user?.role === "ADMIN") && (
               <button
                 type="button"
@@ -163,11 +197,13 @@ function Stat({
   value,
   testId,
   highlight,
+  sublabel,
 }: {
   label: string;
   value: string;
   testId: string;
   highlight?: boolean;
+  sublabel?: string;
 }) {
   return (
     <div
@@ -175,6 +211,7 @@ function Stat({
       className={`rounded-lg border px-3 py-2.5 ${highlight ? "border-accent-900/20 bg-accent-50/40" : "border-zinc-100 bg-white"}`}
     >
       <div className="text-[10px] uppercase tracking-wider text-zinc-500">{label}</div>
+      {sublabel && <div className="text-[9px] text-zinc-400 mt-0.5">{sublabel}</div>}
       <div className="mt-1 text-sm font-semibold text-ink-900 tabular-nums">{value}</div>
     </div>
   );
@@ -188,10 +225,20 @@ export function EstimatedCifPoGateSummary({ tradeId }: { tradeId?: string }) {
     enabled: !!tradeId,
   });
   const current = data?.current;
+  const referenceMissing = data?.referenceFreight?.status === "MISSING";
+
+  if (referenceMissing) {
+    return (
+      <div data-testid="issue-po-reference-missing" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+        {data?.referenceFreight?.message}
+      </div>
+    );
+  }
+
   if (!current) {
     return (
       <div data-testid="issue-po-estimate-missing" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-        An active FreightIQ estimate is required before issuing a Purchase Order.
+        An active reference-freight CIF estimate is required before issuing a Purchase Order.
       </div>
     );
   }
@@ -200,9 +247,10 @@ export function EstimatedCifPoGateSummary({ tradeId }: { tradeId?: string }) {
       <div className="font-medium text-ink-900">Estimated CIF Visibility</div>
       <div className="grid grid-cols-3 gap-2 text-xs">
         <div><span className="text-zinc-500 block">FOB</span><span data-testid="issue-po-fob">{fmtMoney(current.fobValue, current.currency)}</span></div>
-        <div><span className="text-zinc-500 block">Freight</span><span data-testid="issue-po-freight">{fmtMoney(current.estimatedFreight, current.currency)}</span></div>
+        <div><span className="text-zinc-500 block">Reference Freight</span><span data-testid="issue-po-freight">{fmtMoney(current.estimatedFreight, current.currency)}</span></div>
         <div><span className="text-zinc-500 block">CIF</span><span data-testid="issue-po-cif" className="font-semibold">{fmtMoney(current.estimatedCifValue, current.currency)}</span></div>
       </div>
+      <p className="text-[10px] text-zinc-500">{REFERENCE_FREIGHT_DISCLAIMER_TR}</p>
     </div>
   );
 }

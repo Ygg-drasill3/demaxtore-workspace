@@ -29,6 +29,21 @@ describe("<RfqNextActions /> — More-actions trigger", () => {
     expect(trigger).toHaveTextContent(/more actions \(2\)/i);
   });
 
+  it("excludes promoted hero actions from More actions for BUYER@RFQ_OPEN", () => {
+    renderWithProviders(
+      <RfqNextActions
+        workspaceId="w1"
+        state="RFQ_OPEN"
+        actor={{ id: "u1", role: "BUYER" }}
+        isOwner isCounterparty={false}
+      />,
+    );
+    const trigger = screen.getByTestId("rfq-more-actions-trigger");
+    expect(trigger).toHaveTextContent(/more actions \(2\)/i);
+    fireEvent.click(trigger);
+    expect(screen.queryByTestId("action-tile-close_quotations_early")).toBeNull();
+  });
+
   it("clicking the trigger opens the action drawer", () => {
     renderWithProviders(
       <RfqNextActions

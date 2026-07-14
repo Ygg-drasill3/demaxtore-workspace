@@ -64,6 +64,7 @@ export default defineConfig(({ mode }) => {
           vendor: ["react", "react-dom", "react-router-dom"],
           query: ["@tanstack/react-query"],
           socket: ["socket.io-client"],
+          motion: ["framer-motion"],
         },
       },
     },

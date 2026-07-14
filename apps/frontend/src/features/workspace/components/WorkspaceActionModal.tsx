@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/Button";
 import { Input, Textarea } from "@/components/ui/Input";
 import { api } from "@/lib/api";
 
+const DEFAULT_INSPECTOR_NAME = "Demaxtore Inspection";
+
 export interface ActionModalState {
   action: string;
   label: string;
@@ -104,7 +106,7 @@ export function WorkspaceActionModal({
     }
     if (fieldList.includes("label")) init.label = "Production update";
     if (fieldList.includes("percentage")) init.percentage = "50";
-    if (fieldList.includes("inspectorName")) init.inspectorName = "SGS";
+    if (fieldList.includes("inspectorName")) init.inspectorName = DEFAULT_INSPECTOR_NAME;
     if (fieldList.includes("result")) init.result = "PASS";
     if (fieldList.includes("freightForwarder")) {
       init.freightForwarder = "Maersk Logistics";
@@ -162,7 +164,7 @@ export function WorkspaceActionModal({
             type: "application/pdf",
           });
         payload.reportUrl = await uploadInspectionReport(file);
-        if (!payload.inspectorName) payload.inspectorName = "SGS Inspector";
+        if (!payload.inspectorName) payload.inspectorName = DEFAULT_INSPECTOR_NAME;
       }
 
       if (fieldList.includes("file")) {
@@ -283,7 +285,7 @@ export function WorkspaceActionModal({
               data-testid="field-inspectorName"
               value={fields.inspectorName ?? ""}
               onChange={(e) => set("inspectorName", e.target.value)}
-              placeholder="SGS / Bureau Veritas"
+              placeholder="Demaxtore Inspection"
               className="mt-1"
             />
           </label>

@@ -3,7 +3,7 @@
 // Sprint 2.5: buyer-readable labels from state-labels.ts (no FSM language).
 //
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
-import { STATE_LABEL } from "../lib/state-labels";
+import { STATE_LABEL, STATE_LIST_LABEL } from "../lib/state-labels";
 import type { RfqState } from "@dmx/contracts/rfq.fsm";
 
 const STATE_TONE: Record<RfqState, BadgeTone> = {
@@ -25,11 +25,19 @@ const STATE_TONE: Record<RfqState, BadgeTone> = {
   CLOSED_NO_AWARD:     "neutral",
 };
 
-export function RfqStateBadge({ state }: { state: string }) {
-  const label = STATE_LABEL[state as RfqState] ?? state;
+export function RfqStateBadge({ state, compact }: { state: string; compact?: boolean }) {
+  const label = compact
+    ? (STATE_LIST_LABEL[state as RfqState] ?? STATE_LABEL[state as RfqState] ?? state)
+    : (STATE_LABEL[state as RfqState] ?? state);
   const tone  = STATE_TONE[state as RfqState] ?? "neutral";
   return (
-    <Badge tone={tone} dot data-testid={`rfq-state-badge-${state}`}>
+    <Badge
+      tone={tone}
+      dot
+      data-testid={`rfq-state-badge-${state}`}
+      className={compact ? "max-w-[160px] whitespace-normal text-left leading-snug" : undefined}
+      title={STATE_LABEL[state as RfqState] ?? state}
+    >
       {label}
     </Badge>
   );

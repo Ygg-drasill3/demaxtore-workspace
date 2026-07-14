@@ -96,11 +96,13 @@ model User {
   organisationId String?  @map("organisation_id") @db.Uuid
   avatarUrl      String?  @map("avatar_url")
   whatsappPhone  String?  @map("whatsapp_phone")
+  googleId       String?  @unique @map("google_id")
   createdAt      DateTime @default(now()) @map("created_at")
 
   organisation        Organisation?              @relation(fields: [organisationId], references: [id])
   refreshTokens       RefreshToken[]
   passwordResetTokens PasswordResetToken[]
+  passwordlessAccessTokens PasswordlessAccessToken[]
   workspacesCreated   Workspace[]                @relation("WorkspaceCreator")
   participantOf       WorkspaceParticipant[]
   timelineActions     TimelineEvent[]
@@ -160,6 +162,51 @@ model PasswordResetToken {
   @@map("password_reset_tokens")
 }
 
+// ── Passwordless Workspace Access™ ──────────────────────────────────────────
+model PasswordlessAccessToken {
+  id               String    @id @default(uuid()) @db.Uuid
+  jti              String    @unique
+  tokenHash        String    @unique @map("token_hash")
+  userId           String    @map("user_id") @db.Uuid
+  workspaceType    String    @map("workspace_type")
+  workspaceId      String    @map("workspace_id") @db.Uuid
+  conversationId   String    @map("conversation_id") @db.Uuid
+  auditWorkspaceId String    @map("audit_workspace_id") @db.Uuid
+  expiresAt        DateTime  @map("expires_at")
+  consumedAt       DateTime? @map("consumed_at")
+  singleUse        Boolean   @default(true) @map("single_use")
+  emailDeliveryId  String?   @map("email_delivery_id") @db.Uuid
+  revokedAt        DateTime? @map("revoked_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logs PasswordlessAccessLog[]
+
+  @@index([userId, workspaceId])
+  @@index([expiresAt])
+  @@map("passwordless_access_tokens")
+}
+
+model PasswordlessAccessLog {
+  id             String   @id @default(uuid()) @db.Uuid
+  tokenId        String?  @map("token_id") @db.Uuid
+  userId         String?  @map("user_id") @db.Uuid
+  workspaceType  String   @map("workspace_type")
+  workspaceId    String   @map("workspace_id") @db.Uuid
+  conversationId String   @map("conversation_id") @db.Uuid
+  success        Boolean
+  failureReason  String?  @map("failure_reason")
+  ipAddress      String?  @map("ip_address")
+  userAgent      String?  @map("user_agent")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  token PasswordlessAccessToken? @relation(fields: [tokenId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt])
+  @@index([userId, createdAt])
+  @@map("passwordless_access_logs")
+}
+
 // ── Workspaces ──────────────────────────────────────────────────────────────
 model Workspace {
   id          String        @id @default(uuid()) @db.Uuid
@@ -190,6 +237,7 @@ model Workspace {
   timelineEvents          TimelineEvent[]
   rfqDetails              RfqDetails?
   rfqLineItems            RfqLineItem[]
+  supplierLineScopes      SupplierLineScope[]
   rfqAttachments          RfqAttachment[]
   supplierAssignments     SupplierAssignment[]
   clarificationThread     ClarificationThread?
@@ -329,10 +377,26 @@ model RfqLineItem {
   updatedAt   DateTime @updatedAt
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  supplierLineScopes SupplierLineScope[]
 
   @@unique([workspaceId, position])
   @@index([workspaceId])
   @@map("rfq_line_items")
+}
+
+model SupplierLineScope {
+  id             String   @id @default(uuid()) @db.Uuid
+  workspaceId    String   @map("workspace_id") @db.Uuid
+  supplierUserId String   @map("supplier_user_id") @db.Uuid
+  rfqLineItemId  String   @map("rfq_line_item_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  rfqLineItem RfqLineItem @relation(fields: [rfqLineItemId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, supplierUserId, rfqLineItemId])
+  @@index([workspaceId, supplierUserId])
+  @@map("supplier_line_scopes")
 }
 
 model RfqAttachment {
@@ -479,6 +543,63 @@ model Notification {
   @@index([userId, isRead, createdAt])
   @@index([workspaceId, createdAt])
   @@map("notifications")
+}
+
+// ── WhatsApp Notification Bridge™ ───────────────────────────────────────────
+model WhatsAppNotificationDelivery {
+  id                String    @id @default(uuid()) @db.Uuid
+  notificationId    String    @unique @map("notification_id") @db.Uuid
+  userId            String    @map("user_id") @db.Uuid
+  workspaceRef      String?   @map("workspace_ref")
+  templateKey       String    @map("template_key")
+  recipientPhone    String?   @map("recipient_phone")
+  provider          String    @default("meta_cloud")
+  status            String    @default("QUEUED")
+  providerMessageId String?   @map("provider_message_id")
+  retryCount        Int       @default(0) @map("retry_count")
+  lastError         String?   @map("last_error")
+  providerResponse  Json      @default("{}") @map("provider_response")
+  queuedAt          DateTime  @default(now()) @map("queued_at")
+  sentAt            DateTime? @map("sent_at")
+  deliveredAt       DateTime? @map("delivered_at")
+  readAt            DateTime? @map("read_at")
+  nextRetryAt       DateTime? @map("next_retry_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  @@index([status, nextRetryAt])
+  @@index([userId, queuedAt])
+  @@index([providerMessageId])
+  @@map("whatsapp_notification_deliveries")
+}
+
+// ── Email Notification Bridge™ ────────────────────────────────────────────────
+model EmailNotificationDelivery {
+  id                String    @id @default(uuid()) @db.Uuid
+  notificationId    String    @unique @map("notification_id") @db.Uuid
+  userId            String    @map("user_id") @db.Uuid
+  workspaceRef      String?   @map("workspace_ref")
+  subject           String
+  templateKey       String    @map("template_key")
+  recipientEmail    String    @map("recipient_email")
+  provider          String    @default("smtp")
+  status            String    @default("QUEUED")
+  providerMessageId String?   @map("provider_message_id")
+  retryCount        Int       @default(0) @map("retry_count")
+  lastError         String?   @map("last_error")
+  providerResponse  Json      @default("{}") @map("provider_response")
+  queuedAt          DateTime  @default(now()) @map("queued_at")
+  sentAt            DateTime? @map("sent_at")
+  deliveredAt       DateTime? @map("delivered_at")
+  openedAt          DateTime? @map("opened_at")
+  nextRetryAt       DateTime? @map("next_retry_at")
+  passwordlessTokenId String? @map("passwordless_token_id") @db.Uuid
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  @@index([status, nextRetryAt])
+  @@index([userId, queuedAt])
+  @@index([providerMessageId])
+  @@index([passwordlessTokenId])
+  @@map("email_notification_deliveries")
 }
 
 // ── Audit log (defense-in-depth FSM enforcement) ────────────────────────────
@@ -950,31 +1071,72 @@ model FreightSelection {
 }
 
 model FreightEstimate {
-  id                 String    @id @default(uuid()) @db.Uuid
-  tradeId            String    @map("trade_id") @db.Uuid
-  supplierId         String    @map("supplier_id") @db.Uuid
-  originCountry      String    @map("origin_country")
-  originPort         String    @map("origin_port")
-  destinationCountry String    @map("destination_country")
-  destinationPort    String    @map("destination_port")
-  containerType      String    @map("container_type")
-  fobValue           Decimal   @map("fob_value") @db.Decimal(18, 4)
-  estimatedFreight   Decimal   @map("estimated_freight") @db.Decimal(18, 4)
-  currency           String
-  estimatedCifValue  Decimal   @map("estimated_cif_value") @db.Decimal(18, 4)
-  estimatedAt        DateTime  @default(now()) @map("estimated_at")
-  expiresAt          DateTime  @map("expires_at")
-  lastRefreshedAt    DateTime? @map("last_refreshed_at")
-  status             String    @default("ACTIVE")
-  createdAt          DateTime  @default(now()) @map("created_at")
-  updatedAt          DateTime  @updatedAt @map("updated_at")
+  id                     String    @id @default(uuid()) @db.Uuid
+  tradeId                String    @map("trade_id") @db.Uuid
+  supplierId             String    @map("supplier_id") @db.Uuid
+  originCountry          String    @map("origin_country")
+  originPort             String    @map("origin_port")
+  destinationCountry     String    @map("destination_country")
+  destinationPort        String    @map("destination_port")
+  containerType          String    @map("container_type")
+  fobValue               Decimal   @map("fob_value") @db.Decimal(18, 4)
+  estimatedFreight       Decimal   @map("estimated_freight") @db.Decimal(18, 4)
+  currency               String
+  estimatedCifValue      Decimal   @map("estimated_cif_value") @db.Decimal(18, 4)
+  estimatedAt            DateTime  @default(now()) @map("estimated_at")
+  expiresAt              DateTime  @map("expires_at")
+  lastRefreshedAt        DateTime? @map("last_refreshed_at")
+  status                 String    @default("ACTIVE")
+  referenceFreightRateId String?   @map("reference_freight_rate_id") @db.Uuid
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
 
-  trade Workspace @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  trade                Workspace             @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  referenceFreightRate ReferenceFreightRate? @relation(fields: [referenceFreightRateId], references: [id], onDelete: SetNull)
 
   @@index([tradeId, status])
   @@index([tradeId, estimatedAt])
   @@index([expiresAt, status])
+  @@index([referenceFreightRateId])
   @@map("freight_estimates")
+}
+
+model ReferenceFreightRate {
+  id               String   @id @default(uuid()) @db.Uuid
+  originPort       String   @map("origin_port")
+  destinationPort  String   @map("destination_port")
+  containerType    String   @map("container_type")
+  referenceFreight Decimal  @map("reference_freight") @db.Decimal(18, 4)
+  currency         String   @default("USD")
+  validFrom        DateTime @map("valid_from")
+  validUntil       DateTime @map("valid_until")
+  status           String   @default("ACTIVE")
+  createdById      String?  @map("created_by_id") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  audits           ReferenceFreightRateAudit[]
+  freightEstimates FreightEstimate[]
+
+  @@index([originPort, destinationPort, containerType, validUntil])
+  @@index([validFrom, validUntil])
+  @@index([status])
+  @@map("reference_freight_rates")
+}
+
+model ReferenceFreightRateAudit {
+  id          String   @id @default(uuid()) @db.Uuid
+  rateId      String?  @map("rate_id") @db.Uuid
+  action      String
+  actorUserId String?  @map("actor_user_id") @db.Uuid
+  snapshot    Json
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  rate ReferenceFreightRate? @relation(fields: [rateId], references: [id], onDelete: SetNull)
+
+  @@index([rateId, createdAt])
+  @@index([createdAt])
+  @@map("reference_freight_rate_audits")
 }
 
 // Sprint 17B — FreightIQ Booking Engine (planning layer, not shipment execution)
@@ -1521,6 +1683,7 @@ model WorkspaceConversation {
   id            String   @id @default(uuid()) @db.Uuid
   workspaceType String   @map("workspace_type")
   workspaceId   String   @map("workspace_id") @db.Uuid
+  status        String   @default("ACTIVE")
   createdAt     DateTime @default(now()) @map("created_at")
 
   messages WorkspaceMessage[]
@@ -1533,11 +1696,14 @@ model WorkspaceConversation {
 model WorkspaceMessage {
   id              String    @id @default(uuid()) @db.Uuid
   conversationId  String    @map("conversation_id") @db.Uuid
-  authorUserId    String    @map("author_user_id") @db.Uuid
+  authorUserId    String?   @map("author_user_id") @db.Uuid
   messageType     String    @map("message_type")
   visibility      String
   body            String    @db.Text
   status          String    @default("ACTIVE")
+  channelSource   String    @default("WORKSPACE") @map("channel_source")
+  systemEventKey  String?   @map("system_event_key")
+  metadata        Json      @default("{}")
   parentMessageId String?   @map("parent_message_id") @db.Uuid
   editedAt        DateTime? @map("edited_at")
   createdAt       DateTime  @default(now()) @map("created_at")
@@ -1545,8 +1711,10 @@ model WorkspaceMessage {
   conversation WorkspaceConversation        @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   mentions     WorkspaceMention[]
   readReceipts WorkspaceReadReceipt[]
+  deliveries   WorkspaceMessageDelivery[]
   attachments  WorkspaceMessageAttachment[]
 
+  @@unique([conversationId, systemEventKey])
   @@index([conversationId, createdAt])
   @@index([messageType, createdAt])
   @@map("workspace_messages")
@@ -1626,6 +1794,21 @@ model WorkspaceReadReceipt {
   @@unique([messageId, userId])
   @@index([userId])
   @@map("workspace_read_receipts")
+}
+
+model WorkspaceMessageDelivery {
+  id          String    @id @default(uuid()) @db.Uuid
+  messageId   String    @map("message_id") @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  sentAt      DateTime  @default(now()) @map("sent_at")
+  deliveredAt DateTime? @map("delivered_at")
+  readAt      DateTime? @map("read_at")
+
+  message WorkspaceMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([userId])
+  @@map("workspace_message_deliveries")
 }
 
 model WorkspaceMessageAttachment {

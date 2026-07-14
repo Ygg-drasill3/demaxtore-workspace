@@ -9,7 +9,7 @@ import {
 } from "@dmx/contracts/order-shipment-orchestration";
 import { SocketEvents } from "@dmx/contracts/socket-events";
 import { socketBus } from "../../realtime/socket-bus.js";
-import { toAlertDto } from "./control-tower.mapper.js";
+import { broadcastControlTowerAlertCreated } from "./control-tower.socket.js";
 import { isTestWorkspace, resolveOpenAlertsForTestWorkspaces } from "./test-workspace.js";
 
 const H = 3_600_000;
@@ -98,9 +98,7 @@ export class AlertEngine {
         },
         include: { workspace: { select: { externalRef: true } } },
       });
-      socketBus.emitToRole("ADMIN", SocketEvents.CONTROL_TOWER_ALERT_CREATED, {
-        alert: toAlertDto(row),
-      });
+      await broadcastControlTowerAlertCreated(this.db, row);
       if (input.alertKey === AlertKey.ORDER_SHIPMENT_STATE_MISMATCH && input.metadata) {
         void this.enqueueOrchestratorFromAlert(input.workspaceId, input.metadata).catch(() => {});
       }

@@ -12,11 +12,11 @@ import { CommodityBidOrderHandoff } from "../components/CommodityBidOrderHandoff
 import { CommodityBidActionDrawer } from "../components/CommodityBidActionDrawer";
 import { commoditybidScriptFor } from "@dmx/contracts/commoditybid.scripts";
 import { WorkspaceWhatHappensNextCard } from "@/features/workspace/components/WorkspaceWhatHappensNextCard";
-import WorkspaceCommunicationPanel from "@/features/workspace-communication/components/WorkspaceCommunicationPanel";
+import ConversationHubPanel from "@/features/conversation-hub/components/ConversationHubPanel";
 import { EstimatedCifPanel } from "@/features/freight-estimate/components/EstimatedCifPanel";
 import { getSocket } from "@/lib/socket";
 import { useSingleFlight } from "@/lib/useSingleFlight";
-import { focusWorkspaceCommunication } from "@/features/workspace-communication/lib/focus-communication";
+import { focusConversationHub } from "@/features/conversation-hub/lib/focus-conversation-hub";
 import { useT } from "@/i18n/useT";
 import { showQueryFatalError } from "@/lib/query-guards";
 import { getApiErrorMessage } from "@/lib/api-errors";
@@ -204,7 +204,7 @@ export default function CommodityBidWorkspacePage() {
     if (act === "approve_winner") void runAction("approve-winner");
     else if (act === "spawn_orders") void runAction("spawn-orders");
     else if (act === "invite_suppliers") toast.info("Use supplier invitation flow in auction setup.");
-    else if (act === "post_clarification") focusWorkspaceCommunication("cb-communication");
+    else if (act === "post_clarification") focusConversationHub("cb-communication");
     else toast.info(`Action ${act}`);
   };
 
@@ -304,7 +304,7 @@ export default function CommodityBidWorkspacePage() {
         </ul>
       </section>
 
-      <WorkspaceCommunicationPanel workspaceType="COMMODITYBID" workspaceId={id!} testId="cb-communication" />
+      <ConversationHubPanel workspaceType="COMMODITYBID" workspaceId={id!} testId="cb-communication" />
 
       {!isBuyerView && (
       <section data-testid="cb-next-actions" className="dmx-card p-4 flex flex-wrap gap-2">
@@ -325,7 +325,7 @@ export default function CommodityBidWorkspacePage() {
               else if (act === "supplier_accept_invitation") void runAction("accept-invitation");
               else if (act === "supplier_decline_invitation") void runAction("decline-invitation");
               else if (act === "supplier_join_auction") void runAction("join-auction");
-              else if (act === "post_clarification") focusWorkspaceCommunication("cb-communication");
+              else if (act === "post_clarification") focusConversationHub("cb-communication");
               else if (act === "submit_bid_lot" || act === "revise_bid_lot") {
                 document.querySelector('[data-testid="cb-supplier-bid-form"]')?.scrollIntoView({ behavior: "smooth", block: "start" });
               } else if (act === "withdraw_bid_lot" && lotId) {

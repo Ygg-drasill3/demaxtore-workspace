@@ -28,7 +28,7 @@ describe("<MoneySummaryPanel />", () => {
     expect(screen.getByTestId("money-estimated")).toHaveTextContent(/50,000/);
     expect(screen.getByTestId("money-lowest")).toHaveTextContent(/48,000/);
     expect(screen.getByTestId("money-highest")).toHaveTextContent(/51,200/);
-    expect(screen.getByTestId("money-average")).toHaveTextContent(/49,567/);  // (48k+49.5k+51.2k)/3 ≈ 49567
+    expect(screen.getByTestId("money-average")).toHaveTextContent(/49,566\.67/);  // (48k+49.5k+51.2k)/3 ≈ 49566.67
   });
 
   it("highlights the selected quotation total", () => {

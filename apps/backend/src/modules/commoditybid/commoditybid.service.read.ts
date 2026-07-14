@@ -134,6 +134,12 @@ CommodityBidService.prototype.createDraft = async function (input, actor) {
     });
     return ws.id;
   });
+  void (async () => {
+    const { bootstrapWorkspaceConversationAsync, emitConversationSystemEvent } =
+      await import("../conversation-hub/conversation-hub.hooks.js");
+    bootstrapWorkspaceConversationAsync(this.prisma, "COMMODITYBID", id);
+    emitConversationSystemEvent(this.prisma, "COMMODITYBID", id, "WORKSPACE_CREATED", actor.id, input.title);
+  })();
   return this.fetchDTO(id, actor);
 };
 

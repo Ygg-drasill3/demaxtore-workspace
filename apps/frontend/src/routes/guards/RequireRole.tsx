@@ -2,6 +2,7 @@
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/store/auth.store";
 import { ROLE_DASHBOARD, type Role } from "@dmx/contracts/auth";
+import { RedirectToLogin } from "@/components/RedirectToLogin";
 
 /**
  * Role gate. Use after <RequireAuth>.
@@ -13,7 +14,7 @@ export function RequireRole({ allow }: { allow: Role[] }) {
   const { status, user } = useAuth();
 
   if (status !== "authenticated" || !user) {
-    return <Navigate to="/login" replace />;
+    return <RedirectToLogin />;
   }
   if (!allow.includes(user.role)) {
     return <Navigate to={ROLE_DASHBOARD[user.role]} replace />;

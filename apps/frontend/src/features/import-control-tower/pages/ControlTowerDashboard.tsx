@@ -10,6 +10,7 @@ import { ShipmentVisibilityCard } from "../components/ShipmentVisibilityCard";
 import { OperationalRiskCard } from "../components/OperationalRiskCard";
 import { PageSkeleton } from "@/components/ui/SkeletonLoader";
 import { useT } from "@/i18n/useT";
+import { MotionText, ScrollReveal, StaggerGroup } from "@/motion";
 
 export default function ControlTowerDashboard() {
   const { t } = useT();
@@ -36,11 +37,13 @@ export default function ControlTowerDashboard() {
   }
 
   return (
-    <div data-testid="import-control-tower" className="max-w-[1600px] mx-auto space-y-6 animate-fade-in pb-10">
+    <div data-testid="import-control-tower" className="max-w-[1600px] mx-auto space-y-6 pb-10">
       <header className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
         <div>
           <div className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">{t("importTower.title")}</div>
-          <h1 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight mt-2">{t("importTower.commandTitle")}</h1>
+          <MotionText as="h1" className="font-display text-3xl sm:text-4xl font-semibold tracking-tight mt-2">
+            {t("importTower.commandTitle")}
+          </MotionText>
           <p className="text-sm text-zinc-500 mt-1.5">
             {t("importTower.subtitle")}
             {data.refreshedAt && (
@@ -82,22 +85,24 @@ export default function ControlTowerDashboard() {
         </div>
       </header>
 
-      <ControlTowerKpiRow kpis={data.kpis} loading={isLoading} />
-      <TradePipelineWidget stages={data.pipeline} />
+      <StaggerGroup className="space-y-6">
+        <ScrollReveal index={0}><ControlTowerKpiRow kpis={data.kpis} loading={isLoading} /></ScrollReveal>
+        <ScrollReveal index={1}><TradePipelineWidget stages={data.pipeline} /></ScrollReveal>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <AttentionRequiredCard items={data.attentionRequired} />
-        <LiveActivityFeed items={data.activityFeed} />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <UpcomingMilestonesCard items={data.upcomingMilestones} />
-        <div className="lg:col-span-2">
-          <ShipmentVisibilityCard data={data.shipmentVisibility} />
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <ScrollReveal index={2}><AttentionRequiredCard items={data.attentionRequired} /></ScrollReveal>
+          <ScrollReveal index={3}><LiveActivityFeed items={data.activityFeed} /></ScrollReveal>
         </div>
-      </div>
 
-      <OperationalRiskCard items={data.operationalRisks} />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <ScrollReveal index={4}><UpcomingMilestonesCard items={data.upcomingMilestones} /></ScrollReveal>
+          <ScrollReveal index={5} className="lg:col-span-2">
+            <ShipmentVisibilityCard data={data.shipmentVisibility} />
+          </ScrollReveal>
+        </div>
+
+        <ScrollReveal index={6}><OperationalRiskCard items={data.operationalRisks} /></ScrollReveal>
+      </StaggerGroup>
     </div>
   );
 }

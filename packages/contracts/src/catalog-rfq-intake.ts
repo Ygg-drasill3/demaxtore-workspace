@@ -12,6 +12,7 @@ export const CatalogIntakeDTO = z.object({
   contactPerson: z.string().optional(),
   phone: z.string().optional(),
   sessionId: z.string().optional(),
+  productImageUrl: z.string().optional(),
 });
 export type CatalogIntakeDTO = z.infer<typeof CatalogIntakeDTO>;
 
@@ -26,6 +27,7 @@ export const CatalogRfqFormFields = z.object({
   company_name: z.string().max(200).optional(),
   contact_person: z.string().max(200).optional(),
   phone: z.string().max(64).optional(),
+  product_image: z.string().max(2000).optional(),
 });
 export type CatalogRfqFormFields = z.infer<typeof CatalogRfqFormFields>;
 
@@ -87,6 +89,7 @@ export function catalogIntakeFromIngestBody(body: CatalogRfqFormFields & {
   session_id?: string;
   category?: string;
   description?: string;
+  product_image?: string;
 }): CatalogIntakeDTO {
   const qty =
     body.quantity == null
@@ -106,5 +109,6 @@ export function catalogIntakeFromIngestBody(body: CatalogRfqFormFields & {
     contactPerson: body.contact_person?.trim() || body.contact_name?.trim() || undefined,
     phone: body.phone?.trim() || undefined,
     sessionId: body.session_id?.trim() || undefined,
+    productImageUrl: body.product_image?.trim() || undefined,
   });
 }

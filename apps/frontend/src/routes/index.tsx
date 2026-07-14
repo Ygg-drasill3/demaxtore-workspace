@@ -10,6 +10,7 @@ import { AuthLoadingScreen } from "@/components/ui/AuthLoadingScreen";
 import AuthLayout from "@/layouts/AuthLayout";
 import AppLayout  from "@/layouts/AppLayout";
 import EmbedShellLayout from "@/layouts/EmbedShellLayout";
+import PasswordlessLayout from "@/layouts/PasswordlessLayout";
 import { RequireAuth } from "./guards/RequireAuth";
 import { RequireRole } from "./guards/RequireRole";
 
@@ -103,7 +104,11 @@ const SalesControlDashboardPage = lazy(() => import("@/features/sales-control/pa
 const ControlTowerDashboardPage = lazy(() => import("@/features/import-control-tower/pages/ControlTowerDashboard"));
 const ForwarderDashboardPage = lazy(() => import("@/features/forwarder/pages/ForwarderDashboardPage"));
 const ForwarderShipmentPage = lazy(() => import("@/features/forwarder/pages/ForwarderShipmentPage"));
+const WorkspaceInboxPage = lazy(() => import("@/features/workspace-inbox/pages/WorkspaceInboxPage"));
 const MessagesListPage = lazy(() => import("@/features/workspace-communication/pages/MessagesListPage"));
+const PasswordlessConversationPage = lazy(() =>
+  import("@/features/passwordless-access/pages/PasswordlessConversationPage"),
+);
 
 function LazyPage({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<PageSkeleton />}>{children}</Suspense>;
@@ -135,6 +140,10 @@ export function AppRoutes() {
         <Route path="/register"        element={<LazyPage><RegisterPage /></LazyPage>} />
         <Route path="/forgot-password" element={<LazyPage><ForgotPasswordPage /></LazyPage>} />
         <Route path="/reset-password"  element={<LazyPage><ResetPasswordPage /></LazyPage>} />
+      </Route>
+
+      <Route element={<PasswordlessLayout />}>
+        <Route path="/access/conversation" element={<LazyPage><PasswordlessConversationPage /></LazyPage>} />
       </Route>
 
       {/* ─── Authenticated shell ────────────────────────── */}
@@ -175,6 +184,7 @@ export function AppRoutes() {
 
           {/* Buyer */}
           <Route element={<RequireRole allow={["BUYER"]} />}>
+            <Route path="/buyer/inbox"              element={<LazyPage><WorkspaceInboxPage /></LazyPage>} />
             <Route path="/buyer/dashboard"          element={<LazyPage><BuyerDashboardPage /></LazyPage>} />
             <Route path="/buyer/control-tower"       element={<LazyPage><ControlTowerDashboardPage /></LazyPage>} />
             <Route path="/buyer/rfq"                element={<LazyPage><RfqListPage /></LazyPage>} />

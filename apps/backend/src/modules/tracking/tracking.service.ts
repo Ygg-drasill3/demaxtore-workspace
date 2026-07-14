@@ -122,14 +122,8 @@ export class TrackingService {
         await this.emitSocket(shipmentId, "departed", snap);
       }
       if (diff.delayDetected) {
-        socketBus.emitToWorkspace(shipmentId, SocketEvents.SHIPMENT_TRACKING_DELAY, {
-          workspaceId: shipmentId,
-          delayFlag: snap.delayFlag,
-        });
-        socketBus.emitToRole("ADMIN", SocketEvents.SHIPMENT_TRACKING_DELAY, {
-          workspaceId: shipmentId,
-          delayFlag: snap.delayFlag,
-        });
+        const { broadcastShipmentTrackingDelay } = await import("../control-tower/control-tower.socket.js");
+        await broadcastShipmentTrackingDelay(this.db, shipmentId, snap.delayFlag);
       }
       if (diff.arrived) {
         socketBus.emitToWorkspace(shipmentId, SocketEvents.SHIPMENT_TRACKING_ARRIVED, {

@@ -1,12 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { rfqApi } from "../lib/rfq.api";
 import { toast } from "@/store/toast.store";
-import { Gavel, FileText } from "lucide-react";
+import { Gavel, FileText, AlertCircle } from "lucide-react";
 import CommodityBidEmbedPage from "@/features/commoditybid/pages/CommodityBidEmbedPage";
 import { QueryState } from "@/components/ui/QueryState";
 import { useT } from "@/i18n/useT";
+import {
+  assessRfqCommodityBidEligibility,
+  commodityBidEligibleProductLabels,
+} from "@dmx/contracts/commoditybid-rfq-eligibility";
 
 type StrategyChoice = "DIRECT_RFQ" | "COMMODITYBID_AUCTION" | null;
 
@@ -82,6 +86,21 @@ function ProcurementStrategyContent({
   submitting: boolean;
   selectDirect: () => Promise<void>;
 }) {
+  const { t, locale } = useT();
+  const allowedProducts = commodityBidEligibleProductLabels(locale === "tr" ? "tr" : "en").join(", ");
+  const eligibility = useMemo(
+    () => assessRfqCommodityBidEligibility({
+      productCategory: rfq.productCategory,
+      lineItems: rfq.lineItems.map((li) => ({ description: li.description })),
+    }),
+    [rfq.productCategory, rfq.lineItems],
+  );
+
+  const trySelectCommodityBid = () => {
+    if (!eligibility.eligible) return;
+    setChoice("COMMODITYBID_AUCTION");
+  };
+
   return (
     <div
       data-testid="procurement-strategy-page"
@@ -98,7 +117,29 @@ function ProcurementStrategyContent({
       </header>
 
       {!choice && (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-4">
+          {eligibility.eligible ? (
+            <p
+              data-testid="procurement-cb-eligible-hint"
+              className="text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3"
+            >
+              {t("rfq.procurement.cbEligible.hint", undefined, { products: allowedProducts })}
+            </p>
+          ) : (
+            <div
+              data-testid="procurement-cb-ineligible-banner"
+              className="flex gap-3 text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3"
+              role="alert"
+            >
+              <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium">{t("rfq.procurement.cbNotEligible.title")}</p>
+                <p className="mt-1">{t("rfq.procurement.cbNotEligible.body", undefined, { products: allowedProducts })}</p>
+              </div>
+            </div>
+          )}
+
+          <div className="grid gap-4 sm:grid-cols-2">
           <button
             type="button"
             data-testid="procurement-direct-rfq"
@@ -114,15 +155,24 @@ function ProcurementStrategyContent({
           <button
             type="button"
             data-testid="procurement-commoditybid-auction"
-            onClick={() => setChoice("COMMODITYBID_AUCTION")}
-            className="dmx-card dmx-card-hover p-6 text-left space-y-3"
+            onClick={trySelectCommodityBid}
+            disabled={!eligibility.eligible}
+            aria-disabled={!eligibility.eligible}
+            className={`dmx-card p-6 text-left space-y-3 ${
+              eligibility.eligible
+                ? "dmx-card-hover"
+                : "opacity-60 cursor-not-allowed border-dashed border-amber-200 bg-amber-50/40"
+            }`}
           >
-            <Gavel className="h-6 w-6 text-accent-900" />
+            <Gavel className={`h-6 w-6 ${eligibility.eligible ? "text-accent-900" : "text-zinc-400"}`} />
             <h2 className="font-display text-xl font-semibold">CommodityBid Auction</h2>
             <p className="text-sm text-zinc-600">
-              Create a production request in CommodityBid. Suppliers compete live; lowest valid bid wins.
+              {eligibility.eligible
+                ? t("rfq.procurement.cbCard.enabled")
+                : t("rfq.procurement.cbCard.disabled")}
             </p>
           </button>
+        </div>
         </div>
       )}
 
