@@ -4,8 +4,16 @@ import {
   uiLogin, USERS, apiLogin, newRequest, API_BASE,
   setupSubmittedRfqWithStrategy,
   closeQuotationsAndStartEvaluation,
+  clickWorkspaceAction,
+  confirmWorkspaceActionModal,
 } from "./_helpers";
 
+const EMBED_NAV = new Set([
+  "buyer-commoditybid",
+  "buyer-freightiq",
+  "supplier-freightiq",
+  "admin-freightiq",
+]);
 const BUYER_NAV = [
   "buyer-dashboard", "buyer-rfq", "buyer-commoditybid",
   "buyer-purchase-orders", "buyer-orders", "buyer-shipments",
@@ -79,7 +87,7 @@ test.describe.serial("Pilot readiness (FIX-01..03)", () => {
     await closeQuotationsAndStartEvaluation(req, buyerToken, rfqId, "pilot readiness E2E");
     await uiLogin(page, USERS.buyer1);
     await page.goto(`/workspace/rfq/${rfqId}`);
-    await page.getByTestId("whn-primary-cta").click();
+    await page.getByTestId("whn-primary-cta-select_supplier").click();
     await page.locator('[data-testid^="quotation-option-"]').first().click();
     await page.getByTestId("select-supplier-rationale").fill("Pilot selection");
     await page.getByTestId("select-supplier-confirm").click();
@@ -104,7 +112,7 @@ test.describe.serial("Pilot readiness (FIX-01..03)", () => {
       data: { payload: {} },
     });
     await page.goto(`/workspace/rfq/${rfqId}`);
-    const cta = page.getByTestId("whn-primary-cta");
+    const cta = page.getByTestId("whn-primary-cta-issue_po");
     if (await cta.isVisible({ timeout: 8_000 }).catch(() => false)) {
       await cta.click();
       await page.getByTestId("issue-po-confirm").click();
@@ -177,7 +185,8 @@ test.describe.serial("Pilot readiness (FIX-01..03)", () => {
     await uiLogin(page, USERS.supA1);
     await page.goto(`/workspace/order/${orderId}`);
     const resp = page.waitForResponse((r) => r.url().includes("supplier-confirm-order") && r.status() === 200);
-    await page.getByTestId("order-action-supplier_confirm_order").click();
+    await clickWorkspaceAction(page, "order-action-supplier_confirm_order");
+    await confirmWorkspaceActionModal(page);
     await resp;
 
     const req = await newRequest();
@@ -229,7 +238,15 @@ test.describe.serial("Pilot readiness (FIX-01..03)", () => {
     for (const testId of BUYER_NAV) {
       await page.getByTestId(`nav-${testId}`).click();
       await expect(page.getByTestId("placeholder-page")).toHaveCount(0);
-      await expect(page.locator("h1")).toBeVisible();
+      if (EMBED_NAV.has(testId)) {
+        await expect(
+          page.locator('iframe, [data-testid^="cb-external-embed"], [data-testid="freightiq-embed"]').first(),
+        ).toBeVisible({ timeout: 30_000 });
+      } else {
+        await expect(
+          page.locator('h1, [data-testid$="-page"], [data-testid$="-dashboard"]').first(),
+        ).toBeVisible({ timeout: 10_000 });
+      }
     }
   });
 
@@ -238,6 +255,15 @@ test.describe.serial("Pilot readiness (FIX-01..03)", () => {
     for (const testId of SUPPLIER_NAV) {
       await page.getByTestId(`nav-${testId}`).click();
       await expect(page.getByTestId("placeholder-page")).toHaveCount(0);
+      if (EMBED_NAV.has(testId)) {
+        await expect(
+          page.locator('iframe, [data-testid^="cb-external-embed"], [data-testid="freightiq-embed"]').first(),
+        ).toBeVisible({ timeout: 30_000 });
+      } else {
+        await expect(
+          page.locator('h1, [data-testid$="-page"], [data-testid$="-dashboard"]').first(),
+        ).toBeVisible({ timeout: 10_000 });
+      }
     }
   });
 
@@ -246,6 +272,15 @@ test.describe.serial("Pilot readiness (FIX-01..03)", () => {
     for (const testId of ADMIN_NAV) {
       await page.getByTestId(`nav-${testId}`).click();
       await expect(page.getByTestId("placeholder-page")).toHaveCount(0);
+      if (EMBED_NAV.has(testId)) {
+        await expect(
+          page.locator('iframe, [data-testid^="cb-external-embed"], [data-testid="freightiq-embed"]').first(),
+        ).toBeVisible({ timeout: 30_000 });
+      } else {
+        await expect(
+          page.locator('h1, [data-testid$="-page"], [data-testid$="-dashboard"]').first(),
+        ).toBeVisible({ timeout: 10_000 });
+      }
     }
   });
 

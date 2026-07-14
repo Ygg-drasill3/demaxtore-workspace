@@ -8,7 +8,7 @@ import { useAuthGate } from "@/hooks/useAuthGate";
  * Gates a route tree behind a hydrated, authenticated session.
  * - Waits for zustand persist rehydration before judging auth state
  * - While validating, renders a neutral loading shell with timeout fallback
- * - On `unauthenticated`, redirects to /login/ (static login app)
+ * - On `unauthenticated`, redirects to /login (workspace SPA)
  */
 export function RequireAuth() {
   const { loading, timedOut, retry, isAuthenticated, user } = useAuthGate();

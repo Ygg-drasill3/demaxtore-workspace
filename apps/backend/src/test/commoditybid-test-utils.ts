@@ -23,12 +23,14 @@ export async function backdateCommodityBidForLive(workspaceId: string): Promise<
 }
 
 /** Advance SCHEDULED → LIVE via direct scheduler ticks (no wall-clock polling). */
-export async function waitForCommodityBidLive(workspaceId: string, maxTicks = 8): Promise<void> {
+export async function waitForCommodityBidLive(workspaceId: string, maxTicks = 24): Promise<void> {
   await backdateCommodityBidForLive(workspaceId);
   for (let i = 0; i < maxTicks; i++) {
     await runCommodityBidSchedulerTick();
     const ws = await prisma.workspace.findUnique({ where: { id: workspaceId } });
     if (ws?.state === "LIVE") return;
+    // Yield when production scheduler competes on the same DB connection pool.
+    await new Promise((r) => setTimeout(r, 50));
   }
   const ws = await prisma.workspace.findUnique({ where: { id: workspaceId } });
   throw new Error(`workspace ${workspaceId} did not reach LIVE (state=${ws?.state ?? "missing"})`);

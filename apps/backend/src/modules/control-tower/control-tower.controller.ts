@@ -28,7 +28,10 @@ export const controlTowerController = {
 
   alerts: async (req: Request, res: Response) => {
     const query = ListAlertsQuery.parse(req.query);
-    res.json(await service.listAlerts(query, { includeTestData: isValidE2eBypass(req) }));
+    const includeTestData =
+      isValidE2eBypass(req) ||
+      (req.user?.role === "ADMIN" && req.query.includeTestData === "true");
+    res.json(await service.listAlerts(query, { includeTestData }));
   },
 
   alertById: async (req: Request, res: Response) => {

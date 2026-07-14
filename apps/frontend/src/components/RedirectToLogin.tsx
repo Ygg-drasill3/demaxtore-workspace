@@ -1,15 +1,10 @@
-import { useEffect } from "react";
-import { useLocation } from "react-router-dom";
-import { redirectToLogin } from "@/lib/login-redirect";
-import { AuthLoadingScreen } from "@/components/ui/AuthLoadingScreen";
+import { Navigate, useLocation } from "react-router-dom";
+import { loginPageUrl } from "@/lib/login-redirect";
 
+/** In-SPA redirect to the login route (preserves return path). */
 export function RedirectToLogin() {
   const location = useLocation();
-
-  useEffect(() => {
-    const from = `${location.pathname}${location.search}`;
-    redirectToLogin(from.startsWith("/login") ? undefined : from);
-  }, [location]);
-
-  return <AuthLoadingScreen />;
+  const from = `${location.pathname}${location.search}`;
+  const to = loginPageUrl(from.startsWith("/login") ? undefined : from);
+  return <Navigate to={to} replace />;
 }

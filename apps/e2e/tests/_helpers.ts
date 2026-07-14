@@ -246,6 +246,7 @@ export async function findOpenAlert(
     workspaceId: filter.workspaceId,
     alertKey: filter.alertKey,
     limit: "10",
+    includeTestData: "true",
   });
   const res = await req.get(`${API_BASE}/api/control-tower/alerts?${params}`, {
     headers: { Authorization: `Bearer ${adminToken}` },
