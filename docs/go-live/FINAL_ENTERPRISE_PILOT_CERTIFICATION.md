@@ -63,7 +63,7 @@
 | Field | Value |
 | ----- | ----- |
 | Previous commit | `6c0c45354b87aeb4264b0f82f8ceb3ad29114556` |
-| Certified commit | `*(see git log after pilot-hardening commit)*` |
+| Certified commit | `e1b81f1` |
 | Branch | `snapshot/pre-pilot-20260714` |
 | Build command | `cd apps/backend && yarn prisma:deploy && yarn build` |
 | Frontend build | `bash scripts/deploy-workspace-frontend.sh` |
