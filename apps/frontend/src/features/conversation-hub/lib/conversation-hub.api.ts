@@ -70,4 +70,7 @@ export const conversationHubApi = {
     );
     return data;
   },
+
+  downloadUrl: (type: CommWorkspaceType, id: string, attachmentId: string) =>
+    `/api/workspaces/${type.toLowerCase()}/${id}/conversation/attachments/${attachmentId}/download`,
 };

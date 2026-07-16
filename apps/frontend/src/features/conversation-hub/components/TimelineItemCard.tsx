@@ -10,7 +10,9 @@ import {
   PinOff,
 } from "lucide-react";
 import type { TimelineItem, TimelineItemType } from "@dmx/contracts/conversation-hub";
+import type { CommWorkspaceType } from "@dmx/contracts/workspace-communication";
 import { MentionBody } from "./MentionBody";
+import AttachmentDownloadButton from "./AttachmentDownloadButton";
 import { TYPE_LABELS, deliveryLabel, formatWhen } from "../lib/conversation-hub.utils";
 
 const TYPE_ICONS: Partial<Record<TimelineItemType, typeof FileText>> = {
@@ -38,6 +40,8 @@ interface Props {
   item: TimelineItem;
   myUserId?: string;
   highlighted?: boolean;
+  workspaceType?: CommWorkspaceType;
+  workspaceId?: string;
   onVisible?: () => void;
   onTogglePin?: () => void;
 }
@@ -46,6 +50,8 @@ export default function TimelineItemCard({
   item,
   myUserId,
   highlighted,
+  workspaceType,
+  workspaceId,
   onVisible,
   onTogglePin,
 }: Props) {
@@ -130,13 +136,22 @@ export default function TimelineItemCard({
         {item.attachments.length > 0 && (
           <ul className="mt-2 flex flex-wrap gap-2">
             {item.attachments.map((a) => (
-              <li
-                key={a.id}
-                data-testid={`hub-attachment-${a.id}`}
-                className="inline-flex items-center gap-1 text-xs text-blue-700 bg-blue-100/60 px-2 py-0.5 rounded"
-              >
-                <FileText className="h-3 w-3" />
-                {a.fileName}
+              <li key={a.id} data-testid={`hub-attachment-${a.id}`}>
+                {workspaceType && workspaceId ? (
+                  <AttachmentDownloadButton
+                    workspaceType={workspaceType}
+                    workspaceId={workspaceId}
+                    attachmentId={a.id}
+                    fileName={a.fileName}
+                    mimeType={a.mimeType}
+                    fileSizeBytes={a.fileSizeBytes}
+                  />
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-xs text-blue-700 bg-blue-100/60 px-2 py-0.5 rounded">
+                    <FileText className="h-3 w-3" />
+                    {a.fileName}
+                  </span>
+                )}
               </li>
             ))}
           </ul>

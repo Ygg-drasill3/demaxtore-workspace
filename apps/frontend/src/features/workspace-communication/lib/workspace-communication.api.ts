@@ -28,4 +28,7 @@ export const workspaceCommunicationApi = {
     );
     return data;
   },
+
+  downloadUrl: (type: CommWorkspaceType, id: string, attachmentId: string) =>
+    `/api/workspace-communication/${type.toLowerCase()}/${id}/attachments/${attachmentId}/download`,
 };

@@ -1,19 +1,17 @@
 import { useState } from "react";
-import { FileText, Image, Film, FolderOpen } from "lucide-react";
+import { FolderOpen } from "lucide-react";
 import type { AttachmentLibrary } from "@dmx/contracts/conversation-hub";
+import type { CommWorkspaceType } from "@dmx/contracts/workspace-communication";
 import { formatWhen } from "../lib/conversation-hub.utils";
+import AttachmentDownloadButton from "./AttachmentDownloadButton";
 
 interface Props {
   library: AttachmentLibrary;
+  workspaceType: CommWorkspaceType;
+  workspaceId: string;
 }
 
-function categoryIcon(category: string) {
-  if (category === "PHOTO") return Image;
-  if (category === "VIDEO") return Film;
-  return FileText;
-}
-
-export default function AttachmentLibraryPanel({ library }: Props) {
+export default function AttachmentLibraryPanel({ library, workspaceType, workspaceId }: Props) {
   const [open, setOpen] = useState<string | null>(library.categories[0]?.category ?? null);
 
   if (library.totalCount === 0) {
@@ -52,24 +50,26 @@ export default function AttachmentLibraryPanel({ library }: Props) {
         <ul className="rounded-lg border border-zinc-100 divide-y divide-zinc-50 max-h-48 overflow-auto">
           {library.categories
             .find((c) => c.category === open)
-            ?.items.map((item) => {
-              const Icon = categoryIcon(item.category);
-              return (
-                <li
-                  key={item.id}
-                  data-testid={`hub-lib-item-${item.id}`}
-                  className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-zinc-50"
-                >
-                  <Icon className="h-4 w-4 text-blue-600 shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium text-zinc-800">{item.fileName}</p>
-                    <p className="text-[10px] text-zinc-400">
-                      {item.uploadedBy ?? "Unknown"} · {formatWhen(item.uploadedAt)}
-                    </p>
-                  </div>
-                </li>
-              );
-            })}
+            ?.items.map((item) => (
+              <li
+                key={item.id}
+                data-testid={`hub-lib-item-${item.id}`}
+                className="flex flex-col sm:flex-row sm:items-center gap-2 px-3 py-2 text-sm hover:bg-zinc-50"
+              >
+                <AttachmentDownloadButton
+                  workspaceType={workspaceType}
+                  workspaceId={workspaceId}
+                  attachmentId={item.id}
+                  fileName={item.fileName}
+                  mimeType={item.mimeType}
+                  fileSizeBytes={item.fileSizeBytes}
+                  testId={`hub-lib-download-${item.id}`}
+                />
+                <p className="text-[10px] text-zinc-400 sm:ml-auto">
+                  {item.uploadedBy ?? "Unknown"} · {formatWhen(item.uploadedAt)}
+                </p>
+              </li>
+            ))}
         </ul>
       )}
     </section>

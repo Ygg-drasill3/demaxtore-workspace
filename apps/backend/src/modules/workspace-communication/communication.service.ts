@@ -1,5 +1,7 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
-import { writeStoredFile } from "../../lib/file-storage.js";
+import { writeStoredFile, deleteStoredFile, assertStoredFileExists } from "../../lib/file-storage.js";
+import { validateUpload } from "../../lib/upload-security.js";
+import { logger } from "../../config/logger.js";
 import type {
   CommWorkspaceType,
   CommunicationAction,
@@ -186,32 +188,97 @@ export class CommunicationService {
     if (!(await canAccessCommWorkspace(this.db, actor, workspaceType, workspaceId))) {
       throw new AppError(403, "FORBIDDEN");
     }
-    if (file.sizeBytes > MAX_FILE_BYTES) throw new AppError(400, "FILE_TOO_LARGE");
-    if (!ALLOWED_MIMES.has(file.mimeType)) throw new AppError(400, "UNSUPPORTED_MIME");
+
+    let safeName: string;
+    try {
+      ({ safeName } = validateUpload(
+        { originalname: file.originalName, mimetype: file.mimeType, size: file.sizeBytes, buffer: file.buffer },
+        { maxBytes: MAX_FILE_BYTES, allowedMimes: ALLOWED_MIMES },
+      ));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "INVALID_FILE";
+      if (msg.startsWith("UNSUPPORTED_MIME")) throw new AppError(400, "UNSUPPORTED_MIME");
+      if (msg.startsWith("FILE_TOO_LARGE")) throw new AppError(400, "FILE_TOO_LARGE");
+      if (msg === "EMPTY_FILE") throw new AppError(400, "EMPTY_FILE");
+      if (msg === "EXECUTABLE_BLOCKED") throw new AppError(400, "EXECUTABLE_BLOCKED");
+      throw new AppError(400, "INVALID_FILE");
+    }
 
     const resolved = await resolveWorkspace(this.db, workspaceType, workspaceId);
     if (!resolved) throw new AppError(404, "WORKSPACE_NOT_FOUND");
 
-    const { storageKey } = await writeStoredFile(file.buffer, file.originalName);
+    let storageKey: string | null = null;
+    try {
+      const stored = await writeStoredFile(file.buffer, safeName);
+      storageKey = stored.storageKey;
 
-    const row = await this.db.workspaceMessageAttachment.create({
-      data: {
-        workspaceType,
-        workspaceId,
-        fileName: file.originalName,
-        storageKey,
-        mimeType: file.mimeType,
-        fileSizeBytes: file.sizeBytes,
-        uploadedById: actor.id,
-      },
+      const row = await this.db.workspaceMessageAttachment.create({
+        data: {
+          workspaceType,
+          workspaceId,
+          fileName: safeName,
+          storageKey,
+          mimeType: file.mimeType,
+          fileSizeBytes: file.sizeBytes,
+          uploadedById: actor.id,
+        },
+      });
+
+      return {
+        id: row.id,
+        fileName: row.fileName,
+        mimeType: row.mimeType,
+        fileSizeBytes: row.fileSizeBytes,
+        uploadedAt: row.createdAt.toISOString(),
+      };
+    } catch (err) {
+      if (storageKey) {
+        await deleteStoredFile(storageKey).catch(() => undefined);
+      }
+      throw err;
+    }
+  }
+
+  async getAttachmentForDownload(
+    workspaceType: CommWorkspaceType,
+    workspaceId: string,
+    attachmentId: string,
+    actor: AuthUser,
+  ): Promise<{ storageKey: string; fileName: string; mimeType: string; fileSizeBytes: number }> {
+    if (!(await canAccessCommWorkspace(this.db, actor, workspaceType, workspaceId))) {
+      throw new AppError(403, "FORBIDDEN");
+    }
+
+    const row = await this.db.workspaceMessageAttachment.findUnique({
+      where: { id: attachmentId },
+      include: { message: true },
+    });
+    if (!row || row.workspaceType !== workspaceType || row.workspaceId !== workspaceId) {
+      throw new AppError(404, "ATTACHMENT_NOT_FOUND");
+    }
+
+    if (row.messageId && row.message) {
+      if (row.message.status === "DELETED") {
+        throw new AppError(404, "ATTACHMENT_NOT_FOUND");
+      }
+      const resolved = await resolveWorkspace(this.db, workspaceType, workspaceId);
+      if (!resolved) throw new AppError(404, "WORKSPACE_NOT_FOUND");
+      const ctx = await buildVisibilityContext(this.db, resolved);
+      if (!canViewMessage(actor, row.message.visibility as MessageVisibility, ctx)) {
+        throw new AppError(403, "FORBIDDEN");
+      }
+    }
+
+    await assertStoredFileExists(row.storageKey).catch(() => {
+      logger.warn({ attachmentId: row.id }, "[Comm] attachment file missing on storage");
+      throw new AppError(404, "ATTACHMENT_FILE_MISSING");
     });
 
     return {
-      id: row.id,
+      storageKey: row.storageKey,
       fileName: row.fileName,
       mimeType: row.mimeType,
       fileSizeBytes: row.fileSizeBytes,
-      uploadedAt: row.createdAt.toISOString(),
     };
   }
 

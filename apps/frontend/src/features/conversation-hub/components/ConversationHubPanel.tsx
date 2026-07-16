@@ -368,7 +368,11 @@ export default function ConversationHubPanel({
 
         {!isLoading && activeSection === "library" && (
           <div className="px-4">
-            <AttachmentLibraryPanel library={data?.attachmentLibrary ?? { categories: [], totalCount: 0 }} />
+            <AttachmentLibraryPanel
+              library={data?.attachmentLibrary ?? { categories: [], totalCount: 0 }}
+              workspaceType={workspaceType}
+              workspaceId={workspaceId}
+            />
           </div>
         )}
 
@@ -377,6 +381,8 @@ export default function ConversationHubPanel({
             <PinnedTimeline
               items={data?.pinnedItems ?? []}
               myUserId={user?.id}
+              workspaceType={workspaceType}
+              workspaceId={workspaceId}
               onTogglePin={togglePin}
               onVisible={onItemVisible}
             />
@@ -390,6 +396,8 @@ export default function ConversationHubPanel({
                     key={item.id}
                     item={item}
                     myUserId={user?.id}
+                    workspaceType={workspaceType}
+                    workspaceId={workspaceId}
                     highlighted={highlightId === item.id}
                     onVisible={() => void onItemVisible(item)}
                     onTogglePin={() => void togglePin(item)}

@@ -1,15 +1,25 @@
 import { Pin } from "lucide-react";
 import type { TimelineItem } from "@dmx/contracts/conversation-hub";
+import type { CommWorkspaceType } from "@dmx/contracts/workspace-communication";
 import TimelineItemCard from "./TimelineItemCard";
 
 interface Props {
   items: TimelineItem[];
   myUserId?: string;
+  workspaceType?: CommWorkspaceType;
+  workspaceId?: string;
   onTogglePin?: (item: TimelineItem) => void;
   onVisible?: (item: TimelineItem) => void;
 }
 
-export default function PinnedTimeline({ items, myUserId, onTogglePin, onVisible }: Props) {
+export default function PinnedTimeline({
+  items,
+  myUserId,
+  workspaceType,
+  workspaceId,
+  onTogglePin,
+  onVisible,
+}: Props) {
   if (!items.length) return null;
 
   return (
@@ -24,6 +34,8 @@ export default function PinnedTimeline({ items, myUserId, onTogglePin, onVisible
             key={item.id}
             item={item}
             myUserId={myUserId}
+            workspaceType={workspaceType}
+            workspaceId={workspaceId}
             onVisible={() => onVisible?.(item)}
             onTogglePin={() => onTogglePin?.(item)}
           />

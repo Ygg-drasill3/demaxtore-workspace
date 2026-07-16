@@ -33,6 +33,12 @@ workspaceCommunicationRouter.post(
   asyncHandler(communicationController.uploadAttachment),
 );
 
+workspaceCommunicationRouter.get(
+  "/attachments/:attachmentId/download",
+  requireAuth,
+  asyncHandler(communicationController.downloadAttachment),
+);
+
 workspaceCommunicationRouter.post(
   "/actions/:action",
   requireAuth,

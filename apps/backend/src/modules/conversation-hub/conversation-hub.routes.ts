@@ -13,6 +13,7 @@ import {
 } from "@dmx/contracts/conversation-hub.zod";
 import type { CommWorkspaceType } from "@dmx/contracts/workspace-communication";
 import { CommunicationService } from "../workspace-communication/communication.service.js";
+import { streamStoredFileToResponse } from "../../lib/file-storage.js";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 const hub = () => new ConversationHubService(prisma);
@@ -88,5 +89,20 @@ conversationHubRouter.post(
       buffer: req.file.buffer,
     });
     res.status(201).json(result);
+  }),
+);
+
+conversationHubRouter.get(
+  "/attachments/:attachmentId/download",
+  asyncHandler(async (req, res) => {
+    const workspaceType = req.params.workspaceType!.toUpperCase() as CommWorkspaceType;
+    const workspaceId = req.params.workspaceId!;
+    const file = await comm().getAttachmentForDownload(
+      workspaceType,
+      workspaceId,
+      req.params.attachmentId!,
+      req.user!,
+    );
+    await streamStoredFileToResponse(file.storageKey, res, file);
   }),
 );

@@ -3,6 +3,7 @@ import type { CommWorkspaceType, CommunicationAction } from "@dmx/contracts/work
 import { CommWorkspaceTypeParam } from "@dmx/contracts/workspace-communication.zod";
 import { prisma } from "../../db.js";
 import { CommunicationService } from "./communication.service.js";
+import { streamStoredFileToResponse } from "../../lib/file-storage.js";
 
 const service = new CommunicationService(prisma);
 
@@ -69,5 +70,16 @@ export const communicationController = {
         },
       ),
     );
+  },
+
+  async downloadAttachment(req: Request, res: Response) {
+    const workspaceType = parseType(req);
+    const file = await service.getAttachmentForDownload(
+      workspaceType,
+      req.params.workspaceId,
+      req.params.attachmentId,
+      req.user!,
+    );
+    await streamStoredFileToResponse(file.storageKey, res, file);
   },
 };

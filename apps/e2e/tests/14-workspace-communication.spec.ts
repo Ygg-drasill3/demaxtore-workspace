@@ -267,6 +267,15 @@ test.describe.serial("Workspace communication (Sprint 5E)", () => {
     expect(res.ok()).toBeTruthy();
     const body = await res.json() as { messages: Array<{ attachments: Array<{ fileName: string }> }> };
     expect(body.messages.some((m) => m.attachments.some((a) => a.fileName === "comm.pdf"))).toBeTruthy();
+
+    const dl = await fetch(
+      `${API_BASE}/api/workspaces/order/${orderId}/conversation/attachments/${att.id}/download`,
+      { headers: { Authorization: `Bearer ${buyerToken}` } },
+    );
+    expect(dl.status).toBe(200);
+    const buf = Buffer.from(await dl.arrayBuffer());
+    expect(buf.length).toBeGreaterThan(0);
+    expect(buf.subarray(0, 8).toString()).toContain("%PDF");
   });
 
   test("10 — duplicate clientMessageId creates exactly one stored message (MSG-001)", async () => {

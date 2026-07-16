@@ -10,6 +10,7 @@
 | -- | ----------------- | --- | --------------- | ----------------- | ------ |
 | MSG-001 | P2 | Backend `clientMessageId` unique constraint + frontend single-flight send | `communication.service.idempotency.test.ts`, E2E #10, `64-final-pilot-certification` double-click | One message per user action | **RESOLVED** |
 | PAY-UI-002 | P2 | Shared `OnlinePaymentDisabledNotice` on Trade, Order, PO | `OnlinePaymentDisabledNotice.test.tsx`, `63-payment-disabled-notice.spec.ts` | Consistent notice; no checkout | **RESOLVED** |
+| ATT-001 | P2 | Secure attachment download endpoint + `AttachmentDownloadButton` | `communication.attachment-download.test.ts`, Playwright MCP | Buyer/supplier download; 401/403 isolation | **RESOLVED** |
 
 ## Messaging certification
 
@@ -23,7 +24,7 @@
 | Duplicate prevention after reconnect | **Yes** |
 | Persistence | **Yes** |
 | Tenant isolation | **Yes** |
-| Attachments | **NOT CERTIFIED FOR INITIAL PILOT** (ATT-001: upload/display only; no download on production) |
+| Attachments | **CERTIFIED FOR CONTROLLED PILOT** (ATT-001 resolved — see [`ATTACHMENT_DOWNLOAD_CERTIFICATION.md`](./ATTACHMENT_DOWNLOAD_CERTIFICATION.md)) |
 
 ## Production MCP certification (https://workspace.demaxtore.com)
 
@@ -34,7 +35,7 @@ See [`FINAL_PLAYWRIGHT_MCP_CERTIFICATION.md`](./FINAL_PLAYWRIGHT_MCP_CERTIFICATI
 | Greenfield on production URL | **PASS** — `FINAL-MCP-CERT-20260716` / RFQ-2026-0270 |
 | Messaging on production URL | **PASS** |
 | Route audit | **27/27 PASS** |
-| ATT-001 attachment download | **P2 — NOT CERTIFIED** |
+| ATT-001 attachment download | **RESOLVED — CERTIFIED** |
 
 
 | Item | Result |
@@ -85,8 +86,8 @@ See [`FINAL_PLAYWRIGHT_MCP_CERTIFICATION.md`](./FINAL_PLAYWRIGHT_MCP_CERTIFICATI
 
 | Suite | Count |
 | ----- | ----- |
-| Backend | 201/201 |
-| Frontend | 93/93 |
+| Backend | 227/227 |
+| Frontend | 95/95 |
 | Contracts | 125/125 |
 | Auth E2E | 4/4 |
 | Workspace Communication E2E | 10/10 |
@@ -98,6 +99,5 @@ See [`FINAL_PLAYWRIGHT_MCP_CERTIFICATION.md`](./FINAL_PLAYWRIGHT_MCP_CERTIFICATI
 
 ### Pilot exclusions (document for customer)
 
-1. Workspace messaging attachments — not certified for initial pilot
-2. Online payment collection — disabled; manual milestones only
-3. WhatsApp — not certified
+1. Online payment collection — disabled; manual milestones only
+2. WhatsApp — not certified

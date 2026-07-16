@@ -4,6 +4,7 @@ import { MessageSquare, Send, Paperclip } from "lucide-react";
 import type { CommWorkspaceType, MessageType, MessageVisibility } from "@dmx/contracts/workspace-communication";
 import { SocketEvents } from "@dmx/contracts/socket-events";
 import { workspaceCommunicationApi } from "../lib/workspace-communication.api";
+import AttachmentDownloadButton from "@/features/conversation-hub/components/AttachmentDownloadButton";
 import { useAuth } from "@/store/auth.store";
 import { toast } from "@/store/toast.store";
 import { useWorkspaceSocket } from "@/lib/socket";
@@ -197,9 +198,20 @@ export default function WorkspaceCommunicationPanel({
             </div>
             <p className="mt-1 whitespace-pre-wrap" data-testid="comm-message-body">{m.body}</p>
             {(m.attachments ?? []).length > 0 && (
-              <ul className="text-xs text-blue-600 mt-1">
+              <ul className="flex flex-wrap gap-2 mt-1">
                 {(m.attachments ?? []).map((a) => (
-                  <li key={a.id} data-testid={`comm-attachment-${a.id}`}>{a.fileName}</li>
+                  <li key={a.id} data-testid={`comm-attachment-${a.id}`}>
+                    <AttachmentDownloadButton
+                      workspaceType={workspaceType}
+                      workspaceId={workspaceId}
+                      attachmentId={a.id}
+                      fileName={a.fileName}
+                      mimeType={a.mimeType}
+                      fileSizeBytes={a.fileSizeBytes}
+                      downloadUrl={workspaceCommunicationApi.downloadUrl(workspaceType, workspaceId, a.id)}
+                      testId={`comm-attachment-download-${a.id}`}
+                    />
+                  </li>
                 ))}
               </ul>
             )}

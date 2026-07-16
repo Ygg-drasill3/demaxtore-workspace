@@ -13,7 +13,7 @@
 
 **SAFE FOR CONTROLLED ENTERPRISE PILOT**
 
-Workspace messaging, greenfield RFQ→PO→Order, payment safety, tenant isolation, and role-based navigation are certified on production. Workspace messaging **attachments remain NOT CERTIFIED FOR PILOT** (upload/display only; download not implemented). WhatsApp and online payments are explicitly **NOT CERTIFIED**.
+Workspace messaging, greenfield RFQ→PO→Order, payment safety, tenant isolation, role-based navigation, and **workspace attachment download (ATT-001)** are certified on production. WhatsApp and online payments are explicitly **NOT CERTIFIED**.
 
 ---
 
@@ -23,25 +23,20 @@ Workspace messaging, greenfield RFQ→PO→Order, payment safety, tenant isolati
 | -------- | ----: | --- |
 | P0 | 0 | — |
 | P1 | 0 | — |
-| P2 | 1 | ATT-001 |
+| P2 | 0 | — (ATT-001 resolved) |
 | P3 | 0 | — |
 
-### ATT-001 (P2) — Workspace attachment download not implemented
+### ATT-001 (P2) — Workspace attachment download — **RESOLVED**
 
 | Field | Value |
 | ----- | ----- |
-| Severity | P2 |
+| Severity | P2 (resolved 2026-07-16) |
 | Role | Buyer / Supplier |
 | Route | `/workspace/order/{id}` → Conversation Hub |
-| Viewport | Desktop 1440×900 |
-| Preconditions | Message with PDF attachment uploaded via hub API |
-| Steps | Upload attachment → attach to DOCUMENT message → supplier opens timeline |
-| Expected | Authorized receiver can download attachment file |
-| Actual | Attachment filename renders in timeline; **no download endpoint or UI action exists** (`/conversation/attachments/{id}/download` returns 401; no backend route) |
-| Security | Logged-out request blocked (401). Cross-tenant supplier blocked (403/404). **No P0 exposure.** |
-| Customer impact | Pilot users can attach files but receivers cannot download them |
-| Root cause | `conversation-hub.routes.ts` exposes POST `/attachments` only; `TimelineItemCard` renders filename without link |
-| Regression test required | Attachment download E2E when feature is implemented |
+| Fix | Secure download endpoints + `AttachmentDownloadButton` UI |
+| Production verification | Buyer + supplier UI download; API 200/401/403/404; mobile 390×844 |
+| Regression tests | `communication.attachment-download.test.ts`, `AttachmentDownloadButton.test.tsx` |
+| Full report | [`ATTACHMENT_DOWNLOAD_CERTIFICATION.md`](./ATTACHMENT_DOWNLOAD_CERTIFICATION.md) |
 
 ---
 
