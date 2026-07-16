@@ -23,9 +23,19 @@
 | Duplicate prevention after reconnect | **Yes** |
 | Persistence | **Yes** |
 | Tenant isolation | **Yes** |
-| Attachments | **NOT CERTIFIED FOR INITIAL PILOT** |
+| Attachments | **NOT CERTIFIED FOR INITIAL PILOT** (ATT-001: upload/display only; no download on production) |
 
-## Payment certification
+## Production MCP certification (https://workspace.demaxtore.com)
+
+See [`FINAL_PLAYWRIGHT_MCP_CERTIFICATION.md`](./FINAL_PLAYWRIGHT_MCP_CERTIFICATION.md) for full evidence.
+
+| Item | Result |
+| ---- | ------ |
+| Greenfield on production URL | **PASS** — `FINAL-MCP-CERT-20260716` / RFQ-2026-0270 |
+| Messaging on production URL | **PASS** |
+| Route audit | **27/27 PASS** |
+| ATT-001 attachment download | **P2 — NOT CERTIFIED** |
+
 
 | Item | Result |
 | ---- | ------ |

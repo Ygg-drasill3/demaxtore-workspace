@@ -92,9 +92,17 @@ Final hardening completed for MSG-001 (duplicate messages) and PAY-UI-002 (incon
 - Online payment collection
 - Workspace messaging attachments (initial pilot scope)
 
-## Production health snapshot
+## Production MCP certification (2026-07-16 afternoon)
 
-```
-GET /api/healthz → ok
-GET /api/payments/capabilities → onlineCollectionEnabled: false
-```
+Full Playwright MCP audit against **https://workspace.demaxtore.com** documented in [`FINAL_PLAYWRIGHT_MCP_CERTIFICATION.md`](./FINAL_PLAYWRIGHT_MCP_CERTIFICATION.md).
+
+| Metric | Result |
+| ------ | ------ |
+| Production commit verified | `e1b81f1f03b7842ed2bf6f0672cf9d5f6f41ef1a` |
+| Greenfield RFQ→Order (prefixed) | **PASS** — RFQ-2026-0270 |
+| Real-time messaging (production URL) | **PASS** |
+| Route matrix (27 routes × 3 roles) | **27/27 PASS** |
+| Mobile 390×844 critical paths | **PASS** |
+| P0 / P1 | **0 / 0** |
+| New P2 | ATT-001 — attachment download not implemented |
+
