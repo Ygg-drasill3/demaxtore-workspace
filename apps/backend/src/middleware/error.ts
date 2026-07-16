@@ -36,7 +36,12 @@ export function notFoundHandler(_req: Request, res: Response): void {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunction): void {
+export function errorHandler(err: unknown, req: Request, res: Response, next: NextFunction): void {
+  if (res.headersSent) {
+    next(err);
+    return;
+  }
+
   if (err instanceof ZodError) {
     res.status(400).json({
       error: {

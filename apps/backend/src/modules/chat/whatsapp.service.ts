@@ -14,11 +14,22 @@ export function isWhatsAppConfigured(): boolean {
   return Boolean(env.WHATSAPP_ACCESS_TOKEN && env.WHATSAPP_PHONE_NUMBER_ID);
 }
 
+export type WhatsAppSignatureFailure =
+  | "WHATSAPP_APP_SECRET_MISSING"
+  | "WHATSAPP_RAW_BODY_MISSING"
+  | "WHATSAPP_SIGNATURE_MISSING"
+  | "WHATSAPP_SIGNATURE_MALFORMED"
+  | "WHATSAPP_SIGNATURE_INVALID";
+
+export type WhatsAppSignatureResult =
+  | { ok: true }
+  | { ok: false; reason: WhatsAppSignatureFailure };
+
 function timingSafeEqualHex(expectedHex: string, providedHex: string): boolean {
   try {
     const a = Buffer.from(expectedHex, "hex");
     const b = Buffer.from(providedHex, "hex");
-    if (a.length !== b.length) return false;
+    if (a.length !== b.length || a.length === 0) return false;
     return crypto.timingSafeEqual(a, b);
   } catch {
     return false;
@@ -26,15 +37,56 @@ function timingSafeEqualHex(expectedHex: string, providedHex: string): boolean {
 }
 
 /** Fail-closed: missing WHATSAPP_APP_SECRET → reject (never process unsigned webhooks). */
-export function verifyWebhookSignature(rawBody: Buffer, signatureHeader: string | undefined): boolean {
+export function validateWebhookSignature(
+  rawBody: Buffer | undefined,
+  signatureHeader: string | undefined,
+): WhatsAppSignatureResult {
   const secret = env.WHATSAPP_APP_SECRET;
   if (!secret) {
     logger.warn("WHATSAPP_APP_SECRET not set — rejecting webhook");
+    return { ok: false, reason: "WHATSAPP_APP_SECRET_MISSING" };
+  }
+  if (!rawBody || !Buffer.isBuffer(rawBody)) {
+    return { ok: false, reason: "WHATSAPP_RAW_BODY_MISSING" };
+  }
+  if (!signatureHeader) {
+    return { ok: false, reason: "WHATSAPP_SIGNATURE_MISSING" };
+  }
+  if (!signatureHeader.startsWith("sha256=")) {
+    return { ok: false, reason: "WHATSAPP_SIGNATURE_MALFORMED" };
+  }
+  const providedHex = signatureHeader.slice(7);
+  if (!/^[0-9a-f]{64}$/i.test(providedHex)) {
+    return { ok: false, reason: "WHATSAPP_SIGNATURE_MALFORMED" };
+  }
+  const expected = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+  if (!timingSafeEqualHex(expected, providedHex)) {
+    return { ok: false, reason: "WHATSAPP_SIGNATURE_INVALID" };
+  }
+  return { ok: true };
+}
+
+export function verifyWebhookSignature(rawBody: Buffer, signatureHeader: string | undefined): boolean {
+  return validateWebhookSignature(rawBody, signatureHeader).ok;
+}
+
+/** Returns true when WHATSAPP_APP_SECRET matches the configured access token (Meta appsecret_proof). */
+export async function isWhatsAppAppSecretValidForAccessToken(): Promise<boolean> {
+  const secret = env.WHATSAPP_APP_SECRET;
+  const token = env.WHATSAPP_ACCESS_TOKEN;
+  const phoneNumberId = env.WHATSAPP_PHONE_NUMBER_ID;
+  if (!secret || !token || !phoneNumberId) return false;
+
+  const proof = crypto.createHmac("sha256", secret).update(token).digest("hex");
+  const url =
+    `https://graph.facebook.com/${API_VERSION}/${phoneNumberId}` +
+    `?access_token=${encodeURIComponent(token)}&appsecret_proof=${proof}`;
+  try {
+    const resp = await fetch(url);
+    return resp.ok;
+  } catch {
     return false;
   }
-  if (!signatureHeader?.startsWith("sha256=")) return false;
-  const expected = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
-  return timingSafeEqualHex(expected, signatureHeader.slice(7));
 }
 
 export function verifySubscription(

@@ -1,34 +1,38 @@
 import { Router } from "express";
 import { prisma } from "../../db/prisma.js";
-import { TradeChatService } from "./chat.service.js";
 import {
   parseInboundWebhook,
+  validateWebhookSignature,
   verifySubscription,
-  verifyWebhookSignature,
 } from "./whatsapp.service.js";
 import { logger } from "../../config/logger.js";
+import { TradeChatService } from "./chat.service.js";
+import { WhatsAppInboxService } from "../whatsapp-inbox/whatsapp-inbox.service.js";
 
 export const whatsappWebhookRouter = Router();
 
 const chat = () => new TradeChatService(prisma);
+const inbox = () => new WhatsAppInboxService(prisma);
 
 whatsappWebhookRouter.get("/", (req, res) => {
   const mode = req.query["hub.mode"] as string | undefined;
   const token = req.query["hub.verify_token"] as string | undefined;
   const challenge = req.query["hub.challenge"] as string | undefined;
-  const result = verifySubscription(mode, token, challenge);
-  if (!result) {
-    res.status(403).send("Verification failed");
-    return;
+
+  if (mode === "subscribe" && verifySubscription(mode, token, challenge)) {
+    return res.status(200).type("text/plain").send(String(challenge));
   }
-  res.type("text/plain").send(result);
+
+  return res.sendStatus(403);
 });
 
-whatsappWebhookRouter.post("/", async (req, res) => {
+whatsappWebhookRouter.post("/", (req, res) => {
   const raw = req.body as Buffer;
   const signature = req.headers["x-hub-signature-256"] as string | undefined;
-  if (!verifyWebhookSignature(raw, signature)) {
-    res.status(401).json({ ok: false, error: "INVALID_SIGNATURE" });
+  const sig = validateWebhookSignature(raw, signature);
+  if (!sig.ok) {
+    const status = sig.reason === "WHATSAPP_SIGNATURE_INVALID" ? 403 : 401;
+    res.status(status).json({ ok: false, error: sig.reason });
     return;
   }
 
@@ -36,33 +40,42 @@ whatsappWebhookRouter.post("/", async (req, res) => {
   try {
     body = JSON.parse(raw.toString("utf8")) as Record<string, unknown>;
   } catch {
-    res.status(400).json({ ok: false });
+    res.status(200).json({ ok: true });
     return;
   }
 
-  const { parseWhatsAppStatusWebhook } = await import(
-    "../whatsapp-notification-bridge/whatsapp-bridge.webhook.js"
-  );
-  const { updateDeliveryStatusFromWebhook } = await import(
-    "../whatsapp-notification-bridge/whatsapp-bridge.service.js"
-  );
-  for (const st of parseWhatsAppStatusWebhook(body)) {
-    await updateDeliveryStatusFromWebhook(st.providerMessageId, st.status, st.raw);
-  }
+  res.status(200).json({ ok: true });
 
-  const inbound = parseInboundWebhook(body);
-  let processed = 0;
-  for (const item of inbound) {
-    const result = await chat().ingestInbound(
-      item.fromPhone,
-      item.messageText,
-      item.whatsappMessageId,
-    );
-    if (result) processed += 1;
-    else {
-      logger.warn({ from: item.fromPhone, text: item.messageText.slice(0, 80) }, "[WA] no conversation match");
-    }
-  }
+  setImmediate(() => {
+    void (async () => {
+      try {
+        const { parseWhatsAppStatusWebhook } = await import(
+          "../whatsapp-notification-bridge/whatsapp-bridge.webhook.js"
+        );
+        const { updateDeliveryStatusFromWebhook } = await import(
+          "../whatsapp-notification-bridge/whatsapp-bridge.service.js"
+        );
+        for (const st of parseWhatsAppStatusWebhook(body)) {
+          await updateDeliveryStatusFromWebhook(st.providerMessageId, st.status, st.raw);
+        }
 
-  res.json({ ok: true, processed });
+        const inboxResult = await inbox().processWebhookPayload(body);
+        logger.info(inboxResult, "[WA] inbox webhook processed");
+
+        const legacyInbound = parseInboundWebhook(body);
+        for (const item of legacyInbound) {
+          const result = await chat().ingestInbound(
+            item.fromPhone,
+            item.messageText,
+            item.whatsappMessageId,
+          );
+          if (!result) {
+            logger.debug({ from: item.fromPhone }, "[WA] trade chat — no conversation match");
+          }
+        }
+      } catch (err) {
+        logger.error({ err }, "[WA] webhook async processing failed");
+      }
+    })();
+  });
 });

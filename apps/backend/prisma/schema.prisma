@@ -267,6 +267,10 @@ model Workspace {
   freightBookings         FreightBooking[]
   carrierOptions          CarrierOption[]
   mixedContainerDetails   MixedContainerDetails?
+  mcProcurementStatusHistory McProcurementStatusHistory[]
+  mcOrganizationStatusHistory McOrganizationStatusHistory[]
+  mcOrganizationEvents        McOrganizationEvent[]
+  mcInternalNotes         McInternalNote[]
   containerLines          ContainerLine[]
   mcProcurementQuotes     McProcurementQuote[]
   mcContainerOffers       McContainerOffer[]
@@ -938,6 +942,7 @@ model ShipmentWorkspace {
 model FreightRequest {
   id               String    @id @default(uuid()) @db.Uuid
   orderId          String    @map("order_id") @db.Uuid
+  organizationWorkspaceId String? @map("organization_workspace_id") @db.Uuid
   buyerId          String    @map("buyer_id") @db.Uuid
   supplierId       String    @map("supplier_id") @db.Uuid
   mode             String
@@ -956,6 +961,7 @@ model FreightRequest {
   communications FreightRequestCommunication[]
 
   @@index([orderId])
+  @@index([organizationWorkspaceId])
   @@index([status])
   @@index([buyerId])
   @@map("freight_requests")
@@ -1514,6 +1520,7 @@ model TradeException {
 model PurchaseOrder {
   id               String    @id @default(uuid()) @db.Uuid
   orderId          String    @unique @map("order_id") @db.Uuid
+  organizationWorkspaceId String? @map("organization_workspace_id") @db.Uuid
   poNumber         String    @map("po_number")
   buyerId          String    @map("buyer_id") @db.Uuid
   supplierId       String    @map("supplier_id") @db.Uuid
@@ -1535,6 +1542,7 @@ model PurchaseOrder {
   acknowledgements PurchaseOrderAcknowledgement[]
   amendments       PurchaseOrderAmendment[]
 
+  @@index([organizationWorkspaceId])
   @@index([status])
   @@index([buyerId])
   @@index([supplierId])
@@ -1772,6 +1780,103 @@ model DirectMessage {
   @@map("direct_messages")
 }
 
+// ── WhatsApp Cloud API Inbox (ops customer service) ───────────────────────────
+model WhatsAppContact {
+  id          String   @id @default(uuid()) @db.Uuid
+  waId        String   @unique @map("wa_id")
+  phoneNumber String   @map("phone_number")
+  profileName String?  @map("profile_name")
+  userId      String?  @map("user_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  conversations WhatsAppConversation[]
+
+  @@index([phoneNumber])
+  @@index([userId])
+  @@map("whatsapp_contacts")
+}
+
+model WhatsAppConversation {
+  id                 String    @id @default(uuid()) @db.Uuid
+  contactId          String    @map("contact_id") @db.Uuid
+  phoneNumberId      String?   @map("phone_number_id")
+  lastInboundAt      DateTime? @map("last_inbound_at")
+  lastMessageAt      DateTime? @map("last_message_at")
+  lastMessagePreview String?   @map("last_message_preview") @db.Text
+  unreadCount        Int       @default(0) @map("unread_count")
+  status             String    @default("open")
+  assigneeUserId     String?   @map("assignee_user_id") @db.Uuid
+  userId             String?   @map("user_id") @db.Uuid
+  workspaceRfqId     String?   @map("workspace_rfq_id") @db.Uuid
+  orderWorkspaceId   String?   @map("order_workspace_id") @db.Uuid
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  contact  WhatsAppContact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  messages WhatsAppMessage[]
+
+  @@unique([contactId, phoneNumberId])
+  @@index([lastMessageAt])
+  @@index([assigneeUserId])
+  @@index([status])
+  @@map("whatsapp_conversations")
+}
+
+model WhatsAppMessage {
+  id               String    @id @default(uuid()) @db.Uuid
+  conversationId   String    @map("conversation_id") @db.Uuid
+  metaMessageId    String?   @unique @map("meta_message_id")
+  direction        String
+  type             String    @default("text")
+  body             String?   @db.Text
+  mediaId          String?   @map("media_id")
+  mediaStorageKey  String?   @map("media_storage_key")
+  mimeType         String?   @map("mime_type")
+  filename         String?
+  caption          String?
+  replyToMessageId String?   @map("reply_to_message_id") @db.Uuid
+  replyToMetaId    String?   @map("reply_to_meta_id")
+  status           String    @default("received")
+  errorCode        String?   @map("error_code")
+  errorMessage     String?   @map("error_message") @db.Text
+  authorUserId     String?   @map("author_user_id") @db.Uuid
+  sentAt           DateTime? @map("sent_at")
+  deliveredAt      DateTime? @map("delivered_at")
+  readAt           DateTime? @map("read_at")
+  failedAt         DateTime? @map("failed_at")
+  metaTimestamp    DateTime? @map("meta_timestamp")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  conversation WhatsAppConversation    @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  replyTo      WhatsAppMessage?      @relation("WhatsAppMessageReply", fields: [replyToMessageId], references: [id], onDelete: SetNull)
+  replies      WhatsAppMessage[]     @relation("WhatsAppMessageReply")
+  statuses     WhatsAppMessageStatus[]
+
+  @@index([conversationId, createdAt])
+  @@index([metaMessageId])
+  @@index([status])
+  @@map("whatsapp_messages")
+}
+
+model WhatsAppMessageStatus {
+  id           String   @id @default(uuid()) @db.Uuid
+  messageId    String   @map("message_id") @db.Uuid
+  status       String
+  errorCode    String?  @map("error_code")
+  errorTitle   String?  @map("error_title")
+  errorMessage String?  @map("error_message") @db.Text
+  raw          Json?
+  occurredAt   DateTime @map("occurred_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  message WhatsAppMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId, occurredAt])
+  @@map("whatsapp_message_statuses")
+}
+
 model WorkspaceMention {
   id              String   @id @default(uuid()) @db.Uuid
   messageId       String   @map("message_id") @db.Uuid
@@ -1911,6 +2016,7 @@ model PackingType {
   containerLines      ContainerLine[]
   bulkContainerLines  BulkContainerLine[]
   bcProcurementQuotes BcProcurementQuote[]
+  catalogPackaging    CatalogPackaging[]
 
   @@index([segment, isActive])
   @@map("packing_types")
@@ -1934,7 +2040,7 @@ model ProductPackingType {
 }
 
 // ── Mixed Container (Sprint 12B — catalog + builder MVP) ────────────────────
-model CatalogCategory {
+model CatalogIndustry {
   id        String   @id @default(uuid()) @db.Uuid
   slug      String   @unique
   name      String
@@ -1943,8 +2049,29 @@ model CatalogCategory {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  categories CatalogCategory[]
+
+  @@index([status, sortOrder])
+  @@map("catalog_industries")
+}
+
+model CatalogCategory {
+  id              String   @id @default(uuid()) @db.Uuid
+  industryId      String   @map("industry_id") @db.Uuid
+  slug            String   @unique
+  name            String
+  description     String?  @db.Text
+  imageStorageKey String?  @map("image_storage_key")
+  imageMimeType   String?  @map("image_mime_type")
+  sortOrder       Int      @default(0) @map("sort_order")
+  status          String   @default("ACTIVE")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  industry CatalogIndustry @relation(fields: [industryId], references: [id])
   products CatalogProduct[]
 
+  @@index([industryId, status, sortOrder])
   @@index([status, sortOrder])
   @@map("catalog_categories")
 }
@@ -1954,6 +2081,7 @@ model CatalogProduct {
   productRef           String   @unique @map("product_ref")
   categoryId           String   @map("category_id") @db.Uuid
   name                 String
+  shortDescription     String?  @map("short_description") @db.Text
   packagingDescription String   @map("packaging_description")
   unitsPerPallet       Int      @map("units_per_pallet")
   moqPallets           Int      @default(1) @map("moq_pallets")
@@ -1976,12 +2104,36 @@ model CatalogProduct {
   updatedAt            DateTime @updatedAt @map("updated_at")
 
   category            CatalogCategory        @relation(fields: [categoryId], references: [id])
+  packagingOptions    CatalogPackaging[]
   lines               ContainerLine[]
   supplierAllocations McSupplierAllocation[]
 
   @@index([categoryId, status])
   @@index([status])
   @@map("catalog_products")
+}
+
+model CatalogPackaging {
+  id             String   @id @default(uuid()) @db.Uuid
+  productId      String   @map("product_id") @db.Uuid
+  slug           String
+  name           String
+  unitsPerPallet Int      @map("units_per_pallet")
+  moqPallets     Int      @default(1) @map("moq_pallets")
+  sortOrder      Int      @default(0) @map("sort_order")
+  isDefault      Boolean  @default(false) @map("is_default")
+  status         String   @default("ACTIVE")
+  packingTypeId  String?  @map("packing_type_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  product        CatalogProduct  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  packingType    PackingType?    @relation(fields: [packingTypeId], references: [id])
+  containerLines ContainerLine[]
+
+  @@unique([productId, slug])
+  @@index([productId, status, sortOrder])
+  @@map("catalog_packaging")
 }
 
 model MixedContainerDetails {
@@ -1994,8 +2146,14 @@ model MixedContainerDetails {
   currency             String    @default("USD")
   estValueMin          Decimal?  @map("est_value_min") @db.Decimal(18, 4)
   estValueMax          Decimal?  @map("est_value_max") @db.Decimal(18, 4)
-  pricingRequestedAt   DateTime? @map("pricing_requested_at")
-  buyerNotes           String?   @map("buyer_notes")
+  pricingRequestedAt     DateTime? @map("pricing_requested_at")
+  procurementRequestRef  String?   @unique @map("procurement_request_ref")
+  commercialProposalRef  String?   @unique @map("commercial_proposal_ref")
+  organizationRef        String?   @unique @map("organization_ref")
+  organizationStatus     String?   @map("organization_status")
+  organizationStartedAt  DateTime? @map("organization_started_at")
+  assignedOperationsManagerId String? @map("assigned_operations_manager_id") @db.Uuid
+  buyerNotes             String?   @map("buyer_notes")
   priority             String    @default("NORMAL") @map("priority")
   assignedManagerId    String?   @map("assigned_manager_id") @db.Uuid
   activeOfferId        String?   @map("active_offer_id") @db.Uuid
@@ -2007,7 +2165,75 @@ model MixedContainerDetails {
   activeOffer McContainerOffer? @relation("ActiveOffer", fields: [activeOfferId], references: [id], onDelete: SetNull)
 
   @@index([destinationMarket])
+  @@index([assignedManagerId])
+  @@index([pricingRequestedAt])
+  @@index([organizationStatus])
+  @@index([organizationStartedAt])
   @@map("mixed_container_details")
+}
+
+model McOrganizationStatusHistory {
+  id          String   @id @default(uuid()) @db.Uuid
+  workspaceId String   @map("workspace_id") @db.Uuid
+  fromStatus  String?  @map("from_status")
+  toStatus    String   @map("to_status")
+  actorUserId String?  @map("actor_user_id") @db.Uuid
+  note        String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+  @@map("mc_organization_status_history")
+}
+
+model McOrganizationEvent {
+  id                 String   @id @default(uuid()) @db.Uuid
+  workspaceId        String   @map("workspace_id") @db.Uuid
+  dedupeKey          String   @map("dedupe_key")
+  sourceModule       String   @map("source_module")
+  sourceEventType    String   @map("source_event_type")
+  canonicalEventType String   @map("canonical_event_type")
+  label              String
+  actorUserId        String?  @map("actor_user_id") @db.Uuid
+  payload            Json     @default("{}")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, dedupeKey])
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, sourceModule, createdAt])
+  @@map("mc_organization_events")
+}
+
+model McProcurementStatusHistory {
+  id            String   @id @default(uuid()) @db.Uuid
+  workspaceId   String   @map("workspace_id") @db.Uuid
+  fromStatus    String?  @map("from_status")
+  toStatus      String   @map("to_status")
+  workspaceState String  @map("workspace_state")
+  actorUserId   String?  @map("actor_user_id") @db.Uuid
+  note          String?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+  @@map("mc_procurement_status_history")
+}
+
+model McInternalNote {
+  id          String   @id @default(uuid()) @db.Uuid
+  workspaceId String   @map("workspace_id") @db.Uuid
+  authorId    String   @map("author_id") @db.Uuid
+  body        String   @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+  @@map("mc_internal_notes")
 }
 
 model McProcurementQuote {
@@ -2015,6 +2241,7 @@ model McProcurementQuote {
   workspaceId     String    @map("workspace_id") @db.Uuid
   containerLineId String    @map("container_line_id") @db.Uuid
   supplierCode    String    @map("supplier_code")
+  brand           String?
   exwPrice        Decimal   @map("exw_price") @db.Decimal(18, 4)
   currency        String    @default("USD")
   priceUnit       String    @default("PALLET") @map("price_unit")
@@ -2066,6 +2293,7 @@ model McOfferLine {
   containerLineId String  @map("container_line_id") @db.Uuid
   productRef      String  @map("product_ref")
   productName     String  @map("product_name")
+  brand           String?
   packaging       String
   originCountry   String? @map("origin_country")
   palletCount     Int     @map("pallet_count")
@@ -2101,6 +2329,7 @@ model ContainerLine {
   id                 String    @id @default(uuid()) @db.Uuid
   workspaceId        String    @map("workspace_id") @db.Uuid
   catalogProductId   String    @map("catalog_product_id") @db.Uuid
+  catalogPackagingId String?   @map("catalog_packaging_id") @db.Uuid
   packingTypeId      String    @map("packing_type_id") @db.Uuid
   palletCount        Int       @map("pallet_count")
   sortOrder          Int       @default(0) @map("sort_order")
@@ -2113,6 +2342,7 @@ model ContainerLine {
 
   workspace           Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   catalogProduct      CatalogProduct         @relation(fields: [catalogProductId], references: [id])
+  catalogPackaging    CatalogPackaging?      @relation(fields: [catalogPackagingId], references: [id])
   packingType         PackingType            @relation(fields: [packingTypeId], references: [id])
   procurementQuotes   McProcurementQuote[]
   offerLines          McOfferLine[]

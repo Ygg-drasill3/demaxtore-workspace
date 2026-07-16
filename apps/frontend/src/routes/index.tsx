@@ -82,6 +82,7 @@ const TradeDocumentsListPage = lazy(() => import("@/features/trade-documents/pag
 const GeneralMessagesPage = lazy(() => import("@/features/chat/pages/GeneralMessagesPage"));
 const FreightIqMessagesPage = lazy(() => import("@/features/chat/pages/FreightIqMessagesPage"));
 const AdminConversationsPage = lazy(() => import("@/features/chat/pages/AdminConversationsPage"));
+const WhatsAppInboxPage = lazy(() => import("@/features/whatsapp-inbox/pages/WhatsAppInboxPage"));
 const FreightIqEmbedPage = lazy(() => import("@/features/freightiq/pages/FreightIqEmbedPage"));
 const FreightOpsPage = lazy(() => import("@/features/freightiq/pages/FreightOpsPage"));
 const FreightCommercialPage = lazy(() => import("@/features/freightiq/pages/FreightCommercialPage"));
@@ -163,6 +164,8 @@ export function AppRoutes() {
             <Route path="/admin/freight-ops" element={<LazyPage><FreightRfqIntakePage /></LazyPage>} />
             <Route path="/admin/conversations" element={<LazyPage><AdminConversationsPage /></LazyPage>} />
             <Route path="/admin/conversations/:conversationId" element={<LazyPage><AdminConversationsPage /></LazyPage>} />
+            <Route path="/admin/whatsapp-inbox" element={<LazyPage><WhatsAppInboxPage /></LazyPage>} />
+            <Route path="/admin/whatsapp-inbox/:conversationId" element={<LazyPage><WhatsAppInboxPage /></LazyPage>} />
             <Route path="/operations/freight-intake" element={<LazyPage><FreightRfqIntakePage /></LazyPage>} />
           </Route>
         </Route>
@@ -242,6 +245,8 @@ export function AppRoutes() {
             <Route path="/sales/dashboard" element={<LazyPage><SalesControlDashboardPage /></LazyPage>} />
             <Route path="/sales/rfq" element={<LazyPage><RfqListPage /></LazyPage>} />
             <Route path="/sales/control-tower" element={<LazyPage><ControlTowerDashboardPage /></LazyPage>} />
+            <Route path="/sales/whatsapp" element={<LazyPage><WhatsAppInboxPage /></LazyPage>} />
+            <Route path="/sales/whatsapp/:conversationId" element={<LazyPage><WhatsAppInboxPage /></LazyPage>} />
           </Route>
 
           {/* Admin */}
@@ -272,6 +277,8 @@ export function AppRoutes() {
             <Route path="/admin/mixed-container/allocations" element={<LazyPage><AdminMixedContainerAllocationsPage /></LazyPage>} />
             <Route path="/admin/mixed-container" element={<LazyPage><AdminMixedContainerInboxPage /></LazyPage>} />
             <Route path="/admin/mixed-container/:id" element={<LazyPage><AdminMixedContainerProcurementPage /></LazyPage>} />
+            <Route path="/admin/whatsapp-inbox" element={<LazyPage><WhatsAppInboxPage /></LazyPage>} />
+            <Route path="/admin/whatsapp-inbox/:conversationId" element={<LazyPage><WhatsAppInboxPage /></LazyPage>} />
           </Route>
 
           {/* Shared (all roles) */}

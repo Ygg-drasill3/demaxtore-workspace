@@ -103,6 +103,11 @@ export const SocketEvents = {
   COMMUNICATION_DELETED:           "communication.deleted",
   COMMUNICATION_READ:              "communication.read",
   COMMUNICATION_MENTIONED:         "communication.mentioned",
+  // WhatsApp Inbox
+  WHATSAPP_MESSAGE_NEW:            "whatsapp:message:new",
+  WHATSAPP_MESSAGE_STATUS:         "whatsapp:message:status",
+  WHATSAPP_CONVERSATION_UPDATED:   "whatsapp:conversation:updated",
+  WHATSAPP_CONVERSATION_SUBSCRIBE: "whatsapp:conversation:subscribe",
   // Subscription control
   WORKSPACE_SUBSCRIBE:  "workspace:subscribe",
   WORKSPACE_UNSUBSCRIBE:"workspace:unsubscribe",

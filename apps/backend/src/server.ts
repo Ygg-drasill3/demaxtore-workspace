@@ -5,6 +5,7 @@ import * as Sentry from "@sentry/node";
 import { buildApp } from "./app.js";
 import { env } from "./config/env.js";
 import { logger } from "./config/logger.js";
+import { validateProductionSafetyGates } from "./config/production-safety.js";
 import { initSocket } from "./realtime/socket.js";
 import { pruneExpired } from "./modules/auth/bruteforce.js";
 import { startSlaWorker } from "./modules/messaging/sla-worker.js";
@@ -40,6 +41,8 @@ process.on("uncaughtException", (err) => {
 });
 
 async function main(): Promise<void> {
+  validateProductionSafetyGates();
+
   try {
     await getRedisClient();
     logger.info("✓ Redis connection ok");
@@ -85,6 +88,18 @@ async function main(): Promise<void> {
   server.listen(env.PORT, "0.0.0.0", () => {
     logger.info(`✓ DeMaxtore backend listening on http://0.0.0.0:${env.PORT}`);
   });
+
+  if (env.WHATSAPP_ACCESS_TOKEN && env.WHATSAPP_APP_SECRET) {
+    const { isWhatsAppAppSecretValidForAccessToken } = await import("./modules/chat/whatsapp.service.js");
+    const secretOk = await isWhatsAppAppSecretValidForAccessToken();
+    if (!secretOk) {
+      logger.error(
+        "WHATSAPP_APP_SECRET does not match Meta App Secret for the configured access token — Meta webhook POSTs will be rejected",
+      );
+    } else {
+      logger.info("✓ WhatsApp App Secret validated against Meta (appsecret_proof)");
+    }
+  }
 
   const shutdown = async (signal: string): Promise<void> => {
     logger.info({ signal }, "Graceful shutdown initiated");

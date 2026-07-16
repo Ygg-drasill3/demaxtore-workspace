@@ -38,4 +38,8 @@ export const socketBus = {
   emitToRole(role: Role, event: string, payload: unknown): void {
     io()?.to(`role:${role}`).emit(event, payload);
   },
+
+  emitToRoom(room: string, event: string, payload: unknown): void {
+    io()?.to(room).emit(event, payload);
+  },
 };

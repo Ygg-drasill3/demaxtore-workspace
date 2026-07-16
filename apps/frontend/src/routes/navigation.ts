@@ -182,6 +182,7 @@ export const ADMIN_NAV_GROUPS: NavGroup[] = [
       { to: "/admin/commoditybid", label: "Commodity Bids", icon: Workflow,        testId: "admin-commoditybid" },
       { to: "/admin/freightiq",         label: "FreightIQ", icon: Route, testId: "admin-freightiq" },
       { to: "/admin/conversations",     label: "All Conversations", icon: MessageSquare, testId: "admin-conversations" },
+      { to: "/admin/whatsapp-inbox",    label: "WhatsApp Inbox",    icon: MessageSquare, testId: "admin-whatsapp-inbox" },
       { to: "/operations/freight-intake", label: "Freight operations (ops)", icon: Route, testId: "admin-freight-intake" },
       { to: "/admin/orders",       label: "Orders",         icon: Package,         testId: "admin-orders" },
       { to: "/admin/mixed-container", label: "Mixed Containers", icon: Container, testId: "admin-mixed-container" },
