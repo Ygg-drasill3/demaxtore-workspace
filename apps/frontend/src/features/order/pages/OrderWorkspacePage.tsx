@@ -11,6 +11,7 @@ import { api } from "@/lib/api";
 import { freightiqApi } from "@/features/freightiq/lib/freightiq.api";
 import { toast } from "@/store/toast.store";
 import PoSummaryPanel from "@/features/purchase-order/components/PoSummaryPanel";
+import { OnlinePaymentDisabledNotice } from "@/features/payments/components/OnlinePaymentDisabledNotice";
 import ConversationHubPanel from "@/features/conversation-hub/components/ConversationHubPanel";
 import { SocketEvents } from "@dmx/contracts/socket-events";
 import { useWorkspaceSocket } from "@/lib/socket";
@@ -358,6 +359,11 @@ export default function OrderWorkspacePage() {
       />
 
       <PoSummaryPanel orderId={id!} />
+
+      <section data-testid="order-payment-section" className="dmx-card p-4 space-y-2">
+        <h2 className="font-medium text-sm">{t("order.payment.title", "Payment milestones")}</h2>
+        <OnlinePaymentDisabledNotice />
+      </section>
 
       <ConversationHubPanel workspaceType="ORDER" workspaceId={id!} testId="order-communication" />
 

@@ -15,6 +15,8 @@ export const CreateMessagePayload = z.object({
   parentMessageId: z.string().uuid().optional(),
   mentionedUserIds: z.array(z.string().uuid()).optional(),
   attachmentIds: z.array(z.string().uuid()).optional(),
+  /** Per-send client id for idempotent message creation (scoped to sender + conversation). */
+  clientMessageId: z.string().uuid().optional(),
 });
 export type CreateMessagePayload = z.infer<typeof CreateMessagePayload>;
 

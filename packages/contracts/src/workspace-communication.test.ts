@@ -19,4 +19,13 @@ describe("workspace-communication zod", () => {
     const q = MessageSearchQuerySchema.parse({ mentionedMe: true, limit: 10 });
     expect(q.mentionedMe).toBe(true);
   });
+
+  it("accepts optional clientMessageId for idempotent sends (MSG-001)", () => {
+    const id = "22222222-2222-4222-8222-222222222222";
+    const p = CreateMessagePayload.parse({
+      body: "Once",
+      clientMessageId: id,
+    });
+    expect(p.clientMessageId).toBe(id);
+  });
 });

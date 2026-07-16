@@ -8,6 +8,7 @@ export const CreateMessagePayload = z.object({
     parentMessageId: z.string().uuid().optional(),
     mentionedUserIds: z.array(z.string().uuid()).optional(),
     attachmentIds: z.array(z.string().uuid()).optional(),
+    clientMessageId: z.string().uuid().optional(),
 });
 export const EditMessagePayload = z.object({
     messageId: z.string().uuid(),

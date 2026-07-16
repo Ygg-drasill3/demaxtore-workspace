@@ -39,8 +39,17 @@ export const conversationHubApi = {
       parentMessageId?: string;
       attachmentIds?: string[];
       mentionedUserIds?: string[];
+      clientMessageId?: string;
     },
-  ) => api.post<ConversationHub>(`${base(type, id)}/timeline`, body).then((r) => r.data),
+    options?: { idempotencyKey?: string },
+  ) =>
+    api
+      .post<ConversationHub>(`${base(type, id)}/timeline`, body, {
+        headers: options?.idempotencyKey
+          ? { "Idempotency-Key": options.idempotencyKey }
+          : undefined,
+      })
+      .then((r) => r.data),
 
   markDelivered: (type: CommWorkspaceType, id: string, messageId: string) =>
     api.post(`${base(type, id)}/timeline/delivered`, { messageId }),

@@ -1703,6 +1703,7 @@ model WorkspaceMessage {
   status          String    @default("ACTIVE")
   channelSource   String    @default("WORKSPACE") @map("channel_source")
   systemEventKey  String?   @map("system_event_key")
+  clientMessageId String?   @map("client_message_id") @db.Uuid
   metadata        Json      @default("{}")
   parentMessageId String?   @map("parent_message_id") @db.Uuid
   editedAt        DateTime? @map("edited_at")
@@ -1715,6 +1716,7 @@ model WorkspaceMessage {
   attachments  WorkspaceMessageAttachment[]
 
   @@unique([conversationId, systemEventKey])
+  @@unique([conversationId, authorUserId, clientMessageId])
   @@index([conversationId, createdAt])
   @@index([messageType, createdAt])
   @@map("workspace_messages")

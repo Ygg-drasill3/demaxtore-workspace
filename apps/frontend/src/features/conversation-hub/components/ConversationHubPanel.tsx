@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Send, Paperclip, Search, LayoutList, Gavel, FolderOpen, ListTree } from "lucide-react";
 import type { CommWorkspaceType } from "@dmx/contracts/workspace-communication";
@@ -9,8 +9,7 @@ import type { HubSection, TimelineFilter } from "../lib/conversation-hub.types";
 import { ROLE_MENTION_TOKENS, TYPE_LABELS, filterTimeline } from "../lib/conversation-hub.utils";
 import { useAuth } from "@/store/auth.store";
 import { toast } from "@/store/toast.store";
-import { useWorkspaceSocket } from "@/lib/socket";
-import AiMemoryPlaceholder from "./AiMemoryPlaceholder";
+import { useWorkspaceSocket, getSocket } from "@/lib/socket";
 import ConversationHubHeader from "./ConversationHubHeader";
 import ConversationSummaryCard from "./ConversationSummaryCard";
 import ActionCenter from "./ActionCenter";
@@ -65,6 +64,10 @@ export default function ConversationHubPanel({
   const [activeFilter, setActiveFilter] = useState<TimelineFilter>("all");
   const [activeSection, setActiveSection] = useState<HubSection>("timeline");
   const [highlightId, setHighlightId] = useState<string | null>(null);
+  const [isSending, setIsSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const sendInFlight = useRef(false);
+  const pendingClientMessageId = useRef<string | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["conversation-hub", workspaceType, workspaceId],
@@ -111,6 +114,18 @@ export default function ConversationHubPanel({
     [SocketEvents.COMMUNICATION_READ]: refresh,
     [SocketEvents.COMMUNICATION_MENTIONED]: refresh,
   });
+
+  // Refetch timeline after Socket.io reconnect so messages sent while offline appear once.
+  useEffect(() => {
+    const sock = getSocket();
+    const onReconnect = () => {
+      refresh();
+    };
+    sock.io.on("reconnect", onReconnect);
+    return () => {
+      sock.io.off("reconnect", onReconnect);
+    };
+  }, [refresh]);
 
   const pinnedIds = useMemo(() => new Set((data?.pinnedItems ?? []).map((p) => p.id)), [data?.pinnedItems]);
 
@@ -167,13 +182,34 @@ export default function ConversationHubPanel({
   const send = async () => {
     const body = draft.trim();
     if (!body && pendingAttachmentIds.length === 0) return;
+    if (sendInFlight.current) return;
+
+    sendInFlight.current = true;
+    setIsSending(true);
+    setSendError(null);
+
+    const clientMessageId = pendingClientMessageId.current ?? crypto.randomUUID();
+    pendingClientMessageId.current = clientMessageId;
+
+    const savedDraft = draft;
+    const savedAttachments = [...pendingAttachmentIds];
+    const savedItemType = itemType;
+    const savedVisibility = visibility;
+
     try {
-      await conversationHubApi.createItem(workspaceType, workspaceId, {
-        body: body || "(attachment)",
-        itemType: pendingAttachmentIds.length && itemType === "MESSAGE" ? "DOCUMENT" : itemType,
-        visibility,
-        attachmentIds: pendingAttachmentIds.length ? pendingAttachmentIds : undefined,
-      });
+      await conversationHubApi.createItem(
+        workspaceType,
+        workspaceId,
+        {
+          body: body || "(attachment)",
+          itemType: pendingAttachmentIds.length && itemType === "MESSAGE" ? "DOCUMENT" : itemType,
+          visibility,
+          attachmentIds: pendingAttachmentIds.length ? pendingAttachmentIds : undefined,
+          clientMessageId,
+        },
+        { idempotencyKey: clientMessageId },
+      );
+      pendingClientMessageId.current = null;
       setDraft("");
       setPendingAttachmentIds([]);
       setItemType("MESSAGE");
@@ -181,7 +217,22 @@ export default function ConversationHubPanel({
       refresh();
       toast.success("Timeline entry added");
     } catch {
+      setDraft(savedDraft);
+      setPendingAttachmentIds(savedAttachments);
+      setItemType(savedItemType);
+      setVisibility(savedVisibility);
+      setSendError("Failed to send message. Your text was preserved — try again.");
       toast.error("Failed to add timeline entry");
+    } finally {
+      sendInFlight.current = false;
+      setIsSending(false);
+    }
+  };
+
+  const onComposerKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      void send();
     }
   };
 
@@ -222,10 +273,6 @@ export default function ConversationHubPanel({
   return (
     <div data-testid={testId} className="dmx-card flex flex-col min-h-[520px] overflow-hidden">
       {data?.header && <ConversationHubHeader header={data.header} />}
-
-      <div className="px-4 pt-4">
-        <AiMemoryPlaceholder />
-      </div>
 
       {data?.summary && <ConversationSummaryCard summary={data.summary} />}
 
@@ -402,15 +449,26 @@ export default function ConversationHubPanel({
           className="w-full text-sm border rounded px-2 py-2 min-h-[72px] bg-white"
           placeholder="Describe the decision, question, or update… Use @Buyer @Supplier @DeMaxtore"
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            if (sendError) setSendError(null);
+          }}
+          onKeyDown={onComposerKeyDown}
+          disabled={isSending}
         />
+        {sendError && (
+          <p className="text-sm text-red-600" data-testid="hub-send-error" role="alert">
+            {sendError}
+          </p>
+        )}
         <button
           type="button"
           data-testid="hub-send"
-          className="dmx-btn-primary text-sm inline-flex items-center gap-2"
+          className="dmx-btn-primary text-sm inline-flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+          disabled={isSending || (!draft.trim() && pendingAttachmentIds.length === 0)}
           onClick={() => void send()}
         >
-          <Send className="h-3 w-3" /> Add to timeline
+          <Send className="h-3 w-3" /> {isSending ? "Sending…" : "Add to timeline"}
         </button>
       </footer>
       <input ref={fileRef} type="file" className="hidden" onChange={(e) => void onFile(e.target.files)} />

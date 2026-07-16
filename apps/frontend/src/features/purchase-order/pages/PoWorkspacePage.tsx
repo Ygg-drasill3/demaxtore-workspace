@@ -10,6 +10,7 @@ import { SocketEvents } from "@dmx/contracts/socket-events";
 import { useWorkspaceSocket } from "@/lib/socket";
 import { useSingleFlight } from "@/lib/useSingleFlight";
 import TradeDocumentsTab from "@/features/trade-documents/components/TradeDocumentsTab";
+import { OnlinePaymentDisabledNotice } from "@/features/payments/components/OnlinePaymentDisabledNotice";
 import ConversationHubPanel from "@/features/conversation-hub/components/ConversationHubPanel";
 
 export default function PoWorkspacePage() {
@@ -88,6 +89,9 @@ export default function PoWorkspacePage() {
           <span>Currency: {po.currency}</span>
           <span>Incoterm: {po.incoterm ?? "—"}</span>
           <span>Payment: {po.paymentTerms ?? "—"}</span>
+        </div>
+        <div data-testid="po-payment-notice" className="pt-2">
+          <OnlinePaymentDisabledNotice />
         </div>
         <div className="flex flex-wrap items-center gap-3 pt-2">
           <Link

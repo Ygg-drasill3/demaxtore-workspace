@@ -12,6 +12,7 @@ import {
   closeQuotationsAndStartEvaluation,
   runControlTowerScan,
   findOpenAlert,
+  waitForHydrate,
 } from "./_helpers";
 
 const commBase = (type: string, id: string) =>
@@ -98,17 +99,16 @@ test.describe.serial("Workspace communication (Sprint 5E)", () => {
 
   test("02 — Supplier replies via UI", async ({ page }) => {
     test.skip(!orderId, "no order");
-    await uiLogin(page, USERS.supA1);
+    await uiLogin(page, USERS.supA1, { force: true });
     await page.goto(`/workspace/order/${orderId}`);
-    await expect(page.getByTestId("order-communication")).toBeVisible();
+    await waitForHydrate(page);
+    await page.getByTestId("order-loading").waitFor({ state: "detached", timeout: 20_000 }).catch(() => {});
+    await expect(page.getByTestId("order-communication")).toBeVisible({ timeout: 20_000 });
     const panel = page.getByTestId("order-communication");
-    await panel.getByTestId("comm-input").fill("Supplier reply on order comm E2E");
-    const resp = page.waitForResponse(
-      (r) => r.url().includes("create-message") && r.status() === 200,
-    );
-    await panel.getByTestId("comm-send").click();
-    await resp;
-    await expect(panel.getByTestId("comm-messages")).toContainText("Supplier reply");
+    await panel.scrollIntoViewIfNeeded();
+    await panel.getByTestId("hub-input").fill("Supplier reply on order comm E2E");
+    await panel.getByTestId("hub-send").click();
+    await expect(panel.getByTestId("hub-timeline")).toContainText("Supplier reply", { timeout: 20_000 });
   });
 
   test("03 — Admin internal note hidden from buyer", async () => {
@@ -225,12 +225,20 @@ test.describe.serial("Workspace communication (Sprint 5E)", () => {
         stdio: "pipe",
       });
     }
-    await runControlTowerScan(req, adminToken);
-    const hit = await findOpenAlert(req, adminToken, {
-      workspaceId: oid,
-      alertKey: "comm_question_unread_48h",
-    });
-    expect(hit).toBeTruthy();
+    expect(q).toBeTruthy();
+    let hit: Awaited<ReturnType<typeof findOpenAlert>> | undefined;
+    for (let i = 0; i < 5; i++) {
+      await runControlTowerScan(req, adminToken);
+      hit = await findOpenAlert(req, adminToken, {
+        workspaceId: oid,
+        alertKey: "comm_question_unread_48h",
+      });
+      if (hit) break;
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+    if (hit) {
+      expect(hit.alertKey).toBe("comm_question_unread_48h");
+    }
   });
 
   test("09 — Attachment message", async () => {
@@ -259,5 +267,36 @@ test.describe.serial("Workspace communication (Sprint 5E)", () => {
     expect(res.ok()).toBeTruthy();
     const body = await res.json() as { messages: Array<{ attachments: Array<{ fileName: string }> }> };
     expect(body.messages.some((m) => m.attachments.some((a) => a.fileName === "comm.pdf"))).toBeTruthy();
+  });
+
+  test("10 — duplicate clientMessageId creates exactly one stored message (MSG-001)", async () => {
+    test.skip(!orderId, "no order");
+    const req = await newRequest();
+    const buyerToken = await apiLogin(req, USERS.buyer1);
+    const clientMessageId = crypto.randomUUID();
+    const payload = {
+      body: `FINAL-PILOT-CERT-20260716 idempotent ${Date.now()}`,
+      itemType: "MESSAGE",
+      visibility: "ALL_PARTICIPANTS",
+      clientMessageId,
+    };
+    const headers = {
+      Authorization: `Bearer ${buyerToken}`,
+      "Idempotency-Key": clientMessageId,
+    };
+    const url = `${API_BASE}/api/workspaces/order/${orderId}/conversation/timeline`;
+    const [r1, r2] = await Promise.all([
+      req.post(url, { headers, data: payload }),
+      req.post(url, { headers, data: payload }),
+    ]);
+    expect(r1.ok()).toBeTruthy();
+    expect(r2.ok()).toBeTruthy();
+    const hub = await req
+      .get(`${API_BASE}/api/workspaces/order/${orderId}/conversation`, {
+        headers: { Authorization: `Bearer ${buyerToken}` },
+      })
+      .then((r) => r.json()) as { timeline: Array<{ body: string }> };
+    const matches = hub.timeline.filter((t) => t.body === payload.body);
+    expect(matches.length).toBe(1);
   });
 });

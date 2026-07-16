@@ -3,6 +3,11 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import type { CreatePaymentIntentPayload } from "@dmx/contracts/payments";
 import type { PaymentPlanDto } from "@dmx/contracts/payment-milestones";
+import { OnlinePaymentDisabledNotice } from "@/features/payments/components/OnlinePaymentDisabledNotice";
+import { usePaymentCapabilities } from "@/features/payments/hooks/usePaymentCapabilities";
+
+export { usePaymentCapabilities };
+export type { PaymentCapabilities } from "@/features/payments/hooks/usePaymentCapabilities";
 
 export function usePaymentPlan(orderId: string | undefined) {
   return useQuery({
@@ -25,6 +30,7 @@ export function useCreatePaymentIntent(orderId: string | undefined) {
 }
 
 export function TradeFinancialPanel({ orderId }: { orderId: string }) {
+  const { data: caps } = usePaymentCapabilities();
   const { data, isLoading, isError, refetch } = usePaymentPlan(orderId);
   const createIntent = useCreatePaymentIntent(orderId);
 
@@ -46,6 +52,8 @@ export function TradeFinancialPanel({ orderId }: { orderId: string }) {
   }
 
   const pendingMilestone = data.milestones.find((m) => m.status !== "SATISFIED");
+  const intentEnabled = caps?.paymentIntentApiEnabled === true;
+  const milestoneAmount = pendingMilestone?.amount != null ? Number(pendingMilestone.amount) : null;
 
   return (
     <div data-testid="trade-financial-panel" className="space-y-4">
@@ -64,24 +72,31 @@ export function TradeFinancialPanel({ orderId }: { orderId: string }) {
       {data.holds.length > 0 && (
         <p className="text-xs text-amber-700">Active holds: {data.holds.map((h) => h.reason).join(", ")}</p>
       )}
-      {pendingMilestone && (
+      <OnlinePaymentDisabledNotice />
+      {pendingMilestone && intentEnabled && (
         <div className="border-t border-paper-200 pt-3 space-y-2">
           <p className="text-xs text-zinc-500">Create a payment intent for the next milestone.</p>
-          <Button
-            data-testid="create-payment-intent"
-            size="sm"
-            loading={createIntent.isPending}
-            disabled={createIntent.isSuccess}
-            onClick={() =>
-              void createIntent.mutate({
-                amount: Number(pendingMilestone.amount ?? 1),
-                currency: "USD",
-                description: `Milestone: ${pendingMilestone.kind}`,
-              })
-            }
-          >
-            {createIntent.isSuccess ? "Intent created" : "Create payment intent"}
-          </Button>
+          {milestoneAmount == null || milestoneAmount <= 0 ? (
+            <p className="text-xs text-amber-700" data-testid="payment-milestone-amount-missing">
+              Set a milestone amount before creating a payment intent.
+            </p>
+          ) : (
+            <Button
+              data-testid="create-payment-intent"
+              size="sm"
+              loading={createIntent.isPending}
+              disabled={createIntent.isSuccess}
+              onClick={() =>
+                void createIntent.mutate({
+                  amount: milestoneAmount,
+                  currency: (pendingMilestone.currency as "USD" | "EUR" | "GBP") ?? "USD",
+                  description: `Milestone: ${pendingMilestone.kind}`,
+                })
+              }
+            >
+              {createIntent.isSuccess ? "Intent created" : "Create payment intent"}
+            </Button>
+          )}
           {createIntent.isError && (
             <p className="text-xs text-red-600">Failed to create intent. <button type="button" className="underline" onClick={() => createIntent.reset()}>Retry</button></p>
           )}

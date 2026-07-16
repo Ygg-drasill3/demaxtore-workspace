@@ -238,19 +238,33 @@ export class CommunicationService {
       await buildVisibilityContext(this.db, resolved),
     );
 
-    const messageId = await this.db.$transaction(async (tx) => {
-      const conv = await this.ensureConversationTx(tx, resolved);
-      const msg = await tx.workspaceMessage.create({
-        data: {
-          conversationId: conv.id,
-          authorUserId: actor.id,
-          messageType: input.messageType,
-          visibility: input.visibility,
-          body: input.body.trim(),
-          parentMessageId: input.parentMessageId ?? null,
-          status: "ACTIVE",
-        },
-      });
+    if (input.clientMessageId) {
+      const existingId = await this.findClientMessage(
+        resolved,
+        actor.id,
+        input.clientMessageId,
+      );
+      if (existingId) return;
+    }
+
+    let messageId: string;
+    let isReplay = false;
+
+    try {
+      messageId = await this.db.$transaction(async (tx) => {
+        const conv = await this.ensureConversationTx(tx, resolved);
+        const msg = await tx.workspaceMessage.create({
+          data: {
+            conversationId: conv.id,
+            authorUserId: actor.id,
+            messageType: input.messageType,
+            visibility: input.visibility,
+            body: input.body.trim(),
+            parentMessageId: input.parentMessageId ?? null,
+            clientMessageId: input.clientMessageId ?? null,
+            status: "ACTIVE",
+          },
+        });
 
       if (mentionIds.length) {
         await tx.workspaceMention.createMany({
@@ -349,6 +363,29 @@ export class CommunicationService {
 
       return msg.id;
     });
+    } catch (e) {
+      const prismaCode =
+        e && typeof e === "object" && "code" in e
+          ? String((e as { code: unknown }).code)
+          : "";
+      if (input.clientMessageId && prismaCode === "P2002") {
+        const existingId = await this.findClientMessage(
+          resolved,
+          actor.id,
+          input.clientMessageId,
+        );
+        if (existingId) {
+          messageId = existingId;
+          isReplay = true;
+        } else {
+          throw e;
+        }
+      } else {
+        throw e;
+      }
+    }
+
+    if (isReplay) return;
 
     socketBus.scheduleEmit(() => {
       socketBus.emitToWorkspace(resolved.auditWorkspaceId, SocketEvents.COMMUNICATION_CREATED, {
@@ -486,6 +523,34 @@ export class CommunicationService {
       throw new AppError(403, "FORBIDDEN_VISIBILITY");
     }
     return msg;
+  }
+
+  private async findClientMessage(
+    resolved: ResolvedWorkspace,
+    authorUserId: string,
+    clientMessageId: string,
+  ): Promise<string | null> {
+    const conv = await this.db.workspaceConversation.findUnique({
+      where: {
+        workspaceType_workspaceId: {
+          workspaceType: resolved.workspaceType,
+          workspaceId: resolved.workspaceId,
+        },
+      },
+      select: { id: true },
+    });
+    if (!conv) return null;
+
+    const existing = await this.db.workspaceMessage.findFirst({
+      where: {
+        conversationId: conv.id,
+        authorUserId,
+        clientMessageId,
+        status: { not: "DELETED" },
+      },
+      select: { id: true },
+    });
+    return existing?.id ?? null;
   }
 
   private async ensureConversation(resolved: ResolvedWorkspace) {

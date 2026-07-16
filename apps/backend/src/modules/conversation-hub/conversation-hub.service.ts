@@ -194,6 +194,7 @@ export class ConversationHubService {
         parentMessageId: input.parentMessageId,
         attachmentIds: input.attachmentIds,
         mentionedUserIds: input.mentionedUserIds,
+        clientMessageId: input.clientMessageId,
       },
     );
 
