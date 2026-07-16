@@ -3,7 +3,7 @@
 **Date:** 2026-07-16  
 **Status:** ATTACHMENTS CERTIFIED FOR CONTROLLED PILOT  
 **Previous production commit:** `a4604ab`  
-**New production commit:** _(see Production section after deploy)_  
+**New production commit:** `2331cf5`  
 **Certification branch:** `snapshot/pre-pilot-20260714`  
 **Test prefix:** `ATTACHMENT-CERT-20260716` / `FINAL-MCP-CERT-20260716`
 
