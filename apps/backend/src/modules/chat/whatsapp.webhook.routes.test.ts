@@ -14,9 +14,7 @@ vi.mock("../../config/env.js", () => ({
   env: {
     get WHATSAPP_VERIFY_TOKEN() { return h.verifyToken; },
     get WHATSAPP_APP_SECRET() { return h.appSecret; },
-    WHATSAPP_API_VERSION: "v25.0",
   },
-  isProd: false,
 }));
 
 vi.mock("../../db/prisma.js", () => ({ prisma: {} }));
@@ -100,17 +98,6 @@ describe("whatsapp webhook routes — inbox integration", () => {
     expect(h.processWebhookPayload).toHaveBeenCalled();
   });
 
-  it("returns 403 for invalid signature", async () => {
-    const payload = "{}";
-    const res = await request(makeApp())
-      .post("/api/webhooks/whatsapp")
-      .set("content-type", "application/json")
-      .set("x-hub-signature-256", "sha256=" + "a".repeat(64))
-      .send(payload);
-    expect(res.status).toBe(403);
-    expect(res.body.error).toBe("WHATSAPP_SIGNATURE_INVALID");
-  });
-
   it("returns 401 for missing signature", async () => {
     const payload = "{}";
     const res = await request(makeApp())
@@ -119,6 +106,17 @@ describe("whatsapp webhook routes — inbox integration", () => {
       .send(payload);
     expect(res.status).toBe(401);
     expect(res.body.error).toBe("WHATSAPP_SIGNATURE_MISSING");
+  });
+
+  it("returns 403 for invalid signature", async () => {
+    const payload = "{}";
+    const res = await request(makeApp())
+      .post("/api/webhooks/whatsapp")
+      .set("content-type", "application/json")
+      .set("x-hub-signature-256", `sha256=${"b".repeat(64)}`)
+      .send(payload);
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe("WHATSAPP_SIGNATURE_INVALID");
   });
   });
 });

@@ -1,11 +1,10 @@
+import crypto from "node:crypto";
 import { describe, it, expect, vi } from "vitest";
-
-import { createHmac } from "node:crypto";
 
 vi.mock("../../config/env.js", () => ({
   env: {
     WHATSAPP_VERIFY_TOKEN: "demaxtore_whatsapp_2026",
-    WHATSAPP_APP_SECRET: "test-secret",
+    WHATSAPP_APP_SECRET: "test-whatsapp-app-secret-min-32-chars",
     WHATSAPP_API_VERSION: "v25.0",
     WHATSAPP_ACCESS_TOKEN: undefined,
     WHATSAPP_PHONE_NUMBER_ID: undefined,
@@ -15,7 +14,16 @@ vi.mock("../../config/env.js", () => ({
   isProd: false,
 }));
 
-import { normalizePhone, parseInboundWebhook, verifySubscription, validateWebhookSignature } from "./whatsapp.service.js";
+import {
+  normalizePhone,
+  parseInboundWebhook,
+  validateWebhookSignature,
+  verifySubscription,
+} from "./whatsapp.service.js";
+
+function sign(body: string, secret: string) {
+  return `sha256=${crypto.createHmac("sha256", secret).update(body).digest("hex")}`;
+}
 
 describe("whatsapp.service", () => {
   describe("normalizePhone", () => {
@@ -53,38 +61,46 @@ describe("whatsapp.service", () => {
   });
 
   describe("validateWebhookSignature", () => {
-    const secret = "test-secret";
-    const body = Buffer.from('{"object":"whatsapp_business_account"}');
-    const sign = (buf: Buffer) =>
-      `sha256=${createHmac("sha256", secret).update(buf).digest("hex")}`;
+    const secret = "test-whatsapp-app-secret-min-32-chars";
+    const payload = Buffer.from(JSON.stringify({ object: "whatsapp_business_account" }));
 
     it("accepts valid signature", () => {
-      expect(validateWebhookSignature(body, sign(body)).ok).toBe(true);
+      expect(validateWebhookSignature(payload, sign(payload.toString(), secret))).toEqual({ ok: true });
     });
 
     it("rejects missing signature", () => {
-      expect(validateWebhookSignature(body, undefined)).toEqual({
+      expect(validateWebhookSignature(payload, undefined)).toEqual({
         ok: false,
         reason: "WHATSAPP_SIGNATURE_MISSING",
       });
     });
 
-    it("rejects malformed signature", () => {
-      expect(validateWebhookSignature(body, "sha256=not-hex")).toEqual({
+    it("rejects malformed signature prefix", () => {
+      expect(validateWebhookSignature(payload, "sha1=deadbeef")).toEqual({
         ok: false,
         reason: "WHATSAPP_SIGNATURE_MALFORMED",
       });
     });
 
     it("rejects invalid signature", () => {
-      expect(validateWebhookSignature(body, sign(Buffer.from("{}")))).toEqual({
+      const bad = `sha256=${"a".repeat(64)}`;
+      expect(validateWebhookSignature(payload, bad)).toEqual({
+        ok: false,
+        reason: "WHATSAPP_SIGNATURE_INVALID",
+      });
+    });
+
+    it("rejects modified body", () => {
+      const sig = sign(payload.toString(), secret);
+      const tampered = Buffer.from(payload.toString() + " ");
+      expect(validateWebhookSignature(tampered, sig)).toEqual({
         ok: false,
         reason: "WHATSAPP_SIGNATURE_INVALID",
       });
     });
 
     it("rejects missing raw body", () => {
-      expect(validateWebhookSignature(undefined, sign(body))).toEqual({
+      expect(validateWebhookSignature(undefined, sign("{}", secret))).toEqual({
         ok: false,
         reason: "WHATSAPP_RAW_BODY_MISSING",
       });
