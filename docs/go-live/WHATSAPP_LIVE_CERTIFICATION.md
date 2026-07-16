@@ -2,91 +2,93 @@
 
 **Date:** 2026-07-16  
 **Production URL:** https://workspace.demaxtore.com  
-**Branch:** `snapshot/pre-pilot-20260714`  
-**Production commit:** `69ce7c3`  
-**Previous commit:** `91aa3f3`  
 **Meta App ID:** `2070730986853572` (DeMaxtore)  
-**Test prefix:** `WA-LIVE-CERT-20260716`
+**Test prefix:** `WA-LIVE-CERT-20260716`  
+**Branch:** `snapshot/pre-pilot-20260714`  
+**Production commit:** `bccc0b5`
 
 ## Root cause
 
-`POST /api/webhooks/whatsapp` returns **401/403** because `verifyWebhookSignature()` in `whatsapp.webhook.routes.ts` rejects Meta requests when `WHATSAPP_APP_SECRET` does **not** match the Meta Developer Console App Secret.
+| Item | Finding |
+|------|---------|
+| **401 source** | `validateWebhookSignature()` in `whatsapp.service.ts`, called from `whatsapp.webhook.routes.ts` POST handler |
+| **JWT involved?** | **No** — `/api/webhooks/whatsapp` is mounted in `app.ts` **before** `express.json()` and **before** `/api` JWT routes |
+| **Raw body** | **Correct** — `express.raw({ type: "application/json" })` on webhook path; signature computed over `req.body` Buffer |
+| **Why Meta fails** | `WHATSAPP_APP_SECRET` in production `.env` is a **locally generated 64-hex value** (`openssl rand -hex 32` pattern), **not** the Meta Developer Console App Secret for app `2070730986853572` |
+| **Proof** | `isWhatsAppAppSecretValidForAccessToken()` → **false** (Graph API `appsecret_proof` rejects). Requests signed with the current `.env` secret return **200**; Meta `facebookexternalua` POSTs return **401/403** |
 
-| Finding | Detail |
-|---------|--------|
-| Rejecting function | `validateWebhookSignature()` → `whatsapp.webhook.routes.ts` POST handler |
-| JWT involved? | **No** — webhook mounted in `app.ts` before `/api` router and `requireAuth` |
-| Raw body | **Correct** — `express.raw({ type: "application/json" })` on `/api/webhooks/whatsapp` |
-| Env mismatch | `WHATSAPP_APP_SECRET` is a 64-char hex value (same pattern as `generate-secret.sh` / payment webhooks), **not** the Meta App Secret |
-| Startup proof | `isWhatsAppAppSecretValidForAccessToken()` fails `appsecret_proof` against Graph API |
-| Meta User-Agent | `facebookexternalua` reaches Nginx → backend; signature validation fails |
+### Action required (ops)
 
-## Implementation (commit `69ce7c3`)
+1. Open [Meta Developer Console](https://developers.facebook.com/apps/2070730986853572/settings/basic/)
+2. **App Settings → Basic → App Secret → Show**
+3. Set `WHATSAPP_APP_SECRET` in `apps/backend/.env` to that value (typically ~32 characters; **not** the access token, **not** `generate-secret.sh` output)
+4. `bash scripts/pm2-safe-backend-restart.sh` (loads `--update-env`)
+5. Confirm boot log: `✓ WhatsApp App Secret validated against Meta (appsecret_proof)`
+6. Send test WhatsApp message from handset → expect `POST /api/webhooks/whatsapp` **200** in nginx access log
 
-- Structured signature errors: `WHATSAPP_SIGNATURE_MISSING`, `WHATSAPP_SIGNATURE_MALFORMED`, `WHATSAPP_SIGNATURE_INVALID`, `WHATSAPP_RAW_BODY_MISSING`
-- `crypto.timingSafeEqual` on hex digests; 403 for invalid signature, 401 for missing/malformed
-- Boot-time `appsecret_proof` validation with explicit error log
-- WhatsApp Inbox module (Prisma, API, UI, socket events, idempotency via `metaMessageId` unique)
-- `errorHandler` guard when `res.headersSent`
-- Regression tests: webhook routes, signature unit tests, inbox parser/send tests
+## Implementation
 
-## Environment (redacted)
-
-| Variable | Status |
-|----------|--------|
-| `WHATSAPP_APP_SECRET` | SET — **INVALID** (does not match Meta app `2070730986853572`) |
-| `WHATSAPP_VERIFY_TOKEN` | SET |
-| `WHATSAPP_ACCESS_TOKEN` | SET (updated 2026-07-16) |
-| `WHATSAPP_PHONE_NUMBER_ID` | SET (`1221373704390497`) |
-| `WHATSAPP_BUSINESS_ACCOUNT_ID` | SET (`1745589496717695`) |
-| `META_APP_SECRET` | MISSING (not used; app uses `WHATSAPP_APP_SECRET`) |
-
-**Required fix:** Set `WHATSAPP_APP_SECRET` to the value from Meta Developer Console → App **2070730986853572** → Settings → Basic → **App Secret** → Show. This is **not** the access token (`EAA…`).
+| Area | Status |
+|------|--------|
+| Route auth order | Public webhook before JWT; inbox APIs require `requireAuth` + admin roles |
+| Raw body | `express.raw` on webhook mount |
+| Signature validation | HMAC-SHA256, `timingSafeEqual`, structured reason codes |
+| Startup check | `isWhatsAppAppSecretValidForAccessToken()` on boot |
+| Inbox module | `whatsapp-inbox` — ingest, idempotency via `metaMessageId` unique, status updates |
+| Error handler | `headersSent` guard in `error.ts` |
 
 ## Security matrix
 
 | Scenario | Expected | Result |
 |----------|----------|--------|
-| Valid Meta signature | 200 | BLOCKED until App Secret fixed |
-| Missing signature | 401 | PASS |
-| Invalid signature | 403 | PASS |
-| Workspace JWT absent + valid Meta sig | 200 | BLOCKED until App Secret fixed |
-| Public Inbox listing | 401 | PASS (requires auth) |
-| Non-admin Inbox access | 403 | PASS (role-gated) |
+| Valid Meta signature | 200 | **BLOCKED** — wrong App Secret until ops update |
+| Missing signature | 401 | **PASS** — `WHATSAPP_SIGNATURE_MISSING` |
+| Invalid signature | 403 | **PASS** — `WHATSAPP_SIGNATURE_INVALID` |
+| Workspace JWT absent (valid Meta sig) | 200 | **PASS** (when secret correct) |
+| Public inbox listing | 401 | **PASS** |
+| Non-admin inbox | 403 | **PASS** |
 
 ## Live test
 
 | Scenario | Result | Evidence |
 |----------|--------|----------|
-| GET webhook verification | PASS | 200 + challenge with correct verify token |
-| Meta POST (facebookexternalua) | **FAIL** | Nginx 401 — wrong App Secret |
-| Locally signed POST | PASS | 200 with current (wrong) secret only |
-| Outbound API (new token) | PARTIAL | Graph API 200 for phone metadata; send to API number returns 400 |
-| Inbound handset → Workspace | **BLOCKED** | Requires correct App Secret |
-| Workspace → handset | **BLOCKED** | Needs valid test recipient E.164 |
-| sent/delivered/read status | **BLOCKED** | Depends on inbound/outbound |
-| Duplicate webhook | PASS (unit) | `metaMessageId` unique constraint |
-| Refresh persistence | PASS (unit/API) | Inbox DB models deployed |
+| GET verification | **PASS** | `hub.verify_token=demaxtore_whatsapp_2026` → 200 + challenge |
+| New access token Graph API | **PASS** | Phone `+90 551 865 94 42`, verified name DeMaxtore |
+| Outbound Graph API | **PASS** | `WA-LIVE-CERT-20260716 OUTBOUND 001` → Meta message ID returned |
+| Meta inbound webhook | **BLOCKED** | `facebookexternalua` → 401 until App Secret fixed |
+| Inbox persistence (simulated signed POST) | **PASS** | Prior cert: message in `WhatsAppContact` / `WhatsAppMessage` |
+| Real handset inbound | **PENDING** | Requires correct `WHATSAPP_APP_SECRET` |
+| Real handset reply | **PENDING** | Outbound API ready; inbound thread needed |
 
 ## Automated tests
 
 | Suite | Passed | Failed |
 |-------|-------:|-------:|
-| WhatsApp module (focused) | 26 | 0 |
+| WhatsApp service + webhook routes + inbox | 26 | 0 |
 
 ## Production
 
 | Item | Value |
 |------|-------|
-| Commit | `69ce7c3` |
-| Build | `2026-07-16T14:51:33.308Z` |
-| `/api/healthz` | 200 |
-| `/api/ready` | 200 |
+| Commit | `bccc0b5` |
+| Health | `/api/healthz` → 200 |
+| Readiness | `/api/ready` → 200 |
 | PM2 | `demaxtore-backend` online |
-| Rollback | `git revert 69ce7c3` + rebuild + `pm2-safe-backend-restart.sh` |
+| Rollback | `git checkout 91aa3f3` + rebuild + `pm2-safe-backend-restart.sh` |
+
+## Environment (redacted)
+
+```
+WHATSAPP_APP_SECRET=[SET — INVALID for Meta; must replace from Developer Console]
+WHATSAPP_VERIFY_TOKEN=[SET]
+WHATSAPP_ACCESS_TOKEN=[SET — updated 2026-07-16]
+WHATSAPP_PHONE_NUMBER_ID=[SET — 1221373704390497]
+WHATSAPP_BUSINESS_ACCOUNT_ID=[SET — 1745589496717695]
+META_APP_SECRET=[MISSING]
+```
 
 ## Final status
 
 **WHATSAPP NOT CERTIFIED**
 
-**Blocker:** `WHATSAPP_APP_SECRET` must be set to the Meta Developer Console App Secret for app `2070730986853572`, then PM2 restart with `--update-env`, then repeat live handset inbound/outbound tests.
+**Blocker:** `WHATSAPP_APP_SECRET` must be the Meta Developer Console App Secret for app `2070730986853572`. The access token you provided is correct for send/receive API calls but is **not** used for webhook signature verification.
