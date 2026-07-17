@@ -31,6 +31,7 @@ import { getMessagingWriteBridge } from "./messaging-write.bridge.js";
 import { getMessagingWriteDispatcher } from "./messaging-write.dispatcher.js";
 import { registerWiredSurface, buildSocketOutbox } from "./messaging-write.registry.js";
 import { UnifiedMessagingWriteOrchestrator } from "./unified-messaging-write.orchestrator.js";
+import { assertCanSendMessages, loadUserMessagingGate } from "../phone-verification/phone-verification.policy.js";
 
 export class UnifiedMessagingService {
   private readonly repo: UnifiedMessagingRepository;
@@ -92,6 +93,7 @@ export class UnifiedMessagingService {
     conversationId: string,
     input: CreateMessageRequest,
   ): Promise<{ message: ReturnType<typeof mapMessage>; duplicate: boolean }> {
+    assertCanSendMessages(await loadUserMessagingGate(this.prisma, user.id));
     await this.policy.assertConversationAccess(user, conversationId);
     if (!(await this.policy.canSendExternalMessage(user, conversationId))) {
       throw UnifiedMessagingErrors.cannotAccessConversation();

@@ -36,14 +36,18 @@ type SeedUser = {
   orgId: string;
   orgName: string;
   orgKind: string;
+  phoneNumber?: string;
+  phoneVerificationStatus?: string;
 };
+
+const VERIFIED_PHONE = "+905551000001";
 
 const FIXTURE_USERS: SeedUser[] = [
   { email: TEST_USER_EMAILS.admin, displayName: "DeMaxtore Admin", role: Role.ADMIN, orgId: ORG_IDS.demaxtore, orgName: "DeMaxtore Operations", orgKind: "DEMAXTORE" },
-  { email: TEST_USER_EMAILS.buyer1, displayName: "Buyer One Acme", role: Role.BUYER, orgId: ORG_IDS.acme, orgName: "Acme Foods", orgKind: "BUYER_ORG" },
-  { email: TEST_USER_EMAILS.buyer2, displayName: "Buyer Two Beta", role: Role.BUYER, orgId: ORG_IDS.beta, orgName: "Beta Imports", orgKind: "BUYER_ORG" },
-  { email: TEST_USER_EMAILS.supplier1, displayName: "Supplier One Mfg", role: Role.SUPPLIER, orgId: ORG_IDS.mfg, orgName: "Acme Manufacturing", orgKind: "SUPPLIER_ORG" },
-  { email: TEST_USER_EMAILS.supplier2, displayName: "Supplier Beta Industries", role: Role.SUPPLIER, orgId: ORG_IDS.betaInd, orgName: "Beta Industries", orgKind: "SUPPLIER_ORG" },
+  { email: TEST_USER_EMAILS.buyer1, displayName: "Buyer One Acme", role: Role.BUYER, orgId: ORG_IDS.acme, orgName: "Acme Foods", orgKind: "BUYER_ORG", phoneNumber: VERIFIED_PHONE, phoneVerificationStatus: "PHONE_VERIFIED" },
+  { email: TEST_USER_EMAILS.buyer2, displayName: "Buyer Two Beta", role: Role.BUYER, orgId: ORG_IDS.beta, orgName: "Beta Imports", orgKind: "BUYER_ORG", phoneNumber: "+905551000002", phoneVerificationStatus: "PHONE_VERIFIED" },
+  { email: TEST_USER_EMAILS.supplier1, displayName: "Supplier One Mfg", role: Role.SUPPLIER, orgId: ORG_IDS.mfg, orgName: "Acme Manufacturing", orgKind: "SUPPLIER_ORG", phoneNumber: "+905551000003", phoneVerificationStatus: "PHONE_VERIFIED" },
+  { email: TEST_USER_EMAILS.supplier2, displayName: "Supplier Beta Industries", role: Role.SUPPLIER, orgId: ORG_IDS.betaInd, orgName: "Beta Industries", orgKind: "SUPPLIER_ORG", phoneNumber: "+905551000004", phoneVerificationStatus: "PHONE_VERIFIED" },
   { email: TEST_USER_EMAILS.forwarder, displayName: "Forwarder Portal User", role: Role.FORWARDER, orgId: ORG_IDS.demaxtore, orgName: "DeMaxtore Operations", orgKind: "DEMAXTORE" },
   { email: TEST_USER_EMAILS.finance, displayName: "Finance Operator", role: Role.FINANCE_OPERATOR, orgId: ORG_IDS.demaxtore, orgName: "DeMaxtore Operations", orgKind: "DEMAXTORE" },
   { email: TEST_USER_EMAILS.operations, displayName: "Operations Manager", role: Role.OPS_MANAGER, orgId: ORG_IDS.demaxtore, orgName: "DeMaxtore Operations", orgKind: "DEMAXTORE" },
@@ -72,6 +76,20 @@ export async function seedTestUsers(prisma: PrismaClient): Promise<void> {
         role: u.role,
         passwordHash,
         organisationId: u.orgId,
+        ...(u.phoneNumber
+          ? {
+              phoneNumber: u.phoneNumber,
+              whatsappPhone: u.phoneNumber,
+              phoneVerificationStatus: u.phoneVerificationStatus ?? "PHONE_VERIFIED",
+              phoneVerifiedAt: new Date(),
+            }
+          : {
+              phoneNumber: null,
+              whatsappPhone: null,
+              phoneVerificationStatus: null,
+              phoneVerifiedAt: null,
+              phoneVerifiedBy: null,
+            }),
       },
       create: {
         email: u.email,
@@ -79,6 +97,10 @@ export async function seedTestUsers(prisma: PrismaClient): Promise<void> {
         role: u.role,
         passwordHash,
         organisationId: u.orgId,
+        phoneNumber: u.phoneNumber ?? null,
+        whatsappPhone: u.phoneNumber ?? null,
+        phoneVerificationStatus: u.phoneVerificationStatus ?? null,
+        phoneVerifiedAt: u.phoneVerificationStatus === "PHONE_VERIFIED" ? new Date() : null,
       },
     });
   }

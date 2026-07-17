@@ -54,6 +54,7 @@ const LandingPage        = lazy(() => import("@/features/marketing/pages/Landing
 const BuyerDashboardPage    = lazy(() => import("@/features/dashboard/pages/BuyerDashboardPage"));
 const SupplierDashboardPage = lazy(() => import("@/features/dashboard/pages/SupplierDashboardPage"));
 const AdminDashboardPage    = lazy(() => import("@/features/dashboard/pages/AdminDashboardPage"));
+const PhoneVerificationQueuePage = lazy(() => import("@/features/phone-verification/pages/PhoneVerificationQueuePage"));
 
 const NotificationsPage  = lazy(() => import("@/features/notifications/pages/NotificationsPage"));
 const NotFoundPage       = lazy(() => import("@/features/system/NotFoundPage"));
@@ -284,6 +285,7 @@ export function AppRoutes() {
             <Route path="/operations/market-intelligence" element={<LazyPage><MarketIntelligencePage /></LazyPage>} />
             <Route path="/operations/system"               element={<LazyPage><SystemOperationsPage /></LazyPage>} />
             <Route path="/admin/dashboard"          element={<LazyPage><AdminDashboardPage /></LazyPage>} />
+            <Route path="/admin/phone-verifications" element={<LazyPage><PhoneVerificationQueuePage /></LazyPage>} />
             <Route path="/admin/control-tower"       element={<LazyPage><ControlTowerDashboardPage /></LazyPage>} />
             <Route path="/admin/rfq"                element={<LazyPage><RfqListPage /></LazyPage>} />
             <Route path="/admin/commoditybid"         element={<LazyPage><CommodityBidListPage /></LazyPage>} />

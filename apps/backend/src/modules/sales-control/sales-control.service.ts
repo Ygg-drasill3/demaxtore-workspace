@@ -6,6 +6,8 @@ import {
   type CustomerAccountDto,
 } from "@dmx/contracts/sales-control";
 import { AppError } from "../../utils/httpErrors.js";
+import { normalizePhoneInput, PENDING_PHONE_VERIFICATION } from "../phone-verification/phone-verification.policy.js";
+import { notifyAdminsPhoneSubmitted } from "../phone-verification/phone-verification.service.js";
 
 function isCustomerUser(user: Pick<User, "role" | "email">) {
   return ["BUYER", "SUPPLIER"].includes(user.role) && !user.email.endsWith("@demaxtore.com");
@@ -78,6 +80,7 @@ export class SalesControlService {
 
     const passwordHash = await bcrypt.hash(input.password, 10);
     const orgKind = input.role === "BUYER" ? "BUYER_ORG" : "SUPPLIER_ORG";
+    const phone = normalizePhoneInput(input.whatsappPhone);
 
     const user = await this.prisma.$transaction(async (tx) => {
       const organisation = await tx.organisation.create({
@@ -87,18 +90,37 @@ export class SalesControlService {
         },
       });
 
-      return tx.user.create({
+      const created = await tx.user.create({
         data: {
           email,
           passwordHash,
           displayName: input.displayName.trim(),
           role: input.role as Role,
           organisationId: organisation.id,
-          whatsappPhone: input.whatsappPhone?.trim() || null,
+          whatsappPhone: phone,
+          phoneNumber: phone,
+          phoneVerificationStatus: PENDING_PHONE_VERIFICATION,
         },
         include: { organisation: { select: { name: true } } },
       });
+
+      await tx.phoneVerificationRequest.create({
+        data: { userId: created.id, phone, status: "PENDING" },
+      });
+
+      return created;
     });
+
+    const req = await this.prisma.phoneVerificationRequest.findFirstOrThrow({
+      where: { userId: user.id },
+      orderBy: { submittedAt: "desc" },
+    });
+    void notifyAdminsPhoneSubmitted(
+      this.prisma,
+      req.id,
+      { id: user.id, email: user.email, role: user.role },
+      phone,
+    ).catch(() => undefined);
 
     await this.sendAccountWelcomeNotifications({
       displayName: input.displayName.trim(),

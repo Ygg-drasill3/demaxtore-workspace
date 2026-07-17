@@ -359,6 +359,10 @@ export class TradeChatService {
   }
 
   async sendMessage(conversationId: string, actor: AuthUser, body: string) {
+    const { assertCanSendMessages, loadUserMessagingGate } = await import(
+      "../phone-verification/phone-verification.policy.js"
+    );
+    assertCanSendMessages(await loadUserMessagingGate(this.db, actor.id));
     const conv = await this.db.directConversation.findUnique({ where: { id: conversationId } });
     const registryKey =
       conv?.contextType === "ORDER_FREIGHT" ? "order_freight_chat_send" : "direct_chat_send";

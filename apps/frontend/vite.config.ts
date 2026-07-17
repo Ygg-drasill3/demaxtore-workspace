@@ -36,12 +36,55 @@ function buildInfoPlugin(info: { commitSha: string; branch: string; buildTime: s
   };
 }
 
+function loginStaticPlugin(): Plugin {
+  const loginRoot = path.resolve(__dirname, "../../login-static");
+  const mime: Record<string, string> = {
+    ".html": "text/html",
+    ".js": "application/javascript",
+    ".css": "text/css",
+    ".svg": "image/svg+xml",
+    ".json": "application/json",
+    ".ico": "image/x-icon",
+    ".png": "image/png",
+  };
+
+  return {
+    name: "dmx-login-static",
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const url = req.url?.split("?")[0] ?? "";
+        const isLogin =
+          url === "/login" || url === "/login/" ||
+          url.startsWith("/login/") ||
+          url === "/register" || url.startsWith("/register") ||
+          url === "/forgot-password" || url.startsWith("/forgot-password");
+        if (!isLogin) return next();
+
+        let rel = url.replace(/^\/(login|register|forgot-password)\/?/, "") || "index.html";
+        if (rel === "" || rel.endsWith("/")) rel = "index.html";
+        const filePath = path.normalize(path.join(loginRoot, rel));
+        if (!filePath.startsWith(loginRoot) || !fs.existsSync(filePath)) {
+          const fallback = path.join(loginRoot, "index.html");
+          if (!fs.existsSync(fallback)) return next();
+          res.setHeader("Content-Type", "text/html");
+          res.end(fs.readFileSync(fallback));
+          return;
+        }
+        const ext = path.extname(filePath);
+        res.setHeader("Content-Type", mime[ext] ?? "application/octet-stream");
+        res.end(fs.readFileSync(filePath));
+      });
+    },
+  };
+}
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const buildInfo = readBuildInfo();
   return {
   plugins: [
     react(),
+    loginStaticPlugin(),
     buildInfoPlugin(buildInfo),
     nodePolyfills({ include: ["buffer", "stream", "util", "process"] }),
     visualizer({ filename: "dist/stats.html", gzipSize: true, open: false }),
@@ -78,8 +121,8 @@ export default defineConfig(({ mode }) => {
     strictPort: true,
     allowedHosts: true,
     proxy: {
-      "/api":       { target: "http://localhost:3001", changeOrigin: true },
-      "/socket.io": { target: "http://localhost:3001", changeOrigin: true, ws: true },
+      "/api":       { target: process.env.VITE_DEV_API_PROXY ?? "http://localhost:3001", changeOrigin: true },
+      "/socket.io": { target: process.env.VITE_DEV_API_PROXY ?? "http://localhost:3001", changeOrigin: true, ws: true },
     },
   },
   };

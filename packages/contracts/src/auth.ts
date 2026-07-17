@@ -50,6 +50,7 @@ export const RegisterInput = z.object({
   email:            z.string().email().max(200),
   password:         z.string().min(8).max(200),
   organisationName: z.string().trim().min(2).max(160),
+  phone:            z.string().trim().min(8).max(20),
 });
 export type RegisterInput = z.infer<typeof RegisterInput>;
 
@@ -60,6 +61,11 @@ export const UserDTO = z.object({
   role:         RoleEnum,
   organisation: z.string().nullable().optional(),
   avatarUrl:    z.string().url().nullable().optional(),
+  phoneNumber:  z.string().nullable().optional(),
+  phoneVerificationStatus: z
+    .enum(["PENDING_PHONE_VERIFICATION", "PHONE_VERIFIED", "PHONE_REJECTED"])
+    .nullable()
+    .optional(),
   createdAt:    z.string().datetime(),
 });
 export type UserDTO = z.infer<typeof UserDTO>;
@@ -85,3 +91,16 @@ export const ROLE_DASHBOARD: Record<Role, string> = {
   DOCUMENT_CONTROLLER:"/admin/dashboard",
   FORWARDER:          "/forwarder/dashboard",
 };
+
+/** Roles with access to operations console routes (/operations/*). */
+export const OPERATIONS_PLATFORM_ROLES = [
+  "ADMIN",
+  "SUPER_ADMIN",
+  "OPS_MANAGER",
+  "LOGISTICS_OPERATOR",
+  "FINANCE_OPERATOR",
+  "DOCUMENT_CONTROLLER",
+] as const satisfies readonly Role[];
+
+/** Roles with full admin platform access (/admin/* destructive controls). */
+export const ADMIN_PLATFORM_ROLES = ["ADMIN", "SUPER_ADMIN"] as const satisfies readonly Role[];

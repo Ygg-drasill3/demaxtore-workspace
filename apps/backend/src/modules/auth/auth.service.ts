@@ -15,6 +15,8 @@ import {
 import { checkLock, recordFailure, recordSuccess } from "./bruteforce.js";
 import type { User } from "@prisma/client";
 import type { RegisterInput } from "@dmx/contracts/auth";
+import { normalizePhoneInput, PENDING_PHONE_VERIFICATION } from "../phone-verification/phone-verification.policy.js";
+import { notifyAdminsPhoneSubmitted } from "../phone-verification/phone-verification.service.js";
 
 /** Public, serialisable user shape (matches @dmx/contracts UserDTO). */
 export function toUserDTO(u: User & { organisation?: { name: string } | null }) {
@@ -25,6 +27,12 @@ export function toUserDTO(u: User & { organisation?: { name: string } | null }) 
     role:         u.role,
     organisation: u.organisation?.name ?? null,
     avatarUrl:    u.avatarUrl,
+    phoneNumber:  u.phoneNumber ?? null,
+    phoneVerificationStatus: u.phoneVerificationStatus as
+      | "PENDING_PHONE_VERIFICATION"
+      | "PHONE_VERIFIED"
+      | "PHONE_REJECTED"
+      | null,
     createdAt:    u.createdAt.toISOString(),
   };
 }
@@ -104,6 +112,7 @@ export async function register(
   if (existing) throw Conflict("An account with this email already exists");
 
   const passwordHash = await bcrypt.hash(input.password, 10);
+  const phone = normalizePhoneInput(input.phone);
 
   const user = await prisma.$transaction(async (tx) => {
     const organisation = await tx.organisation.create({
@@ -113,17 +122,36 @@ export async function register(
       },
     });
 
-    return tx.user.create({
+    const created = await tx.user.create({
       data: {
         email,
         passwordHash,
         displayName: input.displayName.trim(),
         role: "BUYER",
         organisationId: organisation.id,
+        phoneNumber: phone,
+        phoneVerificationStatus: PENDING_PHONE_VERIFICATION,
       },
       include: { organisation: { select: { name: true } } },
     });
+
+    await tx.phoneVerificationRequest.create({
+      data: { userId: created.id, phone, status: "PENDING" },
+    });
+
+    return created;
   });
+
+  const req = await prisma.phoneVerificationRequest.findFirstOrThrow({
+    where: { userId: user.id },
+    orderBy: { submittedAt: "desc" },
+  });
+  void notifyAdminsPhoneSubmitted(
+    prisma,
+    req.id,
+    { id: user.id, email: user.email, role: user.role },
+    phone,
+  ).catch(() => undefined);
 
   await recordSuccess(ip, email);
   const tokens = await issueTokens(user);

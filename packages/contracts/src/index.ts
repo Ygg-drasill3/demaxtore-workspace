@@ -115,3 +115,4 @@ export * from "./whatsapp-notification-bridge";
 export * from "./email-notification-bridge";
 export * from "./unified-messaging";
 export * from "./unified-messaging.zod";
+export * from "./phone-verification";

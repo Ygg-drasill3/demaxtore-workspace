@@ -36,6 +36,7 @@ import {
 import { notifyCommEvent } from "./communication.notifications.js";
 import { getMessagingWriteBridge } from "../unified-messaging/messaging-write.bridge.js";
 import { getMessagingWriteDispatcher } from "../unified-messaging/messaging-write.dispatcher.js";
+import { assertCanSendMessages, loadUserMessagingGate } from "../phone-verification/phone-verification.policy.js";
 import {
   buildNotificationOutbox,
   buildSocketOutbox,
@@ -167,6 +168,7 @@ export class CommunicationService {
 
     switch (action) {
       case "create_message":
+        assertCanSendMessages(await loadUserMessagingGate(this.db, actor.id));
         await this.createMessage(
           workspaceType,
           workspaceId,

@@ -441,6 +441,10 @@ export class WhatsAppInboxService {
       filename?: string;
     },
   ) {
+    const { assertCanSendMessages, loadUserMessagingGate } = await import(
+      "../phone-verification/phone-verification.policy.js"
+    );
+    assertCanSendMessages(await loadUserMessagingGate(this.db, actor.id));
     return getMessagingWriteBridge(this.db).runLegacyWrite({
       surface: "whatsapp_inbox",
       registryKey: "whatsapp_outbound_text",

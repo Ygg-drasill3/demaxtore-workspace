@@ -7,6 +7,10 @@ const apiPort = process.env.E2E_API_PORT ?? "3015";
 const frontendUrl = process.env.E2E_FRONTEND_URL ?? `http://127.0.0.1:${frontendPort}`;
 const apiUrl = process.env.E2E_API_URL ?? `http://127.0.0.1:${apiPort}`;
 
+// Keep API helpers aligned with the webServer port (default 3015, not legacy 3001).
+process.env.E2E_API_URL ??= apiUrl;
+process.env.E2E_FRONTEND_URL ??= frontendUrl;
+
 export default defineConfig({
   testDir: "./tests",
   fullyParallel: false,
@@ -56,6 +60,10 @@ export default defineConfig({
       url: frontendUrl,
       reuseExistingServer: true,
       timeout: 120_000,
+      env: {
+        ...process.env,
+        VITE_DEV_API_PROXY: apiUrl,
+      },
     },
   ],
 });

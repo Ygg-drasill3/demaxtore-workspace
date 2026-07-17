@@ -2,7 +2,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard, FileText, Package, Bell, Workflow, Mail, Radar, GraduationCap, Route,
-  ClipboardList, Ship, FileCheck, MessageSquare, Plus, Gavel, Inbox, Activity, AlertTriangle, Container, Scale, UserPlus, Users,
+  ClipboardList, Ship, FileCheck, MessageSquare, Plus, Gavel, Inbox, Activity, AlertTriangle, Container, Scale, UserPlus, Users, Phone,
 } from "lucide-react";
 import type { Role } from "@dmx/contracts/auth";
 
@@ -156,6 +156,7 @@ export const ADMIN_NAV_GROUPS: NavGroup[] = [
     id: "home", label: "Home", testId: "nav-group-home",
     items: [
       { to: "/admin/dashboard", label: "Command Center", icon: LayoutDashboard, testId: "admin-dashboard", end: true },
+      { to: "/admin/phone-verifications", label: "Phone verifications", icon: Phone, testId: "admin-phone-verifications" },
       { to: "/sales/dashboard", label: "Sales Control", icon: Users, testId: "admin-sales-control" },
     ],
   },

@@ -15,6 +15,7 @@ import { ControlTowerPanel } from "../components/operations-command-center/Contr
 import { RevenuePanel } from "../components/operations-command-center/RevenuePanel";
 import { TeamWorkloadPanel } from "../components/operations-command-center/TeamWorkloadPanel";
 import { OperationsUpcomingEvents } from "../components/operations-command-center/OperationsUpcomingEvents";
+import { PendingPhoneVerificationsWidget } from "../components/operations-command-center/PendingPhoneVerificationsWidget";
 
 export default function AdminDashboardPage() {
   const { t } = useT();
@@ -44,6 +45,7 @@ export default function AdminDashboardPage() {
       </header>
 
       <OperationsKpiRow kpis={data?.kpis} loading={isLoading} />
+      <PendingPhoneVerificationsWidget />
       <OperationsActionInbox actions={data?.actions} loading={isLoading} />
       <TradeOperationsBoard rows={data?.tradeBoard} loading={isLoading} />
 

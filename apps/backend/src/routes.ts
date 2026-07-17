@@ -62,6 +62,7 @@ import { freightEstimateRouter } from "./modules/freight-estimate/freight-estima
 import { freightBookingRouter } from "./modules/freight-booking/freight-booking.routes.js";
 import tradeTimelineRoutes from "./modules/trade-timeline/trade-timeline.routes.js";
 import salesControlRouter from "./modules/sales-control/sales-control.routes.js";
+import phoneVerificationRoutes from "./modules/phone-verification/phone-verification.routes.js";
 import { asyncHandler } from "./middleware/asyncHandler.js";
 import { idempotency } from "./middleware/idempotency.js";
 import { telemetryBurstLimiter, adminAnalyticsLimiter } from "./middleware/rate-limit.js";
@@ -130,6 +131,7 @@ api.use("/freight-estimates", freightEstimateRouter);
 api.use("/freight-bookings", freightBookingRouter);
 api.use("/trade-timeline", tradeTimelineRoutes);
 api.use("/sales", salesControlRouter);
+api.use("/phone-verification", phoneVerificationRoutes);
 api.use("/workspace-inbox", workspaceInboxRouter);
 api.use(
   "/workspaces/:workspaceType/:workspaceId/conversation",

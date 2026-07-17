@@ -31,13 +31,15 @@ const optionalName = z
   .optional()
   .transform((v) => (v?.trim() ? v.trim() : undefined));
 
+const requiredPhone = z.string().trim().min(8).max(32);
+
 export const CreateCustomerAccountInput = z.object({
   displayName: z.string().trim().min(2).max(120),
   email: z.string().email().max(200),
   password: z.string().min(8).max(200),
   role: CustomerAccountRole,
   organisationName: z.string().trim().min(2).max(160),
-  whatsappPhone: optionalPhone,
+  whatsappPhone: requiredPhone,
   secondaryContactName: optionalName,
   secondaryContactEmail: optionalEmail,
   secondaryContactWhatsapp: optionalPhone,
