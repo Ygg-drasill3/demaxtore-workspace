@@ -1,30 +1,59 @@
-# WhatsApp Live Certification — ATT Webhook 401
+# WhatsApp Cloud API — Production Certification
 
-**Date:** 2026-07-16  
+**Certification status:** **WHATSAPP CLOUD API — PRODUCTION CERTIFIED**
+
+**Certification date:** 17 July 2026  
 **Production URL:** https://workspace.demaxtore.com  
 **Meta App ID:** `2070730986853572` (DeMaxtore)  
-**Test prefix:** `WA-LIVE-CERT-20260716`  
-**Branch:** `snapshot/pre-pilot-20260714`  
-**Production commit:** `bccc0b5`
+**WABA ID:** `1745589496717695`  
+**Phone Number ID:** `1221373704390497`  
+**Production number:** `+90 551 865 94 42`  
+**Test prefix:** `WA-LIVE-CERT-20260717`
 
-## Root cause
+## Verified production flow
 
-| Item | Finding |
-|------|---------|
-| **401 source** | `validateWebhookSignature()` in `whatsapp.service.ts`, called from `whatsapp.webhook.routes.ts` POST handler |
-| **JWT involved?** | **No** — `/api/webhooks/whatsapp` is mounted in `app.ts` **before** `express.json()` and **before** `/api` JWT routes |
-| **Raw body** | **Correct** — `express.raw({ type: "application/json" })` on webhook path; signature computed over `req.body` Buffer |
-| **Why Meta fails** | `WHATSAPP_APP_SECRET` in production `.env` is a **locally generated 64-hex value** (`openssl rand -hex 32` pattern), **not** the Meta Developer Console App Secret for app `2070730986853572` |
-| **Proof** | `isWhatsAppAppSecretValidForAccessToken()` → **false** (Graph API `appsecret_proof` rejects). Requests signed with the current `.env` secret return **200**; Meta `facebookexternalua` POSTs return **401/403** |
+```
+Real WhatsApp handset
+  → Meta Cloud API
+  → POST /api/webhooks/whatsapp
+  → signature validation (X-Hub-Signature-256 / App Secret)
+  → deduplication (metaMessageId unique)
+  → whatsapp_messages persistence
+  → Workspace WhatsApp Inbox
+  → outbound reply
+  → sent / delivered / read webhook updates
+```
 
-### Action required (ops)
+## Verified results (17 July 2026)
 
-1. Open [Meta Developer Console](https://developers.facebook.com/apps/2070730986853572/settings/basic/)
-2. **App Settings → Basic → App Secret → Show**
-3. Set `WHATSAPP_APP_SECRET` in `apps/backend/.env` to that value (typically ~32 characters; **not** the access token, **not** `generate-secret.sh` output)
-4. `bash scripts/pm2-safe-backend-restart.sh` (loads `--update-env`)
-5. Confirm boot log: `✓ WhatsApp App Secret validated against Meta (appsecret_proof)`
-6. Send test WhatsApp message from handset → expect `POST /api/webhooks/whatsapp` **200** in nginx access log
+| Check | Result |
+|-------|--------|
+| Inbound webhook HTTP 200 | **PASS** |
+| Database persistence | **PASS** |
+| Workspace Inbox visibility | **PASS** |
+| Outbound reply | **PASS** |
+| sent status | **PASS** |
+| delivered status | **PASS** |
+| read status | **PASS** |
+| Duplicate prevention | **PASS** |
+| PM2 stability | **PASS** |
+| `/api/healthz` | **200** |
+| `/api/ready` | **200** |
+| Production pilot | **PASS** |
+| Remaining blocker | **NONE** |
+
+### Live pilot evidence (redacted)
+
+| Scenario | Result | Notes |
+|----------|--------|-------|
+| Meta inbound webhook | **PASS** | `facebookexternalua` POST → **200** in nginx access log |
+| Inbound persistence | **PASS** | Inbound row in `whatsapp_messages` with `meta_message_id` and contact record |
+| Workspace Inbox | **PASS** | Inbound thread visible at `/admin/whatsapp-inbox` |
+| Outbound reply | **PASS** | Reply sent from Inbox UI; delivered to real handset |
+| Status webhooks | **PASS** | `sent_at`, `delivered_at`, `read_at` populated on outbound row |
+| Duplicate replay | **PASS** | Identical signed webhook payload replayed twice → HTTP 200 both times; single row retained |
+| GET verification | **PASS** | Hub challenge → 200 + challenge body |
+| Graph API (WABA / phone) | **PASS** | WABA and Phone Number ID accessible with System User token |
 
 ## Implementation
 
@@ -41,24 +70,12 @@
 
 | Scenario | Expected | Result |
 |----------|----------|--------|
-| Valid Meta signature | 200 | **BLOCKED** — wrong App Secret until ops update |
+| Valid Meta signature | 200 | **PASS** |
 | Missing signature | 401 | **PASS** — `WHATSAPP_SIGNATURE_MISSING` |
 | Invalid signature | 403 | **PASS** — `WHATSAPP_SIGNATURE_INVALID` |
-| Workspace JWT absent (valid Meta sig) | 200 | **PASS** (when secret correct) |
+| Workspace JWT absent (valid Meta sig) | 200 | **PASS** |
 | Public inbox listing | 401 | **PASS** |
 | Non-admin inbox | 403 | **PASS** |
-
-## Live test
-
-| Scenario | Result | Evidence |
-|----------|--------|----------|
-| GET verification | **PASS** | `hub.verify_token=demaxtore_whatsapp_2026` → 200 + challenge |
-| New access token Graph API | **PASS** | Phone `+90 551 865 94 42`, verified name DeMaxtore |
-| Outbound Graph API | **PASS** | `WA-LIVE-CERT-20260716 OUTBOUND 001` → Meta message ID returned |
-| Meta inbound webhook | **BLOCKED** | `facebookexternalua` → 401 until App Secret fixed |
-| Inbox persistence (simulated signed POST) | **PASS** | Prior cert: message in `WhatsAppContact` / `WhatsAppMessage` |
-| Real handset inbound | **PENDING** | Requires correct `WHATSAPP_APP_SECRET` |
-| Real handset reply | **PENDING** | Outbound API ready; inbound thread needed |
 
 ## Automated tests
 
@@ -70,25 +87,36 @@
 
 | Item | Value |
 |------|-------|
-| Commit | `bccc0b5` |
 | Health | `/api/healthz` → 200 |
 | Readiness | `/api/ready` → 200 |
-| PM2 | `demaxtore-backend` online |
-| Rollback | `git checkout 91aa3f3` + rebuild + `pm2-safe-backend-restart.sh` |
+| PM2 | `demaxtore-backend` online (stable after clean restart) |
 
 ## Environment (redacted)
 
 ```
-WHATSAPP_APP_SECRET=[SET — INVALID for Meta; must replace from Developer Console]
+WHATSAPP_APP_SECRET=[SET — validated via appsecret_proof]
 WHATSAPP_VERIFY_TOKEN=[SET]
-WHATSAPP_ACCESS_TOKEN=[SET — updated 2026-07-16]
+WHATSAPP_ACCESS_TOKEN=[SET — System User token]
 WHATSAPP_PHONE_NUMBER_ID=[SET — 1221373704390497]
 WHATSAPP_BUSINESS_ACCOUNT_ID=[SET — 1745589496717695]
-META_APP_SECRET=[MISSING]
 ```
+
+Do not commit or paste access tokens, App Secret values, or webhook verify tokens.
+
+## Operational note — PM2 restart script
+
+The existing safe restart script (`scripts/pm2-safe-backend-restart.sh`) previously caused an orphaned process and `EADDRINUSE` on port **3001** during reload. The production pilot passed after fully stopping the PM2 process, clearing port 3001, and starting one clean PM2-managed backend process.
+
+**Follow-up:** fix the safe restart script separately so reload does not leave orphan listeners on port 3001.
+
+## Prior blocker (resolved 17 July 2026)
+
+Earlier certification (16 July 2026) failed because `WHATSAPP_APP_SECRET` in production was a locally generated 64-hex value, not the Meta Developer Console App Secret for app `2070730986853572`. Meta `facebookexternalua` POSTs returned **401/403** until the correct App Secret was configured and the backend was restarted with boot log confirmation:
+
+`✓ WhatsApp App Secret validated against Meta (appsecret_proof)`
 
 ## Final status
 
-**WHATSAPP NOT CERTIFIED**
+**WHATSAPP CLOUD API — PRODUCTION CERTIFIED**
 
-**Blocker:** `WHATSAPP_APP_SECRET` must be the Meta Developer Console App Secret for app `2070730986853572`. The access token you provided is correct for send/receive API calls but is **not** used for webhook signature verification.
+**Remaining blocker:** none.
