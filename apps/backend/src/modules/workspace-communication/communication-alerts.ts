@@ -38,7 +38,7 @@ export async function scanWorkspaceCommunicationAlerts(db: PrismaClient): Promis
         workspaceType: "ORDER",
         title: "Unread question >96h",
         description: q.body.slice(0, 120),
-      })) n++;
+      }, { allowTestWorkspace: true })) n++;
     } else if (age >= H_48) {
       if (await upsertControlTowerAlert(db, {
         workspaceId: resolved.auditWorkspaceId,
@@ -48,7 +48,7 @@ export async function scanWorkspaceCommunicationAlerts(db: PrismaClient): Promis
         workspaceType: "ORDER",
         title: "Unread question >48h",
         description: q.body.slice(0, 120),
-      })) n++;
+      }, { allowTestWorkspace: true })) n++;
     }
   }
 

@@ -10,6 +10,7 @@ import { isAdminChatRole } from "./chat.types.js";
 import { socketBus } from "../../realtime/socket-bus.js";
 import { logger } from "../../config/logger.js";
 import { getMessagingWriteBridge } from "../unified-messaging/messaging-write.bridge.js";
+import { registerWiredSurface } from "../unified-messaging/messaging-write.registry.js";
 
 export type { ChatContextType };
 
@@ -360,7 +361,9 @@ export class TradeChatService {
   async sendMessage(conversationId: string, actor: AuthUser, body: string) {
     return getMessagingWriteBridge(this.db).runLegacyWrite({
       surface: "direct_chat",
+      registryKey: "direct_chat_send",
       actor,
+      idempotencyKey: `chat:${conversationId}:${Date.now()}`,
       legacy: () => this.sendMessageDirect(conversationId, actor, body),
     });
   }
@@ -370,6 +373,7 @@ export class TradeChatService {
     if (!text) throw new AppError(400, "EMPTY_MESSAGE");
 
     const conv = await this.db.directConversation.findUnique({ where: { id: conversationId } });
+    if (conv?.contextType === "ORDER_FREIGHT") registerWiredSurface("order_freight_chat_send");
     if (!conv || !this.canAccessConv(conv, actor.id, actor.role)) {
       throw new AppError(404, "CONVERSATION_NOT_FOUND");
     }

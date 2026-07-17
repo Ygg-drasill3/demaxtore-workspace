@@ -18,6 +18,8 @@ import { FreightCommercialService } from "./commercial/freight-commercial.servic
 import { FreightMarginPolicyService } from "./commercial/freight-margin-policy.service.js";
 import type { AuthUser } from "./freightiq.policy.js";
 import { canAccessFreightForOrder } from "./freightiq.policy.js";
+import { getMessagingWriteBridge } from "../unified-messaging/messaging-write.bridge.js";
+import { registerWiredSurface } from "../unified-messaging/messaging-write.registry.js";
 
 const TERMINAL = ["CANCELLED", "EXPIRED", "CONVERTED_TO_SHIPMENT"] as const;
 
@@ -101,6 +103,7 @@ export class FreightCommunicationsService {
     raw: Record<string, unknown>,
     ctx?: { ip?: string; userAgent?: string },
   ): Promise<FreightSummary> {
+    registerWiredSurface("freightiq_message_send");
     if (actor.role !== "ADMIN") throw new AppError(403, "FORBIDDEN_ROLE");
     if (!(await canAccessFreightForOrder(this.db, actor, orderId))) {
       throw new AppError(403, "FORBIDDEN");
@@ -170,6 +173,10 @@ export class FreightCommunicationsService {
         communicationIds: ids,
       });
     });
+
+    void getMessagingWriteBridge(this.db)
+      .onConversationUpdated({ conversationId: orderId, reason: "freightiq_communication_sent" })
+      .catch(() => undefined);
 
     return this.enrichSummary(orderId, await this.freightIq.getSummary(orderId), actor);
   }

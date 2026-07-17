@@ -11,11 +11,22 @@ echo "==> Rollback test on staging (port $STAGING_PORT)"
 
 set_flag() {
   local key="$1" val="$2"
+  export "${key}=${val}"
   if grep -q "^${key}=" "$ENV_FILE" 2>/dev/null; then
     sed -i "s|^${key}=.*|${key}=${val}|" "$ENV_FILE"
   else
     echo "${key}=${val}" >> "$ENV_FILE"
   fi
+}
+
+load_staging_env() {
+  if [[ -f "$ENV_FILE" ]]; then
+    set -a
+    # shellcheck disable=SC1090
+    source "$ENV_FILE"
+    set +a
+  fi
+  export PORT="${STAGING_PORT}"
 }
 
 health_ok() {
@@ -26,6 +37,7 @@ health_ok() {
 # Stage 1: unified_only
 set_flag UNIFIED_MESSAGING_WRITE_MODE unified_only
 set_flag UNIFIED_MESSAGING_SHADOW_READ_ENABLED false
+load_staging_env
 pm2 restart "$STAGING_PM2" --update-env
 sleep 8
 health_ok || { echo "FAIL: health after unified_only"; exit 1; }
@@ -34,6 +46,7 @@ echo "PASS: unified_only"
 # Stage 2: rollback to mirror
 set_flag UNIFIED_MESSAGING_WRITE_MODE unified_primary_legacy_mirror
 set_flag UNIFIED_MESSAGING_SHADOW_READ_ENABLED true
+load_staging_env
 pm2 restart "$STAGING_PM2" --update-env
 sleep 8
 health_ok || { echo "FAIL: health after rollback"; exit 1; }
@@ -42,6 +55,7 @@ echo "PASS: rollback to unified_primary_legacy_mirror"
 # Stage 3: restore unified_only for staging cert
 set_flag UNIFIED_MESSAGING_WRITE_MODE unified_only
 set_flag UNIFIED_MESSAGING_SHADOW_READ_ENABLED false
+load_staging_env
 pm2 restart "$STAGING_PM2" --update-env
 sleep 8
 health_ok || { echo "FAIL: health after restore"; exit 1; }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { MessageSquare, Search, Archive, User, ChevronLeft, PanelRight, X } from "lucide-react";
+import { MessageSquare, Search, Archive, User, ChevronLeft, PanelRight, X, Paperclip, RotateCcw } from "lucide-react";
 import { useAuth } from "@/store/auth.store";
 import {
   useConversation,
@@ -96,9 +96,17 @@ function ContextPanel({
     await unifiedMessagesApi.archive(conversationId);
   };
 
+  const onUnarchive = async () => {
+    await unifiedMessagesApi.unarchive(conversationId);
+  };
+
+  const onPriority = async (priority: string) => {
+    await unifiedMessagesApi.updatePriority(conversationId, priority);
+  };
+
   return (
     <div
-      data-testid={mobile ? "mobile-context-drawer" : "context-panel"}
+      data-testid={mobile ? "unified-messages-context-drawer" : "context-panel"}
       className={mobile ? "fixed inset-0 z-50 bg-background flex flex-col" : "space-y-4"}
     >
       {mobile && (
@@ -151,6 +159,27 @@ function ContextPanel({
         >
           <Archive className="h-4 w-4" /> Archive
         </button>
+        <button
+          type="button"
+          className="text-sm flex items-center gap-1 text-muted-foreground hover:text-foreground"
+          data-testid="unarchive-conversation"
+          onClick={() => void onUnarchive()}
+        >
+          Unarchive
+        </button>
+        <div className="flex gap-1">
+          {(["LOW", "NORMAL", "HIGH", "URGENT"] as const).map((p) => (
+            <button
+              key={p}
+              type="button"
+              data-testid={`priority-${p}`}
+              className="text-xs px-2 py-0.5 border rounded"
+              onClick={() => void onPriority(p)}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -172,9 +201,20 @@ function MessageComposer({
   const [mode, setMode] = useState<"reply" | "internal">("reply");
   const [text, setText] = useState("");
   const [channel, setChannel] = useState<"WORKSPACE" | "WHATSAPP">("WORKSPACE");
+  const [uploadPct, setUploadPct] = useState<number | null>(null);
   const [optimistic, setOptimistic] = useState<UnifiedMessageDto[]>([]);
+  const fileRef = useRef<HTMLInputElement>(null);
   const send = useSendMessage(conversationId);
   const note = useSendInternalNote(conversationId);
+
+  const onAttach = async (file: File) => {
+    setUploadPct(0);
+    try {
+      await unifiedMessagesApi.uploadAttachment(conversationId, file, setUploadPct);
+    } finally {
+      setUploadPct(null);
+    }
+  };
 
   const onSubmit = async () => {
     if (!text.trim()) return;
@@ -255,6 +295,38 @@ function MessageComposer({
           <option value="WHATSAPP">WhatsApp</option>
         </select>
       )}
+      {mode === "reply" && hasWhatsApp && channel === "WHATSAPP" && (
+        <p className="text-xs text-amber-700" data-testid="whatsapp-window-hint">
+          WhatsApp 24-hour window applies. Template may be required outside the service window.
+        </p>
+      )}
+      <div className="flex items-center gap-2">
+        <input
+          ref={fileRef}
+          type="file"
+          className="hidden"
+          data-testid="attachment-input"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void onAttach(f);
+            e.target.value = "";
+          }}
+        />
+        <button
+          type="button"
+          className="p-2 border rounded"
+          data-testid="attachment-picker"
+          onClick={() => fileRef.current?.click()}
+          aria-label="Attach file"
+        >
+          <Paperclip className="h-4 w-4" />
+        </button>
+        {uploadPct !== null && (
+          <span className="text-xs text-muted-foreground" data-testid="upload-progress">
+            {uploadPct}%
+          </span>
+        )}
+      </div>
       <div className="flex gap-2">
         <textarea
           className="flex-1 border rounded px-3 py-2 text-sm min-h-[60px]"
@@ -289,7 +361,9 @@ export default function UnifiedMessagesPage() {
 
   const [search, setSearch] = useState(filters.search ?? "");
   const [debouncedSearch, setDebouncedSearch] = useState(search);
-  const [mobileView, setMobileView] = useState<"list" | "timeline" | "context">("list");
+  const [mobileView, setMobileView] = useState<"list" | "timeline" | "context">(() =>
+    conversationId ? "timeline" : "list",
+  );
   const [replyTo, setReplyTo] = useState<UnifiedMessageDto | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
@@ -322,6 +396,12 @@ export default function UnifiedMessagesPage() {
 
   useEffect(() => {
     if (conversationId) void markRead.mutate();
+  }, [conversationId]);
+
+  useEffect(() => {
+    if (conversationId && typeof window !== "undefined" && window.innerWidth < 768) {
+      setMobileView("timeline");
+    }
   }, [conversationId]);
 
   const selectConversation = (id: string) => {
@@ -443,6 +523,7 @@ export default function UnifiedMessagesPage() {
               <button
                 type="button"
                 className="lg:hidden"
+                data-testid="unified-messages-context-toggle"
                 onClick={() => setMobileView("context")}
                 aria-label="Context"
               >
@@ -451,8 +532,8 @@ export default function UnifiedMessagesPage() {
             </header>
             <div
               ref={timelineRef}
-              className="flex-1 overflow-y-auto p-4 space-y-3"
-              data-testid="message-timeline"
+              className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[8rem]"
+              data-testid="unified-messages-timeline"
               onScroll={onTimelineScroll}
             >
               {messagesQuery.isFetchingNextPage && (
@@ -488,7 +569,18 @@ export default function UnifiedMessagesPage() {
                         {m.sentAt && <span>sent</span>}
                         {m.deliveredAt && <span>delivered</span>}
                         {m.readAt && <span>read</span>}
-                        {m.failedAt && <span className="text-red-600">failed</span>}
+                        {m.failedAt && (
+                          <button
+                            type="button"
+                            className="text-red-600 underline flex items-center gap-1"
+                            data-testid={`retry-message-${m.id}`}
+                            onClick={() =>
+                              void unifiedMessagesApi.retryMessage(conversationId, m.id)
+                            }
+                          >
+                            <RotateCcw className="h-3 w-3" /> retry
+                          </button>
+                        )}
                         {canInternalNote && (
                           <button type="button" className="underline" onClick={() => setReplyTo(m)}>
                             Reply

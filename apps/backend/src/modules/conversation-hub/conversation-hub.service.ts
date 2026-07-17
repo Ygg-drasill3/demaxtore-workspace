@@ -22,6 +22,7 @@ import {
 } from "../workspace-communication/communication.policy.js";
 import { canViewMessage } from "../workspace-communication/communication.visibility.js";
 import { bootstrapWorkspaceConversation } from "./conversation-bootstrap.js";
+import { registerWiredSurface } from "../unified-messaging/messaging-write.registry.js";
 import {
   buildAttachmentLibrary,
   buildDecisionLog,
@@ -182,6 +183,12 @@ export class ConversationHubService {
     actor: AuthUser,
     input: CreateTimelineItemInput,
   ) {
+    registerWiredSurface(
+      input.itemType === "INTERNAL_NOTE" ? "conversation_hub_internal_note" : "conversation_hub_message",
+    );
+    if (input.parentMessageId) registerWiredSurface("conversation_hub_reply");
+    registerWiredSurface("passwordless_reply");
+
     await this.comm.applyCommunicationAction(
       workspaceType,
       workspaceId,
@@ -212,6 +219,7 @@ export class ConversationHubService {
     actor: AuthUser,
     messageId: string,
   ) {
+    registerWiredSurface("message_read_receipt");
     const resolved = await resolveWorkspace(this.db, workspaceType, workspaceId);
     if (!resolved) throw new AppError(404, "WORKSPACE_NOT_FOUND");
 

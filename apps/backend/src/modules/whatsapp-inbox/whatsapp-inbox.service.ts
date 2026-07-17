@@ -3,6 +3,7 @@ import { AppError } from "../../utils/httpErrors.js";
 import { normalizePhone } from "../chat/whatsapp.service.js";
 import { socketBus } from "../../realtime/socket-bus.js";
 import { getMessagingWriteBridge } from "../unified-messaging/messaging-write.bridge.js";
+import { registerWiredSurface } from "../unified-messaging/messaging-write.registry.js";
 import { logger } from "../../config/logger.js";
 import { parseInboundMessages, parseStatusUpdates } from "./whatsapp-inbox.parser.js";
 import { downloadWhatsAppMedia } from "./whatsapp-inbox.media.js";
@@ -403,7 +404,9 @@ export class WhatsAppInboxService {
   async markRead(actor: AuthUser, conversationId: string) {
     return getMessagingWriteBridge(this.db).runLegacyWrite({
       surface: "whatsapp_inbox",
+      registryKey: "workspace_mark_read",
       actor,
+      idempotencyKey: `wa-read:${conversationId}:${actor.id}`,
       legacy: () => this.markReadDirect(actor, conversationId),
     });
   }
@@ -440,7 +443,9 @@ export class WhatsAppInboxService {
   ) {
     return getMessagingWriteBridge(this.db).runLegacyWrite({
       surface: "whatsapp_inbox",
+      registryKey: "whatsapp_outbound_text",
       actor,
+      idempotencyKey: `wa-send:${input.conversationId ?? input.to ?? "new"}:${Date.now()}`,
       legacy: () => this.sendMessageDirect(actor, input),
     });
   }
@@ -461,6 +466,10 @@ export class WhatsAppInboxService {
     },
   ) {
     this.assertAccess(actor);
+
+    if (input.type !== "text" && input.type !== "template") {
+      registerWiredSurface("whatsapp_outbound_media");
+    }
 
     let conversation = input.conversationId
       ? await this.db.whatsAppConversation.findUnique({

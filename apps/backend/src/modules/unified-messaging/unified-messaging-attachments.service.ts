@@ -2,6 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import { AppError } from "../../utils/httpErrors.js";
 import { CommunicationService } from "../workspace-communication/communication.service.js";
 import { UnifiedMessagingPolicy } from "./unified-messaging.policy.js";
+import { registerWiredSurface } from "./messaging-write.registry.js";
 import { getMessagingWriteBridge } from "./messaging-write.bridge.js";
 import type { AuthUser } from "./unified-messaging.types.js";
 import type { CommWorkspaceType } from "@dmx/contracts/workspace-communication";
@@ -30,6 +31,7 @@ export class UnifiedMessagingAttachmentsService {
     file: { originalName: string; mimeType: string; sizeBytes: number; buffer: Buffer },
   ) {
     await this.policy.assertConversationAccess(user, conversationId);
+    registerWiredSurface("attachment_upload");
     const conv = await this.resolveWorkspace(conversationId);
     const row = await this.comm.uploadAttachment(
       conv.workspaceType as CommWorkspaceType,

@@ -265,7 +265,29 @@ export class UnifiedMessagingWriteOrchestrator {
     externalMessageId?: string;
     systemEventKey?: string;
   }) {
-    return this.repo.createMessage(data);
+    if (data.clientMessageId) {
+      const existing = await this.repo.findMessageByClientId(
+        data.conversationId,
+        data.authorUserId,
+        data.clientMessageId,
+      );
+      if (existing) return existing;
+    }
+    try {
+      return await this.repo.createMessage(data);
+    } catch (e) {
+      const code =
+        e && typeof e === "object" && "code" in e ? String((e as { code: unknown }).code) : "";
+      if (code === "P2002" && data.clientMessageId) {
+        const existing = await this.repo.findMessageByClientId(
+          data.conversationId,
+          data.authorUserId,
+          data.clientMessageId,
+        );
+        if (existing) return existing;
+      }
+      throw e;
+    }
   }
 
   private async mirrorToUnified(

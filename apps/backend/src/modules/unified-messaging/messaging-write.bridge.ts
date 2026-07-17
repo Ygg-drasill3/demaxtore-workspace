@@ -8,6 +8,7 @@ import type { AuthUser } from "./unified-messaging.types.js";
 import { getMessagingDedupStore } from "./messaging-dedup.store.js";
 import { getMessagingOutboxService } from "./messaging-outbox.service.js";
 import { getMessagingWriteDispatcher } from "./messaging-write.dispatcher.js";
+import { registerWiredSurface, type MessagingMutationSurface } from "./messaging-write.registry.js";
 
 export type MessagingWriteSurface =
   | "workspace_communication"
@@ -141,10 +142,12 @@ export class MessagingWriteBridge {
     this.events.emit(event, payload);
   }
 
-  /** Execute legacy write; mirror + events via outbox on failure. */
+  /** Execute legacy write via central dispatcher. */
   async runLegacyWrite<T>(input: {
     surface: MessagingWriteSurface;
+    registryKey?: MessagingMutationSurface;
     actor: AuthUser;
+    idempotencyKey?: string;
     legacy: () => Promise<T>;
     afterLegacy?: (result: T) => Promise<void>;
     mirrorOnFailure?: (result: T) => {
@@ -154,25 +157,30 @@ export class MessagingWriteBridge {
       payload: Record<string, unknown>;
     };
   }): Promise<T> {
-    const result = await input.legacy();
-    try {
-      if (input.afterLegacy) await input.afterLegacy(result);
-    } catch (err) {
-      logger.warn({ err: String(err), surface: input.surface }, "messaging write bridge afterLegacy failed");
-      if (input.mirrorOnFailure) {
-        const m = input.mirrorOnFailure(result);
-        await this.outbox.enqueue({
-          eventType: "LEGACY_MIRROR",
-          aggregateType: input.surface,
-          aggregateId: m.messageId ?? m.idempotencyKey,
-          conversationId: m.conversationId,
-          messageId: m.messageId,
-          idempotencyKey: `mirror:${m.idempotencyKey}`,
-          payload: m.payload,
-        });
-      }
-    }
-    return result;
+    if (input.registryKey) registerWiredSurface(input.registryKey);
+    const idempotencyKey = input.idempotencyKey ?? `${input.surface}:${Date.now()}`;
+    return this.dispatcher.dispatchLegacyFirst({
+      surface: input.surface,
+      actor: input.actor,
+      idempotencyKey,
+      legacy: input.legacy,
+      afterLegacy: input.afterLegacy,
+      mirrorPayload: input.mirrorOnFailure
+        ? (result) => {
+            const m = input.mirrorOnFailure!(result);
+            return {
+              conversationId: m.conversationId,
+              messageId: m.messageId,
+              mirrorInput: {
+                conversationId: m.conversationId ?? "",
+                authorUserId: input.actor.id,
+                body: "",
+              },
+              legacy: { legacyId: m.messageId ?? m.idempotencyKey, legacySource: input.surface },
+            };
+          }
+        : undefined,
+    });
   }
 
   async onWorkspaceMessageCreated(input: {
@@ -435,6 +443,7 @@ export class MessagingWriteBridge {
     metaMessageId?: string | null;
     duplicate?: boolean;
   }) {
+    registerWiredSurface("whatsapp_inbound");
     if (input.duplicate) return;
     const unifiedConv = await this.prisma.workspaceConversation.findFirst({
       where: { metadata: { path: ["whatsappConversationId"], equals: input.whatsappConversationId } },
@@ -468,6 +477,7 @@ export class MessagingWriteBridge {
     body: string;
     systemEventKey?: string;
   }) {
+    registerWiredSurface("system_event");
     const conv = await this.prisma.workspaceConversation.findUnique({
       where: { workspaceType_workspaceId: { workspaceType: input.workspaceType, workspaceId: input.workspaceId } },
     });
@@ -528,6 +538,7 @@ export class MessagingWriteBridge {
     messageId: string;
     status: string;
   }) {
+    registerWiredSurface("whatsapp_status");
     if (this.writeMode !== "legacy_only") {
       await this.orchestrator.updateDeliveryStatus(input.messageId, input.status).catch(() => undefined);
     }

@@ -327,6 +327,9 @@ export class RfqService {
       void (async () => {
         try {
           const { getMessagingWriteBridge } = await import("../unified-messaging/messaging-write.bridge.js");
+          const { registerWiredSurface } = await import("../unified-messaging/messaging-write.registry.js");
+          registerWiredSurface("rfq_clarification_create");
+          if (payload.replyToMessageId) registerWiredSurface("rfq_clarification_reply");
           const latest = await this.prisma.clarificationMessage.findFirst({
             where: { thread: { workspaceId } },
             orderBy: { createdAt: "desc" },

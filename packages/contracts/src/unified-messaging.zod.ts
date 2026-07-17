@@ -81,6 +81,25 @@ export const AddContextRequestSchema = z.object({
   metadata: z.record(z.unknown()).optional(),
 });
 
+export const UpdatePriorityRequestSchema = z.object({
+  priority: z.enum(ConversationPriority),
+});
+
+export const UpdateStatusRequestSchema = z.object({
+  status: z.enum(ConversationStatus),
+});
+
+export const AddParticipantRequestSchema = z.object({
+  userId: z.string().uuid().optional(),
+  whatsappContactId: z.string().uuid().optional(),
+  participantType: z.enum(ParticipantType),
+  participantRole: z.string().trim().max(64).optional(),
+  displayName: z.string().trim().max(200).optional(),
+  phoneE164: z.string().trim().max(32).optional(),
+  email: z.string().email().optional(),
+  companyId: z.string().uuid().optional(),
+});
+
 export const MessageListQuerySchema = z.object({
   cursor: z.string().uuid().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),

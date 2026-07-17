@@ -7,6 +7,7 @@ import type {
   CreateInternalNoteRequest,
   CreateMessageRequest,
 } from "@dmx/contracts/unified-messaging";
+import type { ConversationPriority, ConversationStatus } from "@dmx/contracts/unified-messaging";
 import {
   participantKeyForUser,
   participantKeyForWhatsApp,
@@ -28,6 +29,7 @@ import { UnifiedMessagingRepository } from "./unified-messaging.repository.js";
 import type { AuthUser } from "./unified-messaging.types.js";
 import { getMessagingWriteBridge } from "./messaging-write.bridge.js";
 import { getMessagingWriteDispatcher } from "./messaging-write.dispatcher.js";
+import { registerWiredSurface, buildSocketOutbox } from "./messaging-write.registry.js";
 import { UnifiedMessagingWriteOrchestrator } from "./unified-messaging-write.orchestrator.js";
 
 export class UnifiedMessagingService {
@@ -89,10 +91,19 @@ export class UnifiedMessagingService {
     user: AuthUser,
     conversationId: string,
     input: CreateMessageRequest,
-  ) {
+  ): Promise<{ message: ReturnType<typeof mapMessage>; duplicate: boolean }> {
     await this.policy.assertConversationAccess(user, conversationId);
     if (!(await this.policy.canSendExternalMessage(user, conversationId))) {
       throw UnifiedMessagingErrors.cannotAccessConversation();
+    }
+
+    if (input.clientMessageId) {
+      const existing = await this.repo.findMessageByClientId(
+        conversationId,
+        user.id,
+        input.clientMessageId,
+      );
+      if (existing) return { message: mapMessage(existing), duplicate: true };
     }
 
     const channel: "WORKSPACE" | "WHATSAPP" =
@@ -100,16 +111,21 @@ export class UnifiedMessagingService {
     const audienceScope = "EXTERNAL" as const;
     this.policy.assertCanDispatchToChannel(audienceScope, channel);
 
-    const message = await this.writeOrchestrator.writeFromUnifiedApi(user, {
-      conversationId,
-      authorUserId: user.id,
-      body: input.body,
-      channel,
-      messageType: input.messageType ?? "MESSAGE",
-      visibility: "ALL_PARTICIPANTS",
-      parentMessageId: input.replyToMessageId,
-      clientMessageId: input.clientMessageId,
-    });
+    registerWiredSurface("general_messages_send");
+    const message = await this.writeDispatcher.persistMessageWithOutbox(
+      user,
+      "unified_api",
+      {
+        conversationId,
+        authorUserId: user.id,
+        body: input.body,
+        channel,
+        messageType: input.messageType ?? "MESSAGE",
+        parentMessageId: input.replyToMessageId,
+        clientMessageId: input.clientMessageId,
+      },
+      { idempotencyKey: input.clientMessageId ?? `msg:${conversationId}:${Date.now()}` },
+    );
     if (!message) throw UnifiedMessagingErrors.cannotAccessConversation();
 
     if (channel === "WHATSAPP") {
@@ -128,15 +144,14 @@ export class UnifiedMessagingService {
       });
     }
 
-    const bridge = getMessagingWriteBridge(this.prisma);
-    bridge.publishEvent("messaging:message:new", {
+    getMessagingWriteBridge(this.prisma).publishEvent("messaging:message:new", {
       conversationId,
       messageId: message.id,
       idempotencyKey: input.clientMessageId ?? message.id,
       audienceScope: "EXTERNAL",
     });
 
-    return mapMessage(message);
+    return { message: mapMessage(message), duplicate: false };
   }
 
   async createInternalNote(
@@ -152,13 +167,19 @@ export class UnifiedMessagingService {
     const audienceScope = "INTERNAL" as const;
     this.policy.assertCanDispatchToChannel(audienceScope, "WORKSPACE");
 
-    const message = await this.writeOrchestrator.writeFromUnifiedApi(user, {
-      conversationId,
-      authorUserId: user.id,
-      body: input.body,
-      parentMessageId: input.replyToMessageId,
-      internal: true,
-    });
+    registerWiredSurface("unified_internal_note");
+    const message = await this.writeDispatcher.persistMessageWithOutbox(
+      user,
+      "unified_api",
+      {
+        conversationId,
+        authorUserId: user.id,
+        body: input.body,
+        parentMessageId: input.replyToMessageId,
+        internal: true,
+      },
+      { idempotencyKey: `note:${conversationId}:${Date.now()}` },
+    );
     if (!message) throw UnifiedMessagingErrors.internalNoteBlocked();
 
     getMessagingWriteBridge(this.prisma).publishEvent("messaging:message:new", {
@@ -173,10 +194,12 @@ export class UnifiedMessagingService {
 
   async markConversationRead(user: AuthUser, conversationId: string) {
     await this.policy.assertConversationAccess(user, conversationId);
-    await this.repo.markConversationRead(conversationId, user.id);
-    void getMessagingWriteBridge(this.prisma)
-      .onConversationRead({ actor: user, conversationId })
-      .catch(() => undefined);
+    await this.writeDispatcher.dispatchMarkRead(
+      user,
+      "unified_api",
+      "conversation_mark_read",
+      conversationId,
+    );
     return { ok: true };
   }
 
@@ -208,30 +231,60 @@ export class UnifiedMessagingService {
     const existing = await this.repo.findParticipant(conversationId, participantKey);
     if (existing) throw UnifiedMessagingErrors.duplicateParticipant();
 
-    const row = await this.repo.addParticipant(conversationId, {
-      participantKey,
-      userId: data.userId,
-      whatsappContactId: data.whatsappContactId,
-      participantType: data.participantType,
-      participantRole: data.participantRole,
-      companyId: data.companyId,
-      displayName: data.displayName,
-      phoneE164: data.phoneE164,
-      email: data.email,
+    registerWiredSurface("participant_add");
+    const row = await this.writeDispatcher.dispatchUnifiedFirst({
+      surface: "unified_api",
+      actor: user,
+      idempotencyKey: `participant:add:${conversationId}:${participantKey}`,
+      unified: async (tx) =>
+        tx.workspaceConversationParticipant.create({
+          data: {
+            conversationId,
+            participantKey,
+            userId: data.userId,
+            whatsappContactId: data.whatsappContactId,
+            participantType: data.participantType,
+            participantRole: data.participantRole,
+            companyId: data.companyId,
+            displayName: data.displayName,
+            phoneE164: data.phoneE164,
+            email: data.email,
+          },
+        }),
+      outbox: (row) => [
+        buildSocketOutbox("unified_api", {
+          event: "messaging:participant:updated",
+          conversationId,
+          idempotencyKey: `participant:${row.id}`,
+        }),
+      ],
     });
-
-    void getMessagingWriteBridge(this.prisma)
-      .onParticipantUpdated({ conversationId, participantId: row.id })
-      .catch(() => undefined);
 
     return row;
   }
 
   async removeParticipant(user: AuthUser, conversationId: string, participantId: string) {
     if (!this.policy.canLinkContext(user)) throw UnifiedMessagingErrors.cannotAccessConversation();
-    await this.prisma.workspaceConversationParticipant.update({
-      where: { id: participantId, conversationId },
-      data: { leftAt: new Date() },
+    await this.policy.assertConversationAccess(user, conversationId);
+    registerWiredSurface("participant_remove");
+    await this.writeDispatcher.dispatchUnifiedFirst({
+      surface: "unified_api",
+      actor: user,
+      idempotencyKey: `participant:remove:${participantId}`,
+      unified: async (tx) => {
+        await tx.workspaceConversationParticipant.update({
+          where: { id: participantId, conversationId },
+          data: { leftAt: new Date() },
+        });
+        return { participantId };
+      },
+      outbox: () => [
+        buildSocketOutbox("unified_api", {
+          event: "messaging:participant:updated",
+          conversationId,
+          idempotencyKey: `participant:remove:${participantId}`,
+        }),
+      ],
     });
     return { ok: true };
   }
@@ -239,23 +292,53 @@ export class UnifiedMessagingService {
   async addContext(user: AuthUser, conversationId: string, input: AddContextRequest) {
     if (!this.policy.canLinkContext(user)) throw UnifiedMessagingErrors.cannotLinkContext();
     await this.policy.assertConversationAccess(user, conversationId);
-    const row = await this.repo.addContext(conversationId, {
-      contextType: input.contextType,
-      contextId: input.contextId,
-      contextReference: input.contextReference,
-      metadata: input.metadata,
-      createdById: user.id,
+    registerWiredSurface("context_add");
+    const row = await this.writeDispatcher.dispatchUnifiedFirst({
+      surface: "unified_api",
+      actor: user,
+      idempotencyKey: `context:add:${conversationId}:${input.contextType}:${input.contextId}`,
+      unified: async (tx) =>
+        tx.conversationContext.create({
+          data: {
+            conversationId,
+            contextType: input.contextType,
+            contextId: input.contextId,
+            contextReference: input.contextReference,
+            metadata: (input.metadata ?? {}) as import("@prisma/client").Prisma.InputJsonValue,
+            createdById: user.id,
+          },
+        }),
+      outbox: (row) => [
+        buildSocketOutbox("unified_api", {
+          event: "messaging:context:updated",
+          conversationId,
+          idempotencyKey: `context:${row.id}`,
+        }),
+      ],
     });
-    void getMessagingWriteBridge(this.prisma)
-      .onContextUpdated({ conversationId, contextId: row.id })
-      .catch(() => undefined);
     return row;
   }
 
   async removeContext(user: AuthUser, conversationId: string, contextId: string) {
     if (!this.policy.canLinkContext(user)) throw UnifiedMessagingErrors.cannotLinkContext();
     await this.policy.assertConversationAccess(user, conversationId);
-    await this.repo.removeContext(contextId);
+    registerWiredSurface("context_remove");
+    await this.writeDispatcher.dispatchUnifiedFirst({
+      surface: "unified_api",
+      actor: user,
+      idempotencyKey: `context:remove:${contextId}`,
+      unified: async (tx) => {
+        await tx.conversationContext.delete({ where: { id: contextId } });
+        return { contextId };
+      },
+      outbox: () => [
+        buildSocketOutbox("unified_api", {
+          event: "messaging:context:updated",
+          conversationId,
+          idempotencyKey: `context:remove:${contextId}`,
+        }),
+      ],
+    });
     return { ok: true };
   }
 
@@ -267,34 +350,17 @@ export class UnifiedMessagingService {
     if (!this.policy.canAssignConversation(user)) {
       throw UnifiedMessagingErrors.cannotAssign();
     }
-    await this.writeDispatcher.dispatchUnifiedFirst({
-      surface: "unified_api",
-      actor: user,
-      idempotencyKey: `assign:${conversationId}:${input.assignedUserId}`,
-      unified: async (tx) => {
-        await tx.workspaceConversation.update({
-          where: { id: conversationId },
-          data: { assignedUserId: input.assignedUserId },
-        });
-        return { conversationId, assignedUserId: input.assignedUserId };
-      },
-      outbox: () => [
-        {
-          eventType: "SOCKET_EMIT",
-          aggregateType: "unified_api",
-          aggregateId: conversationId,
-          conversationId,
-          idempotencyKey: `socket:assign:${conversationId}:${input.assignedUserId}`,
-          payload: {
-            event: "messaging:conversation:assigned",
-            eventPayload: {
-              conversationId,
-              idempotencyKey: `assign:${conversationId}:${input.assignedUserId}`,
-            },
-          },
-        },
-      ],
-    });
+    registerWiredSurface("conversation_assignment");
+    registerWiredSurface("team_assignment");
+    await this.writeDispatcher.dispatchConversationMutation(
+      user,
+      "unified_api",
+      "conversation_assignment",
+      conversationId,
+      `assign:${conversationId}:${input.assignedUserId}`,
+      { assignedUserId: input.assignedUserId },
+      "messaging:conversation:assigned",
+    );
     return this.getConversation(user, conversationId);
   }
 
@@ -302,31 +368,97 @@ export class UnifiedMessagingService {
     if (!this.policy.canArchiveConversation(user)) {
       throw UnifiedMessagingErrors.cannotArchive();
     }
-    await this.writeDispatcher.dispatchUnifiedFirst({
+    registerWiredSurface("archive");
+    await this.writeDispatcher.dispatchConversationMutation(
+      user,
+      "unified_api",
+      "archive",
+      conversationId,
+      `archive:${conversationId}`,
+      { isArchived: true, status: "ARCHIVED" },
+      "messaging:conversation:archived",
+    );
+    return this.getConversation(user, conversationId);
+  }
+
+  async unarchiveConversation(user: AuthUser, conversationId: string) {
+    if (!this.policy.canArchiveConversation(user)) {
+      throw UnifiedMessagingErrors.cannotArchive();
+    }
+    registerWiredSurface("unarchive");
+    await this.writeDispatcher.dispatchConversationMutation(
+      user,
+      "unified_api",
+      "unarchive",
+      conversationId,
+      `unarchive:${conversationId}`,
+      { isArchived: false, status: "ACTIVE" },
+      "messaging:conversation:updated",
+    );
+    return this.getConversation(user, conversationId);
+  }
+
+  async updatePriority(user: AuthUser, conversationId: string, priority: ConversationPriority) {
+    if (!this.policy.canAssignConversation(user)) throw UnifiedMessagingErrors.cannotAssign();
+    await this.policy.assertConversationAccess(user, conversationId);
+    registerWiredSurface("priority_update");
+    await this.writeDispatcher.dispatchConversationMutation(
+      user,
+      "unified_api",
+      "priority_update",
+      conversationId,
+      `priority:${conversationId}:${priority}`,
+      { priority },
+      "messaging:conversation:updated",
+    );
+    return this.getConversation(user, conversationId);
+  }
+
+  async updateStatus(user: AuthUser, conversationId: string, status: ConversationStatus) {
+    if (!this.policy.canAssignConversation(user)) throw UnifiedMessagingErrors.cannotAssign();
+    await this.policy.assertConversationAccess(user, conversationId);
+    registerWiredSurface("conversation_status_update");
+    await this.writeDispatcher.dispatchConversationMutation(
+      user,
+      "unified_api",
+      "conversation_status_update",
+      conversationId,
+      `status:${conversationId}:${status}`,
+      { status },
+      "messaging:conversation:updated",
+    );
+    return this.getConversation(user, conversationId);
+  }
+
+  async retryMessage(user: AuthUser, conversationId: string, messageId: string) {
+    await this.policy.assertConversationAccess(user, conversationId);
+    if (!this.policy.canSendExternalMessage(user, conversationId)) {
+      throw UnifiedMessagingErrors.cannotAccessConversation();
+    }
+    registerWiredSurface("message_retry");
+    const msg = await this.prisma.workspaceMessage.findFirst({
+      where: { id: messageId, conversationId },
+    });
+    if (!msg?.failedAt) throw UnifiedMessagingErrors.conversationNotFound();
+
+    const retried = await this.writeDispatcher.dispatchUnifiedFirst({
       surface: "unified_api",
       actor: user,
-      idempotencyKey: `archive:${conversationId}`,
-      unified: async (tx) => {
-        await tx.workspaceConversation.update({
-          where: { id: conversationId },
-          data: { isArchived: true, status: "ARCHIVED" },
-        });
-        return { conversationId };
-      },
+      idempotencyKey: `retry:${messageId}`,
+      unified: async (tx) =>
+        tx.workspaceMessage.update({
+          where: { id: messageId },
+          data: { failedAt: null, sentAt: new Date() },
+        }),
       outbox: () => [
-        {
-          eventType: "SOCKET_EMIT",
-          aggregateType: "unified_api",
-          aggregateId: conversationId,
+        buildSocketOutbox("unified_api", {
+          event: "messaging:message:status",
           conversationId,
-          idempotencyKey: `socket:archive:${conversationId}`,
-          payload: {
-            event: "messaging:conversation:archived",
-            eventPayload: { conversationId, idempotencyKey: `archive:${conversationId}` },
-          },
-        },
+          messageId,
+          idempotencyKey: `retry:${messageId}`,
+        }),
       ],
     });
-    return this.getConversation(user, conversationId);
+    return mapMessage(retried);
   }
 }

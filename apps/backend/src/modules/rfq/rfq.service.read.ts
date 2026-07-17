@@ -535,12 +535,27 @@ RfqService.prototype.buildNextActionContext = async function (ws, actor) {
 };
 
 RfqService.prototype.markClarificationRead = async function (wsId, messageId, userId) {
-  void wsId;
   await this.prisma.clarificationReadReceipt.upsert({
     where:  { messageId_userId: { messageId, userId } },
     create: { messageId, userId },
     update: {},
   });
+  const conv = await this.prisma.workspaceConversation.findUnique({
+    where: { workspaceType_workspaceId: { workspaceType: "RFQ", workspaceId: wsId } },
+    select: { id: true },
+  });
+  if (conv) {
+    const { getMessagingWriteBridge } = await import("../unified-messaging/messaging-write.bridge.js");
+    const { registerWiredSurface } = await import("../unified-messaging/messaging-write.registry.js");
+    registerWiredSurface("rfq_clarification_read");
+    void getMessagingWriteBridge(this.prisma)
+      .onConversationRead({
+        actor: { id: userId, email: "", role: "BUYER" },
+        conversationId: conv.id,
+        workspaceId: wsId,
+      })
+      .catch(() => undefined);
+  }
 };
 
 RfqService.prototype.adminQueue = async function () {

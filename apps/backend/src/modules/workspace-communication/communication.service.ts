@@ -35,6 +35,7 @@ import {
 } from "./communication.policy.js";
 import { notifyCommEvent } from "./communication.notifications.js";
 import { getMessagingWriteBridge } from "../unified-messaging/messaging-write.bridge.js";
+import { registerWiredSurface } from "../unified-messaging/messaging-write.registry.js";
 
 const ALLOWED_MIMES = new Set([
   "application/pdf",
@@ -164,7 +165,9 @@ export class CommunicationService {
       case "create_message":
         await getMessagingWriteBridge(this.db).runLegacyWrite({
           surface: "workspace_communication",
+          registryKey: "workspace_external_message",
           actor,
+          idempotencyKey: `ws:${workspaceType}:${workspaceId}:${String(payload.clientMessageId ?? Date.now())}`,
           legacy: () =>
             this.createMessage(workspaceType, workspaceId, actor, CreateMessagePayload.parse(payload), ctx),
         });
@@ -178,7 +181,9 @@ export class CommunicationService {
       case "mark_read":
         await getMessagingWriteBridge(this.db).runLegacyWrite({
           surface: "workspace_communication",
+          registryKey: "workspace_mark_read",
           actor,
+          idempotencyKey: `ws-read:${workspaceType}:${workspaceId}:${actor.id}`,
           legacy: () =>
             this.markRead(workspaceType, workspaceId, actor, MarkReadPayload.parse(payload), ctx),
         });
@@ -198,7 +203,9 @@ export class CommunicationService {
   ) {
     return getMessagingWriteBridge(this.db).runLegacyWrite({
       surface: "workspace_communication",
+      registryKey: "workspace_attachment",
       actor,
+      idempotencyKey: `ws-attach:${workspaceType}:${workspaceId}:${file.originalName}:${Date.now()}`,
       legacy: () => this.uploadAttachmentDirect(workspaceType, workspaceId, actor, file),
     });
   }
@@ -347,6 +354,11 @@ export class CommunicationService {
       );
       if (existingId) return;
     }
+
+    const isInternal =
+      input.messageType === "INTERNAL_NOTE" || input.visibility === "ADMIN_ONLY";
+    registerWiredSurface(isInternal ? "workspace_internal_note" : "workspace_external_message");
+    if (mentionIds.length) registerWiredSurface("mention");
 
     let messageId: string;
     let isReplay = false;

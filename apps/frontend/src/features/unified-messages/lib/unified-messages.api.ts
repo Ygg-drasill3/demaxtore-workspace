@@ -70,4 +70,44 @@ export const unifiedMessagesApi = {
       .post<UnifiedConversationDetail>(`/messaging/conversations/${conversationId}/archive`, {})
       .then((r) => r.data);
   },
+
+  unarchive(conversationId: string) {
+    return api
+      .post<UnifiedConversationDetail>(`/messaging/conversations/${conversationId}/unarchive`, {})
+      .then((r) => r.data);
+  },
+
+  updatePriority(conversationId: string, priority: string) {
+    return api
+      .post<UnifiedConversationDetail>(`/messaging/conversations/${conversationId}/priority`, {
+        priority,
+      })
+      .then((r) => r.data);
+  },
+
+  uploadAttachment(conversationId: string, file: File, onProgress?: (pct: number) => void) {
+    const form = new FormData();
+    form.append("file", file);
+    return api
+      .post<{ id: string; fileName: string; mimeType: string }>(
+        `/messaging/conversations/${conversationId}/attachments`,
+        form,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+          onUploadProgress: (e) => {
+            if (e.total && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
+          },
+        },
+      )
+      .then((r) => r.data);
+  },
+
+  retryMessage(conversationId: string, messageId: string) {
+    return api
+      .post<UnifiedMessageDto>(
+        `/messaging/conversations/${conversationId}/messages/${messageId}/retry`,
+        {},
+      )
+      .then((r) => r.data);
+  },
 };

@@ -8,6 +8,7 @@ import {
   resolveWorkspace,
 } from "../workspace-communication/communication.policy.js";
 import { bootstrapWorkspaceConversation } from "./conversation-bootstrap.js";
+import { getMessagingWriteBridge } from "../unified-messaging/messaging-write.bridge.js";
 import type { AuthUser } from "../../types/auth-user.js";
 
 export interface RecordSystemEventInput {
@@ -80,6 +81,16 @@ export class SystemEventsService {
         messageId,
       });
     });
+
+    void getMessagingWriteBridge(this.db)
+      .onSystemMessage({
+        workspaceType: resolved.workspaceType,
+        workspaceId: resolved.workspaceId,
+        auditWorkspaceId: resolved.auditWorkspaceId,
+        messageId,
+        body: input.body,
+      })
+      .catch(() => undefined);
 
     void (async () => {
       // FSM transitions already create notifications; only bootstrap events need engine fan-out.

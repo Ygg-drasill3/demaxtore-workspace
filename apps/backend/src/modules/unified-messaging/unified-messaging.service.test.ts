@@ -6,6 +6,7 @@ describe("UnifiedMessagingService", () => {
   const tx = {
     workspaceMessage: { create: vi.fn() },
     workspaceConversation: { update: vi.fn() },
+    messagingOutboxEvent: { create: vi.fn().mockResolvedValue({ id: "o1" }) },
   };
 
   const prisma = {

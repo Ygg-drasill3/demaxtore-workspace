@@ -5,6 +5,7 @@ import { UnifiedMessagingWriteOrchestrator } from "./unified-messaging-write.orc
 import { getMessagingOutboxService, type EnqueueOutboxInput } from "./messaging-outbox.service.js";
 import type { AuthUser } from "./unified-messaging.types.js";
 import type { MessagingWriteSurface } from "./messaging-write.bridge.js";
+import { buildSocketOutbox, registerWiredSurface, type MessagingMutationSurface } from "./messaging-write.registry.js";
 
 export type WriteMode =
   | "legacy_only"
@@ -169,6 +170,64 @@ export class MessagingWriteDispatcher {
         }
         return events;
       },
+    });
+  }
+
+  /** Conversation metadata mutation with transactional outbox. */
+  async dispatchConversationMutation(
+    user: AuthUser,
+    surface: MessagingWriteSurface,
+    registryKey: MessagingMutationSurface,
+    conversationId: string,
+    idempotencyKey: string,
+    data: Prisma.WorkspaceConversationUpdateInput,
+    socket: Parameters<typeof buildSocketOutbox>[1]["event"],
+  ) {
+    registerWiredSurface(registryKey);
+    return this.dispatchUnifiedFirst({
+      surface,
+      actor: user,
+      idempotencyKey,
+      unified: async (tx) => {
+        await tx.workspaceConversation.update({ where: { id: conversationId }, data });
+        return { conversationId };
+      },
+      outbox: () => [
+        buildSocketOutbox(surface, {
+          event: socket,
+          conversationId,
+          idempotencyKey,
+        }),
+      ],
+    });
+  }
+
+  /** Mark conversation read with outbox socket event. */
+  async dispatchMarkRead(
+    user: AuthUser,
+    surface: MessagingWriteSurface,
+    registryKey: MessagingMutationSurface,
+    conversationId: string,
+  ) {
+    registerWiredSurface(registryKey);
+    return this.dispatchUnifiedFirst({
+      surface,
+      actor: user,
+      idempotencyKey: `read:${conversationId}:${user.id}`,
+      unified: async (tx) => {
+        await tx.workspaceConversationParticipant.updateMany({
+          where: { conversationId, userId: user.id },
+          data: { lastReadAt: new Date() },
+        });
+        return { conversationId };
+      },
+      outbox: () => [
+        buildSocketOutbox(surface, {
+          event: "messaging:conversation:read",
+          conversationId,
+          idempotencyKey: `read:${conversationId}:${user.id}`,
+        }),
+      ],
     });
   }
 

@@ -4,8 +4,14 @@ import { CommWorkspaceTypeParam } from "@dmx/contracts/workspace-communication.z
 import { prisma } from "../../db.js";
 import { CommunicationService } from "./communication.service.js";
 import { streamStoredFileToResponse } from "../../lib/file-storage.js";
+import {
+  getLegacyMessagingAdapters,
+  shouldUseAdapterLayer,
+  toMessagingActor,
+} from "../unified-messaging/adapters/legacy/index.js";
 
 const service = new CommunicationService(prisma);
+const adapters = () => getLegacyMessagingAdapters(prisma);
 
 const ACTION_MAP: Record<string, CommunicationAction> = {
   "create-message": "create_message",
@@ -22,13 +28,37 @@ export const communicationController = {
   async get(req: Request, res: Response) {
     const workspaceType = parseType(req);
     const workspaceId = req.params.workspaceId;
-    res.json(await service.getConversation(workspaceType, workspaceId, req.user!));
+    const actor = req.user!;
+    if (!shouldUseAdapterLayer()) {
+      res.json(await service.getConversation(workspaceType, workspaceId, actor));
+      return;
+    }
+    res.json(
+      await adapters().workspaceCommunication.getConversation(
+        () => service.getConversation(workspaceType, workspaceId, actor),
+        workspaceType,
+        workspaceId,
+        toMessagingActor(actor),
+      ),
+    );
   },
 
   async search(req: Request, res: Response) {
     const workspaceType = parseType(req);
     const workspaceId = req.params.workspaceId;
-    res.json(await service.searchMessages(workspaceType, workspaceId, req.user!, req.query));
+    const actor = req.user!;
+    if (!shouldUseAdapterLayer()) {
+      res.json(await service.searchMessages(workspaceType, workspaceId, actor, req.query));
+      return;
+    }
+    res.json(
+      await adapters().workspaceCommunication.searchMessages(
+        () => service.searchMessages(workspaceType, workspaceId, actor, req.query),
+        workspaceType,
+        workspaceId,
+        toMessagingActor(actor),
+      ),
+    );
   },
 
   async action(req: Request, res: Response) {

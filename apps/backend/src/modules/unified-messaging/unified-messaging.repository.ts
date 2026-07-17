@@ -232,6 +232,16 @@ export class UnifiedMessagingRepository {
     });
   }
 
+  async findMessageByClientId(
+    conversationId: string,
+    authorUserId: string,
+    clientMessageId: string,
+  ) {
+    return this.prisma.workspaceMessage.findFirst({
+      where: { conversationId, authorUserId, clientMessageId },
+    });
+  }
+
   async findMessageByExternalId(externalMessageId: string) {
     return this.prisma.workspaceMessage.findFirst({
       where: { externalMessageId },

@@ -12,12 +12,15 @@ import { streamStoredFileToResponse } from "../../lib/file-storage.js";
 
 import {
   AddContextRequestSchema,
+  AddParticipantRequestSchema,
   AssignConversationRequestSchema,
   ConversationListFiltersSchema,
   CreateConversationRequestSchema,
   CreateInternalNoteRequestSchema,
   CreateMessageRequestSchema,
   MessageListQuerySchema,
+  UpdatePriorityRequestSchema,
+  UpdateStatusRequestSchema,
 } from "@dmx/contracts/unified-messaging.zod";
 
 const uploadAttachment = multer({
@@ -115,8 +118,12 @@ router.post(
   "/:conversationId/messages",
   asyncHandler(async (req, res) => {
     const body = CreateMessageRequestSchema.parse(req.body);
-    const msg = await service().createMessage(req.user!, req.params.conversationId, body);
-    res.status(201).json(msg);
+    const { message, duplicate } = await service().createMessage(
+      req.user!,
+      req.params.conversationId,
+      body,
+    );
+    res.status(duplicate ? 200 : 201).json(message);
   }),
 );
 
@@ -148,6 +155,63 @@ router.post(
   "/:conversationId/archive",
   asyncHandler(async (req, res) => {
     res.json(await service().archiveConversation(req.user!, req.params.conversationId));
+  }),
+);
+
+router.post(
+  "/:conversationId/unarchive",
+  asyncHandler(async (req, res) => {
+    res.json(await service().unarchiveConversation(req.user!, req.params.conversationId));
+  }),
+);
+
+router.post(
+  "/:conversationId/priority",
+  asyncHandler(async (req, res) => {
+    const body = UpdatePriorityRequestSchema.parse(req.body);
+    res.json(await service().updatePriority(req.user!, req.params.conversationId, body.priority));
+  }),
+);
+
+router.post(
+  "/:conversationId/status",
+  asyncHandler(async (req, res) => {
+    const body = UpdateStatusRequestSchema.parse(req.body);
+    res.json(await service().updateStatus(req.user!, req.params.conversationId, body.status));
+  }),
+);
+
+router.post(
+  "/:conversationId/messages/:messageId/retry",
+  asyncHandler(async (req, res) => {
+    res.json(
+      await service().retryMessage(
+        req.user!,
+        req.params.conversationId,
+        req.params.messageId,
+      ),
+    );
+  }),
+);
+
+router.post(
+  "/:conversationId/participants",
+  asyncHandler(async (req, res) => {
+    const body = AddParticipantRequestSchema.parse(req.body);
+    res.status(201).json(await service().addParticipant(req.user!, req.params.conversationId, body));
+  }),
+);
+
+router.delete(
+  "/:conversationId/participants/:participantId",
+  asyncHandler(async (req, res) => {
+    res.json(
+      await service().removeParticipant(
+        req.user!,
+        req.params.conversationId,
+        req.params.participantId,
+      ),
+    );
   }),
 );
 
