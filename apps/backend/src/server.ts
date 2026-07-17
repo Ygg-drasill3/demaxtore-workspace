@@ -15,6 +15,7 @@ import { startControlTowerScheduler } from "./modules/control-tower/control-towe
 import { startTrackingScheduler } from "./modules/tracking/tracking.scheduler.js";
 import { startWhatsAppBridgeRetryWorker } from "./modules/whatsapp-notification-bridge/whatsapp-bridge.scheduler.js";
 import { startEmailBridgeRetryWorker } from "./modules/email-notification-bridge/email-bridge.scheduler.js";
+import { startMessagingOutboxWorker } from "./modules/unified-messaging/messaging-outbox.service.js";
 import { prisma } from "./db/prisma.js";
 import { reconcileStaleRunningJobs } from "./modules/jobs/job-reconciler.js";
 import { closeSchedulerPool } from "./db/scheduler-lock.js";
@@ -80,6 +81,7 @@ async function main(): Promise<void> {
   startTrackingScheduler();
   startWhatsAppBridgeRetryWorker();
   startEmailBridgeRetryWorker();
+  startMessagingOutboxWorker(prisma);
 
   setInterval(() => {
     void reconcileStaleRunningJobs(prisma, env.JOB_STALE_RUNNING_MS);

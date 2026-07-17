@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import type { ConversationListFilters } from "@dmx/contracts/unified-messaging";
 import { unifiedMessagesApi } from "../lib/unified-messages.api";
@@ -24,6 +24,29 @@ export function useConversations(filters?: ConversationListFilters) {
   return useQuery({
     queryKey: ["unified-messages", "conversations", merged],
     queryFn: () => unifiedMessagesApi.listConversations(merged),
+  });
+}
+
+export function useInfiniteConversations(filters?: ConversationListFilters) {
+  const urlFilters = useConversationFiltersFromUrl();
+  const merged = { ...urlFilters, ...filters, limit: filters?.limit ?? 30 };
+  return useInfiniteQuery({
+    queryKey: ["unified-messages", "conversations-infinite", merged],
+    queryFn: ({ pageParam }) =>
+      unifiedMessagesApi.listConversations({ ...merged, cursor: pageParam as string | undefined }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => (last.hasMore ? last.nextCursor ?? undefined : undefined),
+  });
+}
+
+export function useInfiniteMessages(conversationId?: string) {
+  return useInfiniteQuery({
+    queryKey: ["unified-messages", "messages-infinite", conversationId],
+    queryFn: ({ pageParam }) =>
+      unifiedMessagesApi.listMessages(conversationId!, pageParam as string | undefined, 50),
+    enabled: Boolean(conversationId),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => (last.hasMore ? last.nextCursor ?? undefined : undefined),
   });
 }
 

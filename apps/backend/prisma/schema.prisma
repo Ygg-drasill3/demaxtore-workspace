@@ -1688,34 +1688,61 @@ model DocumentReview {
 
 // ── Workspace communication (Sprint 5E) ─────────────────────────────────────
 model WorkspaceConversation {
-  id            String   @id @default(uuid()) @db.Uuid
-  workspaceType String   @map("workspace_type")
-  workspaceId   String   @map("workspace_id") @db.Uuid
-  status        String   @default("ACTIVE")
-  createdAt     DateTime @default(now()) @map("created_at")
+  id                    String    @id @default(uuid()) @db.Uuid
+  workspaceType         String    @map("workspace_type")
+  workspaceId           String    @map("workspace_id") @db.Uuid
+  status                String    @default("ACTIVE")
+  subject               String?
+  priority              String    @default("NORMAL")
+  primaryChannel        String    @default("WORKSPACE") @map("primary_channel")
+  assignedUserId        String?   @map("assigned_user_id") @db.Uuid
+  assignedTeamId        String?   @map("assigned_team_id") @db.Uuid
+  isArchived            Boolean   @default(false) @map("is_archived")
+  lastMessageAt         DateTime? @map("last_message_at")
+  lastExternalMessageAt DateTime? @map("last_external_message_at")
+  lastInboundMessageAt  DateTime? @map("last_inbound_message_at")
+  metadata              Json      @default("{}")
+  createdAt             DateTime  @default(now()) @map("created_at")
 
-  messages WorkspaceMessage[]
+  messages     WorkspaceMessage[]
+  participants WorkspaceConversationParticipant[]
+  contexts     ConversationContext[]
 
   @@unique([workspaceType, workspaceId])
   @@index([workspaceId])
+  @@index([lastMessageAt])
+  @@index([assignedUserId])
+  @@index([status, isArchived])
   @@map("workspace_conversations")
 }
 
 model WorkspaceMessage {
-  id              String    @id @default(uuid()) @db.Uuid
-  conversationId  String    @map("conversation_id") @db.Uuid
-  authorUserId    String?   @map("author_user_id") @db.Uuid
-  messageType     String    @map("message_type")
-  visibility      String
-  body            String    @db.Text
-  status          String    @default("ACTIVE")
-  channelSource   String    @default("WORKSPACE") @map("channel_source")
-  systemEventKey  String?   @map("system_event_key")
-  clientMessageId String?   @map("client_message_id") @db.Uuid
-  metadata        Json      @default("{}")
-  parentMessageId String?   @map("parent_message_id") @db.Uuid
-  editedAt        DateTime? @map("edited_at")
-  createdAt       DateTime  @default(now()) @map("created_at")
+  id                String    @id @default(uuid()) @db.Uuid
+  conversationId    String    @map("conversation_id") @db.Uuid
+  authorUserId      String?   @map("author_user_id") @db.Uuid
+  messageType       String    @map("message_type")
+  visibility        String
+  audienceScope     String    @default("EXTERNAL") @map("audience_scope")
+  body              String    @db.Text
+  status            String    @default("ACTIVE")
+  direction         String    @default("OUTBOUND")
+  channelSource     String    @default("WORKSPACE") @map("channel_source")
+  systemEventKey    String?   @map("system_event_key")
+  clientMessageId   String?   @map("client_message_id") @db.Uuid
+  metadata          Json      @default("{}")
+  parentMessageId   String?   @map("parent_message_id") @db.Uuid
+  externalMessageId String?   @map("external_message_id")
+  whatsappMessageId String?   @map("whatsapp_message_id")
+  sentAt            DateTime? @map("sent_at")
+  deliveredAt       DateTime? @map("delivered_at")
+  readAt            DateTime? @map("read_at")
+  failedAt          DateTime? @map("failed_at")
+  failureCode       String?   @map("failure_code")
+  failureReason     String?   @map("failure_reason") @db.Text
+  legacySource      String?   @map("legacy_source")
+  legacyId          String?   @map("legacy_id")
+  editedAt          DateTime? @map("edited_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
 
   conversation WorkspaceConversation        @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   mentions     WorkspaceMention[]
@@ -1725,9 +1752,60 @@ model WorkspaceMessage {
 
   @@unique([conversationId, systemEventKey])
   @@unique([conversationId, authorUserId, clientMessageId])
+  @@unique([legacySource, legacyId])
   @@index([conversationId, createdAt])
   @@index([messageType, createdAt])
+  @@index([channelSource, createdAt])
+  @@index([audienceScope])
+  @@index([externalMessageId])
+  @@index([whatsappMessageId])
   @@map("workspace_messages")
+}
+
+model WorkspaceConversationParticipant {
+  id                String    @id @default(uuid()) @db.Uuid
+  conversationId    String    @map("conversation_id") @db.Uuid
+  participantKey    String    @map("participant_key")
+  userId            String?   @map("user_id") @db.Uuid
+  whatsappContactId String?   @map("whatsapp_contact_id") @db.Uuid
+  participantType   String    @map("participant_type")
+  participantRole   String    @default("MEMBER") @map("participant_role")
+  companyId         String?   @map("company_id") @db.Uuid
+  displayName       String?   @map("display_name")
+  phoneE164         String?   @map("phone_e164")
+  email             String?
+  joinedAt          DateTime  @default(now()) @map("joined_at")
+  leftAt            DateTime? @map("left_at")
+  lastReadAt        DateTime? @map("last_read_at")
+  mutedAt           DateTime? @map("muted_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  conversation    WorkspaceConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  whatsappContact WhatsAppContact?      @relation(fields: [whatsappContactId], references: [id], onDelete: SetNull)
+
+  @@unique([conversationId, participantKey])
+  @@index([userId])
+  @@index([whatsappContactId])
+  @@index([companyId])
+  @@map("workspace_conversation_participants")
+}
+
+model ConversationContext {
+  id               String   @id @default(uuid()) @db.Uuid
+  conversationId   String   @map("conversation_id") @db.Uuid
+  contextType      String   @map("context_type")
+  contextId        String   @map("context_id") @db.Uuid
+  contextReference String?  @map("context_reference")
+  metadata         Json?    @default("{}")
+  createdAt        DateTime @default(now()) @map("created_at")
+  createdById      String?  @map("created_by_id") @db.Uuid
+
+  conversation WorkspaceConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, contextType, contextId])
+  @@index([contextType, contextId])
+  @@map("conversation_contexts")
 }
 
 model DirectConversation {
@@ -1790,7 +1868,8 @@ model WhatsAppContact {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  conversations WhatsAppConversation[]
+  conversations            WhatsAppConversation[]
+  conversationParticipants WorkspaceConversationParticipant[]
 
   @@index([phoneNumber])
   @@index([userId])
@@ -2802,4 +2881,39 @@ model ProcessedEvent {
   @@unique([source, eventId])
   @@index([workspaceId])
   @@map("processed_events")
+}
+
+// ── Unified Messaging — transactional outbox + persistent dedup ───────────────
+model MessagingOutboxEvent {
+  id             String    @id @default(uuid()) @db.Uuid
+  eventType      String    @map("event_type")
+  aggregateType  String    @map("aggregate_type")
+  aggregateId    String    @map("aggregate_id")
+  conversationId String?   @map("conversation_id") @db.Uuid
+  messageId      String?   @map("message_id") @db.Uuid
+  idempotencyKey String    @unique @map("idempotency_key")
+  payload        Json      @default("{}")
+  status         String    @default("PENDING")
+  attempts       Int       @default(0)
+  availableAt    DateTime  @default(now()) @map("available_at")
+  processedAt    DateTime? @map("processed_at")
+  failedAt       DateTime? @map("failed_at")
+  lastErrorCode  String?   @map("last_error_code")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@index([status, availableAt])
+  @@index([conversationId])
+  @@map("messaging_outbox_events")
+}
+
+model MessagingIdempotencyKey {
+  id        String   @id @default(uuid()) @db.Uuid
+  scope     String
+  keyHash   String   @unique @map("key_hash")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([expiresAt])
+  @@map("messaging_idempotency_keys")
 }

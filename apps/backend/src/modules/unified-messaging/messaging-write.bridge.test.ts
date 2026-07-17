@@ -1,4 +1,12 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+
+vi.mock("../../lib/redis.js", () => ({
+  getRedisClient: vi.fn().mockResolvedValue({
+    set: vi.fn().mockResolvedValue("OK"),
+    get: vi.fn().mockResolvedValue(null),
+  }),
+}));
+
 import {
   MessagingEventEmitter,
   MessagingNotificationDedup,
@@ -32,13 +40,20 @@ describe("messaging-status", () => {
 describe("MessagingEventEmitter", () => {
   beforeEach(() => resetMessagingEventDedupForTests());
 
-  it("tracks dedup keys in memory", () => {
-    const emitter = new MessagingEventEmitter();
+  it("tracks dedup keys in memory", async () => {
+    const mockPrisma = {
+      messagingIdempotencyKey: {
+        create: vi.fn().mockResolvedValue({ id: "1" }),
+        findUnique: vi.fn().mockResolvedValue(null),
+      },
+    };
+    const emitter = new MessagingEventEmitter(mockPrisma as never);
     emitter.emit("messaging:message:new", {
       conversationId: "c1",
       messageId: "m1",
       idempotencyKey: "idem-1",
     });
+    await new Promise((r) => setTimeout(r, 50));
     emitter.emit("messaging:message:new", {
       conversationId: "c1",
       messageId: "m1",

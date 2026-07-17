@@ -162,7 +162,12 @@ export class CommunicationService {
 
     switch (action) {
       case "create_message":
-        await this.createMessage(workspaceType, workspaceId, actor, CreateMessagePayload.parse(payload), ctx);
+        await getMessagingWriteBridge(this.db).runLegacyWrite({
+          surface: "workspace_communication",
+          actor,
+          legacy: () =>
+            this.createMessage(workspaceType, workspaceId, actor, CreateMessagePayload.parse(payload), ctx),
+        });
         break;
       case "edit_message":
         await this.editMessage(workspaceType, workspaceId, actor, EditMessagePayload.parse(payload), ctx);
@@ -224,6 +229,16 @@ export class CommunicationService {
           uploadedById: actor.id,
         },
       });
+
+      const conv = await this.db.workspaceConversation.findUnique({
+        where: { workspaceType_workspaceId: { workspaceType, workspaceId } },
+        select: { id: true },
+      });
+      if (conv) {
+        void getMessagingWriteBridge(this.db)
+          .onAttachmentCreated({ conversationId: conv.id, attachmentId: row.id })
+          .catch(() => undefined);
+      }
 
       return {
         id: row.id,
@@ -393,9 +408,17 @@ export class CommunicationService {
         centerType: authorRole === "SUPPLIER" ? "NEW_SUPPLIER_MESSAGE" : undefined,
         metadata: {
           messageId: msg.id,
+          conversationId: conv.id,
           sensitiveContent: input.messageType === "INTERNAL_NOTE",
           messageVisibility: input.visibility,
         },
+        messagingDedup: input.messageType === "INTERNAL_NOTE"
+          ? undefined
+          : {
+              eventType: "message:new",
+              conversationId: conv.id,
+              messageId: msg.id,
+            },
       });
 
       for (const uid of mentionIds) {
@@ -412,7 +435,12 @@ export class CommunicationService {
           message: input.body.slice(0, 120),
           link,
           centerType: isBuyer ? "BUYER_MENTIONED" : "SUPPLIER_MENTIONED",
-          metadata: { messageId: msg.id },
+          metadata: { messageId: msg.id, conversationId: conv.id },
+          messagingDedup: {
+            eventType: "mention",
+            conversationId: conv.id,
+            messageId: msg.id,
+          },
         });
         await this.audit(tx, resolved, actor, "communication.mentioned", { messageId: msg.id, userId: uid }, ctx);
       }

@@ -5,6 +5,8 @@ import { socketBus } from "../../realtime/socket-bus.js";
 import { UnifiedMessagingWriteOrchestrator } from "./unified-messaging-write.orchestrator.js";
 import { participantKeyForUser } from "./unified-messaging.constants.js";
 import type { AuthUser } from "./unified-messaging.types.js";
+import { getMessagingDedupStore } from "./messaging-dedup.store.js";
+import { getMessagingOutboxService } from "./messaging-outbox.service.js";
 
 export type MessagingWriteSurface =
   | "workspace_communication"
@@ -24,6 +26,8 @@ function eventKey(parts: string[]) {
 }
 
 export class MessagingEventEmitter {
+  constructor(private readonly prisma: PrismaClient) {}
+
   emit(
     event:
       | "messaging:conversation:new"
@@ -51,7 +55,18 @@ export class MessagingEventEmitter {
       payload.conversationId,
       payload.messageId ?? "",
     ]);
+
+    void this.emitOnce(event, payload, dedupeKey);
+  }
+
+  private async emitOnce(
+    event: Parameters<MessagingEventEmitter["emit"]>[0],
+    payload: Parameters<MessagingEventEmitter["emit"]>[1],
+    dedupeKey: string,
+  ) {
     if (emittedEventKeys.has(dedupeKey)) return;
+    const claimed = await getMessagingDedupStore(this.prisma).claim("socket", dedupeKey);
+    if (!claimed) return;
     emittedEventKeys.add(dedupeKey);
     setTimeout(() => emittedEventKeys.delete(dedupeKey), 60_000);
 
@@ -61,9 +76,10 @@ export class MessagingEventEmitter {
         conversationId: payload.conversationId,
         messageId: payload.messageId,
         workspaceId: payload.workspaceId,
+        idempotencyKey: dedupeKey,
       });
       if (payload.workspaceId) {
-        socketBus.emitToWorkspace(payload.workspaceId, event, payload);
+        socketBus.emitToWorkspace(payload.workspaceId, event, { ...payload, idempotencyKey: dedupeKey });
       }
     });
   }
@@ -79,14 +95,7 @@ export class MessagingNotificationDedup {
     recipientId: string;
   }): Promise<boolean> {
     const key = `messaging:${input.eventType}:${input.conversationId}:${input.messageId}:${input.recipientId}`;
-    const hash = createHash("sha256").update(key).digest("hex").slice(0, 32);
-    const existing = await this.prisma.notification.findFirst({
-      where: {
-        metadata: { path: ["messagingDedupKey"], equals: hash },
-      },
-      select: { id: true },
-    });
-    return !existing;
+    return getMessagingDedupStore(this.prisma).claim("notification", key);
   }
 
   messagingDedupMetadata(eventType: string, conversationId: string, messageId: string, recipientId: string) {
@@ -97,12 +106,15 @@ export class MessagingNotificationDedup {
 
 export class MessagingWriteBridge {
   private readonly orchestrator: UnifiedMessagingWriteOrchestrator;
-  private readonly events = new MessagingEventEmitter();
+  private readonly events: MessagingEventEmitter;
   readonly notifications: MessagingNotificationDedup;
+  private readonly outbox: ReturnType<typeof getMessagingOutboxService>;
 
   constructor(private readonly prisma: PrismaClient) {
     this.orchestrator = new UnifiedMessagingWriteOrchestrator(prisma);
+    this.events = new MessagingEventEmitter(prisma);
     this.notifications = new MessagingNotificationDedup(prisma);
+    this.outbox = getMessagingOutboxService(prisma);
   }
 
   get writeMode() {
@@ -116,18 +128,36 @@ export class MessagingWriteBridge {
     this.events.emit(event, payload);
   }
 
-  /** Execute legacy write; mirror + events based on write mode. */
+  /** Execute legacy write; mirror + events via outbox on failure. */
   async runLegacyWrite<T>(input: {
     surface: MessagingWriteSurface;
     actor: AuthUser;
     legacy: () => Promise<T>;
     afterLegacy?: (result: T) => Promise<void>;
+    mirrorOnFailure?: (result: T) => {
+      idempotencyKey: string;
+      conversationId?: string;
+      messageId?: string;
+      payload: Record<string, unknown>;
+    };
   }): Promise<T> {
     const result = await input.legacy();
     try {
       if (input.afterLegacy) await input.afterLegacy(result);
     } catch (err) {
       logger.warn({ err: String(err), surface: input.surface }, "messaging write bridge afterLegacy failed");
+      if (input.mirrorOnFailure) {
+        const m = input.mirrorOnFailure(result);
+        await this.outbox.enqueue({
+          eventType: "LEGACY_MIRROR",
+          aggregateType: input.surface,
+          aggregateId: m.messageId ?? m.idempotencyKey,
+          conversationId: m.conversationId,
+          messageId: m.messageId,
+          idempotencyKey: `mirror:${m.idempotencyKey}`,
+          payload: m.payload,
+        });
+      }
     }
     return result;
   }

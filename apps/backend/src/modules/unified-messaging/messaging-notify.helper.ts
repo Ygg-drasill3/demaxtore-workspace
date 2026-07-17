@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 import type { Prisma } from "@prisma/client";
+import { prisma } from "../../db/prisma.js";
+import { getMessagingDedupStore } from "./messaging-dedup.store.js";
 
 export function messagingDedupKey(
   eventType: string,
@@ -34,13 +36,11 @@ export async function filterRecipientsForMessagingDedup(
 ): Promise<string[]> {
   if (!input.userIds.length) return [];
   const out: string[] = [];
+  const dedup = getMessagingDedupStore(prisma);
   for (const userId of input.userIds) {
-    const hash = messagingDedupKey(input.eventType, input.conversationId, input.messageId, userId);
-    const existing = await tx.notification.findFirst({
-      where: { metadata: { path: ["messagingDedupKey"], equals: hash } },
-      select: { id: true },
-    });
-    if (!existing) out.push(userId);
+    const key = `messaging:${input.eventType}:${input.conversationId}:${input.messageId}:${userId}`;
+    const claimed = await dedup.claim("notification", key);
+    if (claimed) out.push(userId);
   }
   return out;
 }

@@ -358,6 +358,14 @@ export class TradeChatService {
   }
 
   async sendMessage(conversationId: string, actor: AuthUser, body: string) {
+    return getMessagingWriteBridge(this.db).runLegacyWrite({
+      surface: "direct_chat",
+      actor,
+      legacy: () => this.sendMessageDirect(conversationId, actor, body),
+    });
+  }
+
+  private async sendMessageDirect(conversationId: string, actor: AuthUser, body: string) {
     const text = body.trim();
     if (!text) throw new AppError(400, "EMPTY_MESSAGE");
 
