@@ -144,6 +144,11 @@ if (process.env.NODE_ENV === "test") {
   api.post(
     "/internal/messaging/socket-emit-test",
     asyncHandler(async (req, res) => {
+      const secret = process.env.E2E_TEST_SECRET ?? "";
+      const header = String(req.headers["x-e2e-test-secret"] ?? "");
+      if (!secret || secret.length < 32 || header !== secret) {
+        return res.status(403).json({ error: { code: "FORBIDDEN" } });
+      }
       const body = req.body as {
         event: Parameters<ReturnType<typeof getMessagingWriteBridge>["publishEvent"]>[0];
         payload: Parameters<ReturnType<typeof getMessagingWriteBridge>["publishEvent"]>[1];

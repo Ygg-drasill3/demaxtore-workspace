@@ -105,6 +105,40 @@ export async function initSocket(http: HttpServer): Promise<SocketServer> {
       ack?.({ ok: true });
     });
 
+    s.on(SocketEvents.MESSAGING_CONVERSATION_SUBSCRIBE, async (conversationId: unknown, ack?: Ack) => {
+      if (typeof conversationId !== "string" || !/^[0-9a-f-]{36}$/i.test(conversationId)) {
+        ack?.({ ok: false, error: "INVALID_CONVERSATION_ID" });
+        return;
+      }
+      try {
+        const { UnifiedMessagingPolicy } = await import(
+          "../modules/unified-messaging/unified-messaging.policy.js"
+        );
+        const policy = new UnifiedMessagingPolicy(prisma);
+        const allowed = await policy.canAccessConversation(
+          { id: userId, role, email: s.data.email },
+          conversationId,
+        );
+        if (!allowed) {
+          ack?.({ ok: false, error: "FORBIDDEN" });
+          logger.warn({ userId, conversationId }, "socket.messaging.subscribe.forbidden");
+          return;
+        }
+        await s.join(`messaging:conversation:${conversationId}`);
+        ack?.({ ok: true });
+        logger.debug({ userId, conversationId, sid: s.id }, "socket.messaging.subscribed");
+      } catch (e) {
+        logger.error({ err: e, userId, conversationId }, "socket.messaging.subscribe.error");
+        ack?.({ ok: false, error: "INTERNAL" });
+      }
+    });
+
+    s.on(SocketEvents.MESSAGING_CONVERSATION_UNSUBSCRIBE, (conversationId: unknown, ack?: Ack) => {
+      if (typeof conversationId !== "string") return ack?.({ ok: false, error: "INVALID_CONVERSATION_ID" });
+      void s.leave(`messaging:conversation:${conversationId}`);
+      ack?.({ ok: true });
+    });
+
     s.on("disconnect", (reason) => {
       logger.info({ userId, sid: s.id, reason }, "socket.disconnected");
     });

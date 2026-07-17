@@ -239,34 +239,68 @@ export class CommunicationService {
       const stored = await writeStoredFile(file.buffer, safeName);
       storageKey = stored.storageKey;
 
-      const row = await this.db.workspaceMessageAttachment.create({
-        data: {
-          workspaceType,
-          workspaceId,
-          fileName: safeName,
-          storageKey,
-          mimeType: file.mimeType,
-          fileSizeBytes: file.sizeBytes,
-          uploadedById: actor.id,
-        },
-      });
-
       const conv = await this.db.workspaceConversation.findUnique({
         where: { workspaceType_workspaceId: { workspaceType, workspaceId } },
         select: { id: true },
       });
-      if (conv) {
-        void getMessagingWriteBridge(this.db)
-          .onAttachmentCreated({ conversationId: conv.id, attachmentId: row.id })
-          .catch(() => undefined);
-      }
+
+      const row = await getMessagingWriteDispatcher(this.db).dispatchMutation({
+        surface: "workspace_communication",
+        registryKey: "workspace_attachment",
+        actor,
+        idempotencyKey: `ws-attach:${workspaceType}:${workspaceId}:${safeName}:${Date.now()}`,
+        unifiedPrimary: async (tx) => {
+          const attachment = await tx.workspaceMessageAttachment.create({
+            data: {
+              workspaceType,
+              workspaceId,
+              fileName: safeName,
+              storageKey: stored.storageKey,
+              mimeType: file.mimeType,
+              fileSizeBytes: file.sizeBytes,
+              uploadedById: actor.id,
+            },
+          });
+          return { attachment, conversationId: conv?.id };
+        },
+        buildOutbox: (result) =>
+          result.conversationId
+            ? [
+                buildSocketOutbox("workspace_communication", {
+                  event: "messaging:attachment:created",
+                  conversationId: result.conversationId,
+                  messageId: result.attachment.id,
+                  idempotencyKey: `attach:${result.attachment.id}`,
+                }),
+              ]
+            : [],
+        legacyOnly: async () => {
+          const attachment = await this.db.workspaceMessageAttachment.create({
+            data: {
+              workspaceType,
+              workspaceId,
+              fileName: safeName,
+              storageKey: stored.storageKey,
+              mimeType: file.mimeType,
+              fileSizeBytes: file.sizeBytes,
+              uploadedById: actor.id,
+            },
+          });
+          if (conv) {
+            void getMessagingWriteBridge(this.db)
+              .onAttachmentCreated({ conversationId: conv.id, attachmentId: attachment.id })
+              .catch(() => undefined);
+          }
+          return { attachment, conversationId: conv?.id };
+        },
+      });
 
       return {
-        id: row.id,
-        fileName: row.fileName,
-        mimeType: row.mimeType,
-        fileSizeBytes: row.fileSizeBytes,
-        uploadedAt: row.createdAt.toISOString(),
+        id: row.attachment.id,
+        fileName: row.attachment.fileName,
+        mimeType: row.attachment.mimeType,
+        fileSizeBytes: row.attachment.fileSizeBytes,
+        uploadedAt: row.attachment.createdAt.toISOString(),
       };
     } catch (err) {
       if (storageKey) {
@@ -749,32 +783,66 @@ export class CommunicationService {
     const resolved = await resolveWorkspace(this.db, workspaceType, workspaceId);
     if (!resolved) throw new AppError(404, "WORKSPACE_NOT_FOUND");
     const msg = await this.loadMessageForActor(input.messageId, actor, resolved);
+    const idempotencyKey = `ws-msg-read:${msg.id}:${actor.id}`;
 
-    await this.db.$transaction(async (tx) => {
-      await tx.workspaceReadReceipt.upsert({
-        where: { messageId_userId: { messageId: msg.id, userId: actor.id } },
-        create: { messageId: msg.id, userId: actor.id },
-        update: { readAt: new Date() },
-      });
-      await this.audit(tx, resolved, actor, "communication.read", { messageId: msg.id }, ctx);
+    await getMessagingWriteDispatcher(this.db).dispatchMutation({
+      surface: "workspace_communication",
+      registryKey: "workspace_mark_read",
+      actor,
+      idempotencyKey,
+      unifiedPrimary: async (tx) => {
+        await tx.workspaceReadReceipt.upsert({
+          where: { messageId_userId: { messageId: msg.id, userId: actor.id } },
+          create: { messageId: msg.id, userId: actor.id },
+          update: { readAt: new Date() },
+        });
+        await this.audit(tx, resolved, actor, "communication.read", { messageId: msg.id }, ctx);
+        return {
+          conversationId: msg.conversationId,
+          messageId: msg.id,
+          workspaceId: resolved.auditWorkspaceId,
+        };
+      },
+      buildOutbox: (result) => [
+        buildSocketOutbox("workspace_communication", {
+          event: "messaging:conversation:read",
+          conversationId: result.conversationId,
+          messageId: result.messageId,
+          workspaceId: result.workspaceId,
+          idempotencyKey,
+        }),
+      ],
+      legacyOnly: async () => {
+        await this.db.$transaction(async (tx) => {
+          await tx.workspaceReadReceipt.upsert({
+            where: { messageId_userId: { messageId: msg.id, userId: actor.id } },
+            create: { messageId: msg.id, userId: actor.id },
+            update: { readAt: new Date() },
+          });
+          await this.audit(tx, resolved, actor, "communication.read", { messageId: msg.id }, ctx);
+        });
+        socketBus.scheduleEmit(() => {
+          socketBus.emitToWorkspace(resolved.auditWorkspaceId, SocketEvents.COMMUNICATION_READ, {
+            workspaceType,
+            workspaceId,
+            messageId: input.messageId,
+            userId: actor.id,
+          });
+        });
+        void getMessagingWriteBridge(this.db)
+          .onConversationRead({
+            actor,
+            conversationId: msg.conversationId,
+            workspaceId: resolved.auditWorkspaceId,
+          })
+          .catch(() => undefined);
+        return {
+          conversationId: msg.conversationId,
+          messageId: msg.id,
+          workspaceId: resolved.auditWorkspaceId,
+        };
+      },
     });
-
-    socketBus.scheduleEmit(() => {
-      socketBus.emitToWorkspace(resolved!.auditWorkspaceId, SocketEvents.COMMUNICATION_READ, {
-        workspaceType,
-        workspaceId,
-        messageId: input.messageId,
-        userId: actor.id,
-      });
-    });
-
-    void getMessagingWriteBridge(this.db)
-      .onConversationRead({
-        actor,
-        conversationId: msg.conversationId,
-        workspaceId: resolved.auditWorkspaceId,
-      })
-      .catch(() => undefined);
   }
 
   private async loadMessageForActor(

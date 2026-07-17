@@ -111,6 +111,8 @@ export const SocketEvents = {
   // Subscription control
   WORKSPACE_SUBSCRIBE:  "workspace:subscribe",
   WORKSPACE_UNSUBSCRIBE:"workspace:unsubscribe",
+  MESSAGING_CONVERSATION_SUBSCRIBE: "messaging:conversation:subscribe",
+  MESSAGING_CONVERSATION_UNSUBSCRIBE: "messaging:conversation:unsubscribe",
 } as const;
 
 export type SocketEventName = (typeof SocketEvents)[keyof typeof SocketEvents];
