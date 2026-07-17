@@ -4,6 +4,7 @@ import { mixedContainerApi } from "../lib/mixed-container.api";
 import { Button } from "@/components/ui/Button";
 import { MC_STATE_LABELS } from "@dmx/contracts/mixed-container.zod";
 import { toast } from "@/store/toast.store";
+import { ContainerCommunicationPanel } from "@/features/unified-messages/components/ContainerCommunicationPanel";
 
 function fmtMoney(n: number) {
   return `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
@@ -47,14 +48,14 @@ export default function MixedContainerCoordinationPage() {
         <div data-testid="mc-buyer-execution-ready" className="dmx-card p-5 bg-green-50 border-green-200">
           <h2 className="font-medium text-green-900">Execution Ready</h2>
           <p className="text-sm text-green-800 mt-1">All supplier payments confirmed. Your SmartContainer is ready for order execution.</p>
-          <Link to={`/buyer/mixed-container/execution/${id}`} className="inline-block mt-3 text-sm text-accent-900 underline" data-testid="mc-view-execution">View Execution Dashboard</Link>
+          <Link to={`/buyer/mixed-container/organization/${id}`} className="inline-block mt-3 text-sm text-accent-900 underline" data-testid="mc-view-execution">View Organization Workspace</Link>
         </div>
       )}
 
       {["MC_EXECUTION_ACTIVE", "MC_EXECUTION_COMPLETE"].includes(data.state) && (
         <div className="dmx-card p-5 bg-blue-50 border-blue-200">
           <h2 className="font-medium text-blue-900">Execution in progress</h2>
-          <Link to={`/buyer/mixed-container/execution/${id}`} className="inline-block mt-2 text-sm text-accent-900 underline" data-testid="mc-view-execution-active">View Execution Dashboard</Link>
+          <Link to={`/buyer/mixed-container/organization/${id}`} className="inline-block mt-2 text-sm text-accent-900 underline" data-testid="mc-view-execution-active">View Organization Workspace</Link>
         </div>
       )}
 
@@ -174,6 +175,14 @@ export default function MixedContainerCoordinationPage() {
             </tbody>
           </table>
         </section>
+      )}
+
+      {id && (
+        <ContainerCommunicationPanel
+          contextType="SMART_CONTAINER"
+          contextId={id}
+          testId="smart-container-communication"
+        />
       )}
     </div>
   );

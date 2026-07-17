@@ -34,7 +34,10 @@ export class MessagingEventEmitter {
       | "messaging:conversation:read"
       | "messaging:conversation:assigned"
       | "messaging:conversation:archived"
-      | "messaging:participant:updated",
+      | "messaging:participant:updated"
+      | "messaging:context:updated"
+      | "messaging:attachment:created"
+      | "messaging:typing",
     payload: {
       conversationId: string;
       messageId?: string;
@@ -104,6 +107,13 @@ export class MessagingWriteBridge {
 
   get writeMode() {
     return this.orchestrator.writeMode;
+  }
+
+  publishEvent(
+    event: Parameters<MessagingEventEmitter["emit"]>[0],
+    payload: Parameters<MessagingEventEmitter["emit"]>[1],
+  ) {
+    this.events.emit(event, payload);
   }
 
   /** Execute legacy write; mirror + events based on write mode. */
@@ -215,21 +225,83 @@ export class MessagingWriteBridge {
     messageId: string;
     body: string;
     source: string;
+    channel?: "WORKSPACE" | "WHATSAPP";
+    clientMessageId?: string | null;
+    whatsappMessageId?: string | null;
   }) {
     let unifiedConv = await this.prisma.workspaceConversation.findFirst({
       where: { metadata: { path: ["legacyDirectConversationId"], equals: input.directConversationId } },
     });
 
-    if (!unifiedConv && this.writeMode !== "legacy_only") {
-      const direct = await this.prisma.directConversation.findUnique({ where: { id: input.directConversationId } });
-      if (direct) {
-        unifiedConv = await this.prisma.workspaceConversation.findFirst({
-          where: {
-            contexts: {
-              some: { contextType: direct.contextType === "ORDER_FREIGHT" ? "FREIGHT" : direct.contextType, contextId: direct.contextWorkspaceId },
-            },
+    const direct = await this.prisma.directConversation.findUnique({
+      where: { id: input.directConversationId },
+    });
+
+    if (!unifiedConv && direct) {
+      const contextType =
+        direct.contextType === "ORDER_FREIGHT" ? "FREIGHT" : direct.contextType;
+      unifiedConv = await this.prisma.workspaceConversation.findFirst({
+        where: {
+          contexts: {
+            some: { contextType, contextId: direct.contextWorkspaceId },
           },
+        },
+      });
+    }
+
+    if (!unifiedConv && direct && this.writeMode !== "legacy_only") {
+      const contextType =
+        direct.contextType === "ORDER_FREIGHT" ? "FREIGHT" : direct.contextType;
+      unifiedConv = await this.prisma.workspaceConversation.create({
+        data: {
+          workspaceType: "DIRECT_CHAT",
+          workspaceId: input.directConversationId,
+          primaryChannel: input.source === "whatsapp" ? "WHATSAPP" : "WORKSPACE",
+          metadata: { legacyDirectConversationId: input.directConversationId },
+          contexts: direct.contextWorkspaceId
+            ? {
+                create: {
+                  contextType,
+                  contextId: direct.contextWorkspaceId,
+                  contextReference: direct.contextRef,
+                },
+              }
+            : undefined,
+        },
+      });
+    }
+
+    const channel = input.channel ?? (input.source === "whatsapp" ? "WHATSAPP" : "WORKSPACE");
+    const legacy = { legacyId: input.messageId, legacySource: "direct_chat" };
+
+    if (unifiedConv && this.writeMode === "legacy_primary_unified_mirror") {
+      try {
+        await this.orchestrator.mirrorFromLegacy(
+          input.actor,
+          {
+            conversationId: unifiedConv.id,
+            authorUserId: input.actor.id,
+            body: input.body,
+            channel,
+            clientMessageId: input.clientMessageId ?? undefined,
+          },
+          legacy,
+        );
+      } catch (err) {
+        logger.warn({ err: String(err), surface: "direct_chat" }, "unified mirror failed");
+      }
+    } else if (unifiedConv && (this.writeMode === "unified_primary_legacy_mirror" || this.writeMode === "unified_only")) {
+      try {
+        await this.orchestrator.createExternalMessage(input.actor, {
+          conversationId: unifiedConv.id,
+          authorUserId: input.actor.id,
+          body: input.body,
+          channel,
+          clientMessageId: input.clientMessageId ?? undefined,
+          legacyMirror: async () => legacy,
         });
+      } catch (err) {
+        logger.warn({ err: String(err), surface: "direct_chat" }, "unified write failed");
       }
     }
 
@@ -237,7 +309,7 @@ export class MessagingWriteBridge {
       this.events.emit("messaging:message:new", {
         conversationId: unifiedConv.id,
         messageId: input.messageId,
-        idempotencyKey: input.messageId,
+        idempotencyKey: input.whatsappMessageId ?? input.clientMessageId ?? input.messageId,
       });
     }
   }
@@ -311,6 +383,100 @@ export class MessagingWriteBridge {
     this.events.emit("messaging:conversation:archived", {
       conversationId: input.conversationId,
       idempotencyKey: `${input.conversationId}:archive`,
+    });
+  }
+
+  async onWhatsAppInbound(input: {
+    whatsappConversationId: string;
+    messageId: string;
+    metaMessageId?: string | null;
+    duplicate?: boolean;
+  }) {
+    if (input.duplicate) return;
+    const unifiedConv = await this.prisma.workspaceConversation.findFirst({
+      where: { metadata: { path: ["whatsappConversationId"], equals: input.whatsappConversationId } },
+    });
+    const convId = unifiedConv?.id ?? input.whatsappConversationId;
+    this.events.emit("messaging:message:new", {
+      conversationId: convId,
+      messageId: input.messageId,
+      idempotencyKey: input.metaMessageId ?? `inbound:${input.messageId}`,
+    });
+  }
+
+  async onAttachmentCreated(input: {
+    conversationId: string;
+    messageId?: string;
+    attachmentId: string;
+  }) {
+    this.events.emit("messaging:attachment:created", {
+      conversationId: input.conversationId,
+      messageId: input.messageId,
+      idempotencyKey: `attach:${input.attachmentId}`,
+    });
+  }
+
+  async onSystemMessage(input: {
+    actor?: AuthUser;
+    workspaceType: string;
+    workspaceId: string;
+    auditWorkspaceId: string;
+    messageId: string;
+    body: string;
+    systemEventKey?: string;
+  }) {
+    const conv = await this.prisma.workspaceConversation.findUnique({
+      where: { workspaceType_workspaceId: { workspaceType: input.workspaceType, workspaceId: input.workspaceId } },
+    });
+    if (!conv) return;
+
+    const actor = input.actor ?? { id: "system", email: "", role: "SYSTEM" };
+    const legacy = { legacyId: input.messageId, legacySource: "system_event" };
+
+    if (this.writeMode !== "legacy_only") {
+      try {
+        await this.orchestrator.createSystemMessage(
+          actor,
+          {
+            conversationId: conv.id,
+            authorUserId: actor.id,
+            body: input.body,
+            systemEventKey: input.systemEventKey,
+          },
+          legacy,
+        );
+      } catch (err) {
+        logger.warn({ err: String(err), surface: "system_event" }, "unified mirror failed");
+      }
+    }
+
+    this.events.emit("messaging:message:new", {
+      conversationId: conv.id,
+      messageId: input.messageId,
+      workspaceId: input.auditWorkspaceId,
+      audienceScope: "SYSTEM",
+      idempotencyKey: `system:${input.messageId}`,
+    });
+  }
+
+  async onParticipantUpdated(input: { conversationId: string; participantId: string }) {
+    this.events.emit("messaging:participant:updated", {
+      conversationId: input.conversationId,
+      idempotencyKey: `participant:${input.participantId}`,
+    });
+  }
+
+  async onContextUpdated(input: { conversationId: string; contextId: string }) {
+    this.events.emit("messaging:context:updated", {
+      conversationId: input.conversationId,
+      idempotencyKey: `context:${input.contextId}`,
+    });
+  }
+
+  async onConversationUpdated(input: { conversationId: string; reason: string }) {
+    this.events.emit("messaging:conversation:updated", {
+      conversationId: input.conversationId,
+      idempotencyKey: `${input.conversationId}:updated:${input.reason}`,
     });
   }
 

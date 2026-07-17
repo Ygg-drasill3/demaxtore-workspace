@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { bulkContainerApi } from "../lib/bulk-container.api";
 import { BC_STATE_LABELS } from "@dmx/contracts/bulk-container.zod";
 import type { BcCoordinationDTO } from "@dmx/contracts/bulk-container.zod";
+import { ContainerCommunicationPanel } from "@/features/unified-messages/components/ContainerCommunicationPanel";
 
 function fmtMoney(n: number) {
   return `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
@@ -177,6 +178,14 @@ export default function BulkContainerCoordinationPage() {
             </tbody>
           </table>
         </section>
+      )}
+
+      {id && (
+        <ContainerCommunicationPanel
+          contextType="BULK_CONTAINER"
+          contextId={id}
+          testId="bulk-container-communication"
+        />
       )}
     </div>
   );

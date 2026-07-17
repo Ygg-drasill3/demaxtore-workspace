@@ -40,6 +40,52 @@ export class UnifiedMessagingWriteOrchestrator {
     return getUnifiedMessagingWriteMode();
   }
 
+  /** Canonical unified API write — always persists unified row; optional legacy mirror. */
+  async writeFromUnifiedApi(
+    user: AuthUser,
+    input: CreateExternalMessageInput & { internal?: boolean },
+  ) {
+    if (input.internal) {
+      if (!this.policy.canCreateInternalNote(user)) throw new Error("INTERNAL_NOTE_BLOCKED");
+      return this.persistUnifiedMessage({
+        conversationId: input.conversationId,
+        authorUserId: input.authorUserId,
+        body: input.body,
+        messageType: "INTERNAL_NOTE",
+        visibility: "ADMIN_ONLY",
+        audienceScope: "INTERNAL",
+        direction: "INTERNAL",
+        channelSource: "WORKSPACE",
+        parentMessageId: input.parentMessageId,
+      });
+    }
+
+    const channel = input.channel ?? "WORKSPACE";
+    const audienceScope = "EXTERNAL" as const;
+    this.policy.assertCanDispatchToChannel(audienceScope, channel);
+
+    const unified = await this.persistUnifiedMessage({
+      conversationId: input.conversationId,
+      authorUserId: input.authorUserId,
+      body: input.body,
+      messageType: input.messageType ?? "MESSAGE",
+      visibility: input.visibility ?? "ALL_PARTICIPANTS",
+      audienceScope,
+      direction: defaultDirectionForAudience(audienceScope),
+      channelSource: channelToColumn(channel),
+      parentMessageId: input.parentMessageId,
+      clientMessageId: input.clientMessageId,
+    });
+
+    const mode = this.writeMode;
+    if (mode === "unified_primary_legacy_mirror" && input.legacyMirror) {
+      void input.legacyMirror().catch((err) => {
+        logger.warn({ err: String(err), messageId: unified.id }, "legacy mirror failed");
+      });
+    }
+    return unified;
+  }
+
   async createExternalMessage(user: AuthUser, input: CreateExternalMessageInput) {
     const mode = this.writeMode;
     const channel = input.channel ?? "WORKSPACE";
@@ -149,6 +195,46 @@ export class UnifiedMessagingWriteOrchestrator {
     return this.prisma.workspaceMessage.update({ where: { id: messageId }, data });
   }
 
+  async createSystemMessage(
+    user: AuthUser,
+    input: Omit<CreateExternalMessageInput, "channel"> & { systemEventKey?: string },
+    legacy?: { legacyId: string; legacySource: string },
+  ) {
+    const audienceScope = "SYSTEM" as const;
+    this.policy.assertCanDispatchToChannel(audienceScope, "WORKSPACE");
+    const mode = this.writeMode;
+
+    if (mode === "legacy_only") return null;
+
+    if (mode === "legacy_primary_unified_mirror" && legacy) {
+      return this.mirrorToUnified(
+        user,
+        { ...input, channel: "WORKSPACE", messageType: "SYSTEM_EVENT", visibility: "ALL_PARTICIPANTS" },
+        legacy,
+        audienceScope,
+      );
+    }
+
+    if (legacy) {
+      const existing = await this.repo.findMessageByLegacy(legacy.legacySource, legacy.legacyId);
+      if (existing) return existing;
+    }
+
+    return this.persistUnifiedMessage({
+      conversationId: input.conversationId,
+      authorUserId: input.authorUserId,
+      body: input.body,
+      messageType: "SYSTEM_EVENT",
+      visibility: "ALL_PARTICIPANTS",
+      audienceScope,
+      direction: "INTERNAL",
+      channelSource: "WORKSPACE",
+      legacySource: legacy?.legacySource,
+      legacyId: legacy?.legacyId,
+      systemEventKey: input.systemEventKey,
+    });
+  }
+
   async mirrorFromLegacy(
     user: AuthUser,
     input: CreateExternalMessageInput,
@@ -177,6 +263,7 @@ export class UnifiedMessagingWriteOrchestrator {
     legacySource?: string;
     legacyId?: string;
     externalMessageId?: string;
+    systemEventKey?: string;
   }) {
     return this.repo.createMessage(data);
   }
@@ -185,17 +272,20 @@ export class UnifiedMessagingWriteOrchestrator {
     user: AuthUser,
     input: CreateExternalMessageInput,
     legacy: { legacyId: string; legacySource: string },
+    audienceScope: "EXTERNAL" | "INTERNAL" | "SYSTEM" = "EXTERNAL",
   ) {
     const existing = await this.repo.findMessageByLegacy(legacy.legacySource, legacy.legacyId);
     if (existing) return existing;
+    const isInternal = audienceScope === "INTERNAL" || input.messageType === "INTERNAL_NOTE";
+    const resolvedScope = isInternal ? "INTERNAL" : audienceScope;
     return this.persistUnifiedMessage({
       conversationId: input.conversationId,
       authorUserId: input.authorUserId,
       body: input.body,
       messageType: input.messageType ?? "MESSAGE",
-      visibility: input.visibility ?? "ALL_PARTICIPANTS",
-      audienceScope: "EXTERNAL",
-      direction: defaultDirectionForAudience("EXTERNAL"),
+      visibility: input.visibility ?? (isInternal ? "ADMIN_ONLY" : "ALL_PARTICIPANTS"),
+      audienceScope: resolvedScope,
+      direction: defaultDirectionForAudience(resolvedScope),
       channelSource: channelToColumn(input.channel ?? "WORKSPACE"),
       parentMessageId: input.parentMessageId,
       clientMessageId: input.clientMessageId,

@@ -205,6 +205,7 @@ export class UnifiedMessagingRepository {
     legacyId?: string;
     externalMessageId?: string;
     whatsappMessageId?: string;
+    systemEventKey?: string;
     sentAt?: Date;
   }) {
     return this.prisma.$transaction(async (tx) => {

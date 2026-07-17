@@ -441,6 +441,7 @@ export class TradeChatService {
         messageId: msg.id,
         body: text,
         source,
+        whatsappMessageId,
       })
       .catch(() => undefined);
     return dto;
@@ -543,6 +544,17 @@ export class TradeChatService {
 
     const dto = mapMessageRow(msg, matchedConv, authorId ?? "", senderType);
     this.emitMessageEvent(matchedConv, dto);
+
+    void getMessagingWriteBridge(this.db)
+      .onDirectMessageCreated({
+        actor: { id: authorId ?? "system", email: "", role: "SYSTEM" },
+        directConversationId: matchedConv.id,
+        messageId: msg.id,
+        body: messageText,
+        source: "whatsapp",
+        whatsappMessageId,
+      })
+      .catch(() => undefined);
 
     return { conversationId: matchedConv.id, messageId: msg.id, duplicate: false };
   }

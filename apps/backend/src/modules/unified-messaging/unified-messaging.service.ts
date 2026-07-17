@@ -8,8 +8,6 @@ import type {
   CreateMessageRequest,
 } from "@dmx/contracts/unified-messaging";
 import {
-  channelToColumn,
-  defaultDirectionForAudience,
   participantKeyForUser,
   participantKeyForWhatsApp,
 } from "./unified-messaging.constants.js";
@@ -28,11 +26,14 @@ import {
 import { UnifiedMessagingPolicy } from "./unified-messaging.policy.js";
 import { UnifiedMessagingRepository } from "./unified-messaging.repository.js";
 import type { AuthUser } from "./unified-messaging.types.js";
+import { getMessagingWriteBridge } from "./messaging-write.bridge.js";
+import { UnifiedMessagingWriteOrchestrator } from "./unified-messaging-write.orchestrator.js";
 
 export class UnifiedMessagingService {
   private readonly repo: UnifiedMessagingRepository;
   private readonly policy: UnifiedMessagingPolicy;
   private readonly dispatcher: MessagingChannelDispatcher;
+  private readonly writeOrchestrator: UnifiedMessagingWriteOrchestrator;
 
   constructor(private readonly prisma: PrismaClient) {
     this.repo = new UnifiedMessagingRepository(prisma);
@@ -41,6 +42,7 @@ export class UnifiedMessagingService {
       new WorkspaceChannelAdapter(),
       new WhatsAppChannelAdapterStub(),
     ]);
+    this.writeOrchestrator = new UnifiedMessagingWriteOrchestrator(prisma);
   }
 
   async listConversations(user: AuthUser, filters: ConversationListFilters) {
@@ -90,22 +92,22 @@ export class UnifiedMessagingService {
       throw UnifiedMessagingErrors.cannotAccessConversation();
     }
 
-    const channel = input.channel ?? "WORKSPACE";
+    const channel: "WORKSPACE" | "WHATSAPP" =
+      input.channel === "WHATSAPP" ? "WHATSAPP" : "WORKSPACE";
     const audienceScope = "EXTERNAL" as const;
     this.policy.assertCanDispatchToChannel(audienceScope, channel);
 
-    const message = await this.repo.createMessage({
+    const message = await this.writeOrchestrator.writeFromUnifiedApi(user, {
       conversationId,
       authorUserId: user.id,
       body: input.body,
+      channel,
       messageType: input.messageType ?? "MESSAGE",
       visibility: "ALL_PARTICIPANTS",
-      audienceScope,
-      direction: defaultDirectionForAudience(audienceScope),
-      channelSource: channelToColumn(channel),
       parentMessageId: input.replyToMessageId,
       clientMessageId: input.clientMessageId,
     });
+    if (!message) throw UnifiedMessagingErrors.cannotAccessConversation();
 
     if (channel === "WHATSAPP") {
       await this.dispatcher.dispatch("WHATSAPP", {
@@ -123,6 +125,14 @@ export class UnifiedMessagingService {
       });
     }
 
+    const bridge = getMessagingWriteBridge(this.prisma);
+    bridge.publishEvent("messaging:message:new", {
+      conversationId,
+      messageId: message.id,
+      idempotencyKey: input.clientMessageId ?? message.id,
+      audienceScope: "EXTERNAL",
+    });
+
     return mapMessage(message);
   }
 
@@ -139,16 +149,20 @@ export class UnifiedMessagingService {
     const audienceScope = "INTERNAL" as const;
     this.policy.assertCanDispatchToChannel(audienceScope, "WORKSPACE");
 
-    const message = await this.repo.createMessage({
+    const message = await this.writeOrchestrator.writeFromUnifiedApi(user, {
       conversationId,
       authorUserId: user.id,
       body: input.body,
-      messageType: "INTERNAL_NOTE",
-      visibility: "ADMIN_ONLY",
-      audienceScope,
-      direction: "INTERNAL",
-      channelSource: "WORKSPACE",
       parentMessageId: input.replyToMessageId,
+      internal: true,
+    });
+    if (!message) throw UnifiedMessagingErrors.internalNoteBlocked();
+
+    getMessagingWriteBridge(this.prisma).publishEvent("messaging:message:new", {
+      conversationId,
+      messageId: message.id,
+      audienceScope: "INTERNAL",
+      idempotencyKey: message.id,
     });
 
     return mapMessage(message);
@@ -157,6 +171,9 @@ export class UnifiedMessagingService {
   async markConversationRead(user: AuthUser, conversationId: string) {
     await this.policy.assertConversationAccess(user, conversationId);
     await this.repo.markConversationRead(conversationId, user.id);
+    void getMessagingWriteBridge(this.prisma)
+      .onConversationRead({ actor: user, conversationId })
+      .catch(() => undefined);
     return { ok: true };
   }
 
@@ -200,6 +217,10 @@ export class UnifiedMessagingService {
       email: data.email,
     });
 
+    void getMessagingWriteBridge(this.prisma)
+      .onParticipantUpdated({ conversationId, participantId: row.id })
+      .catch(() => undefined);
+
     return row;
   }
 
@@ -222,6 +243,9 @@ export class UnifiedMessagingService {
       metadata: input.metadata,
       createdById: user.id,
     });
+    void getMessagingWriteBridge(this.prisma)
+      .onContextUpdated({ conversationId, contextId: row.id })
+      .catch(() => undefined);
     return row;
   }
 
@@ -241,6 +265,9 @@ export class UnifiedMessagingService {
       throw UnifiedMessagingErrors.cannotAssign();
     }
     await this.repo.assignConversation(conversationId, input.assignedUserId);
+    void getMessagingWriteBridge(this.prisma)
+      .onAssignment({ conversationId, assignedUserId: input.assignedUserId })
+      .catch(() => undefined);
     return this.getConversation(user, conversationId);
   }
 
@@ -249,6 +276,9 @@ export class UnifiedMessagingService {
       throw UnifiedMessagingErrors.cannotArchive();
     }
     await this.repo.archiveConversation(conversationId);
+    void getMessagingWriteBridge(this.prisma)
+      .onArchive({ conversationId })
+      .catch(() => undefined);
     return this.getConversation(user, conversationId);
   }
 }
