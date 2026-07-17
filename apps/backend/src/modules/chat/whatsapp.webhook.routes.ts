@@ -62,6 +62,21 @@ whatsappWebhookRouter.post("/", (req, res) => {
         const inboxResult = await inbox().processWebhookPayload(body);
         logger.info(inboxResult, "[WA] inbox webhook processed");
 
+        try {
+          const { UnifiedMessagingInboundHandler } = await import(
+            "../unified-messaging/unified-messaging-inbound.handler.js"
+          );
+          const unifiedInbound = new UnifiedMessagingInboundHandler(prisma);
+          if (inboxResult && typeof inboxResult === "object") {
+            await unifiedInbound.mirrorWhatsAppInboxResult(inboxResult as never);
+          }
+          for (const st of parseWhatsAppStatusWebhook(body)) {
+            await unifiedInbound.mirrorDeliveryStatus(st.providerMessageId, st.status);
+          }
+        } catch (mirrorErr) {
+          logger.warn({ err: mirrorErr }, "[WA] unified mirror skipped");
+        }
+
         const legacyInbound = parseInboundWebhook(body);
         for (const item of legacyInbound) {
           const result = await chat().ingestInbound(

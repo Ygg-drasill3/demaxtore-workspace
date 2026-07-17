@@ -4,9 +4,15 @@ import { asyncHandler } from "../../middleware/asyncHandler.js";
 import { prisma } from "../../db/prisma.js";
 import { TradeChatService } from "./chat.service.js";
 import { integrationStatus } from "./whatsapp.service.js";
+import {
+  getLegacyMessagingAdapters,
+  shouldUseAdapterLayer,
+  toMessagingActor,
+} from "../unified-messaging/adapters/legacy/index.js";
 
 const router = Router();
 const chat = () => new TradeChatService(prisma);
+const adapters = () => getLegacyMessagingAdapters(prisma);
 
 /** Production API: /api/conversations */
 router.get("/status", requireAuth, asyncHandler(async (_req, res) => {
@@ -14,8 +20,17 @@ router.get("/status", requireAuth, asyncHandler(async (_req, res) => {
 }));
 
 router.get("/", requireAuth, asyncHandler(async (req, res) => {
-  const rows = await chat().listConversations(req.user!.id, req.user!.role);
-  res.json(rows);
+  const actor = req.user!;
+  if (!shouldUseAdapterLayer()) {
+    res.json(await chat().listConversations(actor.id, actor.role));
+    return;
+  }
+  res.json(
+    await adapters().directChat.listConversations(
+      () => chat().listConversations(actor.id, actor.role),
+      toMessagingActor(actor),
+    ),
+  );
 }));
 
 router.get("/admin/all", requireAuth, requireRole("ADMIN", "SUPER_ADMIN", "OPS_MANAGER"), asyncHandler(async (_req, res) => {
@@ -69,8 +84,18 @@ router.post("/order/:orderWorkspaceId/freight/:forwarderContactId/ensure", requi
 }));
 
 router.get("/:conversationId", requireAuth, asyncHandler(async (req, res) => {
-  const data = await chat().getConversation(req.params.conversationId, req.user!.id, req.user!.role);
-  res.json(data);
+  const actor = req.user!;
+  if (!shouldUseAdapterLayer()) {
+    res.json(await chat().getConversation(req.params.conversationId, actor.id, actor.role));
+    return;
+  }
+  res.json(
+    await adapters().directChat.getConversation(
+      () => chat().getConversation(req.params.conversationId, actor.id, actor.role),
+      req.params.conversationId,
+      toMessagingActor(actor),
+    ),
+  );
 }));
 
 router.post("/:conversationId/messages", requireAuth, asyncHandler(async (req, res) => {

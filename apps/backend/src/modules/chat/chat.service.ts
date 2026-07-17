@@ -9,6 +9,7 @@ import type { ChatContextType } from "./chat.types.js";
 import { isAdminChatRole } from "./chat.types.js";
 import { socketBus } from "../../realtime/socket-bus.js";
 import { logger } from "../../config/logger.js";
+import { getMessagingWriteBridge } from "../unified-messaging/messaging-write.bridge.js";
 
 export type { ChatContextType };
 
@@ -433,6 +434,15 @@ export class TradeChatService {
 
     const dto = mapMessageRow(msg, conv, actor.id, actor.role);
     this.emitMessageEvent(conv, dto);
+    void getMessagingWriteBridge(this.db)
+      .onDirectMessageCreated({
+        actor,
+        directConversationId: conversationId,
+        messageId: msg.id,
+        body: text,
+        source,
+      })
+      .catch(() => undefined);
     return dto;
   }
 

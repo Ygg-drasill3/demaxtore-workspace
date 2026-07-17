@@ -49,10 +49,13 @@ import exceptionHubRoutes from "./modules/exception-hub/exception-hub.routes.js"
 import { paymentRouter } from "./modules/payments/payment.routes.js";
 import { orchestrationRouter } from "./modules/orchestration/orchestration.routes.js";
 import { forwarderRouter } from "./modules/forwarder/forwarder.routes.js";
+import { referenceFreightAdminRouter } from "./modules/reference-freight/reference-freight.routes.js";
 import { publicCatalogRfqRouter } from "./modules/integrations/catalog-rfq-ingest.routes.js";
 import { chatRouter } from "./modules/chat/chat.routes.js";
 import { conversationsRouter } from "./modules/chat/conversations.routes.js";
 import { whatsappInboxRouter } from "./modules/whatsapp-inbox/whatsapp-inbox.routes.js";
+import { unifiedMessagingRouter } from "./modules/unified-messaging/unified-messaging.routes.js";
+import { isUnifiedMessagingEnabled } from "./config/env.js";
 import { freightEstimateRouter } from "./modules/freight-estimate/freight-estimate.routes.js";
 import { freightBookingRouter } from "./modules/freight-booking/freight-booking.routes.js";
 import tradeTimelineRoutes from "./modules/trade-timeline/trade-timeline.routes.js";
@@ -112,11 +115,15 @@ api.use("/exceptions", exceptionHubRoutes);
 api.use("/payments", paymentRouter);
 api.use("/orchestration", orchestrationRouter);
 api.use("/forwarder", forwarderRouter);
+api.use("/admin/reference-freight-rates", referenceFreightAdminRouter);
 api.use("/trade-documents", tradeDocumentsRouter);
 api.use("/purchase-orders", purchaseOrderRouter);
 api.use("/chat", chatRouter);
 api.use("/conversations", conversationsRouter);
 api.use("/whatsapp", whatsappInboxRouter);
+if (isUnifiedMessagingEnabled()) {
+  api.use("/messaging/conversations", unifiedMessagingRouter);
+}
 api.use("/freight-estimates", freightEstimateRouter);
 api.use("/freight-bookings", freightBookingRouter);
 api.use("/trade-timeline", tradeTimelineRoutes);

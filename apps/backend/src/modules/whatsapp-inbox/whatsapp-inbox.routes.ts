@@ -5,9 +5,15 @@ import { prisma } from "../../db/prisma.js";
 import { WhatsAppInboxService } from "./whatsapp-inbox.service.js";
 import { assertStoredFileExists } from "../../lib/file-storage.js";
 import fsp from "node:fs/promises";
+import {
+  getLegacyMessagingAdapters,
+  shouldUseAdapterLayer,
+  toMessagingActor,
+} from "../unified-messaging/adapters/legacy/index.js";
 
 const router = Router();
 const inbox = () => new WhatsAppInboxService(prisma);
+const adapters = () => getLegacyMessagingAdapters(prisma);
 
 const INBOX_ROLES = ["SUPER_ADMIN", "ADMIN", "OPS_MANAGER", "SALES_CONTROL"] as const;
 
@@ -18,8 +24,17 @@ router.get(
   asyncHandler(async (req, res) => {
     const cursor = typeof req.query.cursor === "string" ? req.query.cursor : undefined;
     const limit = req.query.limit ? Number(req.query.limit) : undefined;
-    const data = await inbox().listConversations(req.user!, { cursor, limit });
-    res.json(data);
+    const actor = req.user!;
+    if (!shouldUseAdapterLayer()) {
+      res.json(await inbox().listConversations(actor, { cursor, limit }));
+      return;
+    }
+    res.json(
+      await adapters().whatsappInbox.listConversations(
+        () => inbox().listConversations(actor, { cursor, limit }),
+        toMessagingActor(actor),
+      ),
+    );
   }),
 );
 
@@ -30,8 +45,18 @@ router.get(
   asyncHandler(async (req, res) => {
     const cursor = typeof req.query.cursor === "string" ? req.query.cursor : undefined;
     const limit = req.query.limit ? Number(req.query.limit) : undefined;
-    const data = await inbox().getMessages(req.user!, req.params.id, { cursor, limit });
-    res.json(data);
+    const actor = req.user!;
+    if (!shouldUseAdapterLayer()) {
+      res.json(await inbox().getMessages(actor, req.params.id, { cursor, limit }));
+      return;
+    }
+    res.json(
+      await adapters().whatsappInbox.getMessages(
+        () => inbox().getMessages(actor, req.params.id, { cursor, limit }),
+        req.params.id,
+        toMessagingActor(actor),
+      ),
+    );
   }),
 );
 

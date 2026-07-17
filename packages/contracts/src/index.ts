@@ -113,3 +113,5 @@ export * from "./workspace-inbox.zod";
 export * from "./passwordless-access";
 export * from "./whatsapp-notification-bridge";
 export * from "./email-notification-bridge";
+export * from "./unified-messaging";
+export * from "./unified-messaging.zod";

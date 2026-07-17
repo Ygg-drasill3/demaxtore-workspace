@@ -14,6 +14,7 @@ import {
   type SendMessageInput,
 } from "./whatsapp-inbox.types.js";
 import type { AuthUser } from "../../types/auth-user.js";
+import { getMessagingWriteBridge } from "../unified-messaging/messaging-write.bridge.js";
 
 function previewForMessage(type: string, body: string | null, caption: string | null): string {
   if (body?.trim()) return body.trim().slice(0, 200);
@@ -386,6 +387,9 @@ export class WhatsAppInboxService {
       where: { id: conversationId },
       data: { unreadCount: 0 },
     });
+    void getMessagingWriteBridge(this.db)
+      .onConversationRead({ actor, conversationId })
+      .catch(() => undefined);
     return { ok: true };
   }
 
@@ -524,6 +528,16 @@ export class WhatsAppInboxService {
       message: messageDto,
       conversation: convDto,
     });
+
+    void getMessagingWriteBridge(this.db)
+      .onWhatsAppMessageCreated({
+        actor,
+        whatsappConversationId: conversation.id,
+        messageId: updated.id,
+        direction: "OUTBOUND",
+        metaMessageId: result.metaMessageId,
+      })
+      .catch(() => undefined);
 
     if (!result.metaMessageId && result.error) {
       throw new AppError(502, "WHATSAPP_SEND_FAILED", { message: result.error, messageId: pending.id });

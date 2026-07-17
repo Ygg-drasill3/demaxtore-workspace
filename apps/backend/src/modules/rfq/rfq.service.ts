@@ -323,6 +323,34 @@ export class RfqService {
       })();
     }
 
+    if (action === "post_clarification") {
+      void (async () => {
+        try {
+          const { getMessagingWriteBridge } = await import("../unified-messaging/messaging-write.bridge.js");
+          const latest = await this.prisma.clarificationMessage.findFirst({
+            where: { thread: { workspaceId } },
+            orderBy: { createdAt: "desc" },
+          });
+          if (!latest) return;
+          const body = String(payload.message ?? "").trim();
+          const visibility = payload.visibility === "ADMIN_ONLY" ? "ADMIN_ONLY" : "ALL";
+          await getMessagingWriteBridge(this.prisma).onWorkspaceMessageCreated({
+            actor: { id: actor.id, role: actor.role, email: actor.email },
+            workspaceType: "RFQ",
+            workspaceId,
+            auditWorkspaceId: workspaceId,
+            messageId: latest.id,
+            body,
+            messageType: visibility === "ADMIN_ONLY" ? "INTERNAL_NOTE" : "MESSAGE",
+            visibility: visibility === "ADMIN_ONLY" ? "ADMIN_ONLY" : "ALL_PARTICIPANTS",
+            legacySource: "rfq_clarification",
+          });
+        } catch (err) {
+          logger.warn({ err, workspaceId }, "RFQ clarification messaging bridge failed");
+        }
+      })();
+    }
+
     void (async () => {
       const { emitFromRfqAuditEvent, bootstrapSpawnedOrdersForParent } =
         await import("../conversation-hub/conversation-hub.hooks.js");

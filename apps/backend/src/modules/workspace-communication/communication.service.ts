@@ -34,6 +34,7 @@ import {
   type ResolvedWorkspace,
 } from "./communication.policy.js";
 import { notifyCommEvent } from "./communication.notifications.js";
+import { getMessagingWriteBridge } from "../unified-messaging/messaging-write.bridge.js";
 
 const ALLOWED_MIMES = new Set([
   "application/pdf",
@@ -468,6 +469,20 @@ export class CommunicationService {
         });
       }
     });
+
+    void getMessagingWriteBridge(this.db)
+      .onWorkspaceMessageCreated({
+        actor,
+        workspaceType,
+        workspaceId,
+        auditWorkspaceId: resolved.auditWorkspaceId,
+        messageId,
+        body: input.body.trim(),
+        messageType: input.messageType,
+        visibility: input.visibility,
+        clientMessageId: input.clientMessageId,
+      })
+      .catch(() => undefined);
   }
 
   private async editMessage(
@@ -565,6 +580,14 @@ export class CommunicationService {
         userId: actor.id,
       });
     });
+
+    void getMessagingWriteBridge(this.db)
+      .onConversationRead({
+        actor,
+        conversationId: msg.conversationId,
+        workspaceId: resolved.auditWorkspaceId,
+      })
+      .catch(() => undefined);
   }
 
   private async loadMessageForActor(

@@ -112,6 +112,11 @@ export async function initSocket(http: HttpServer): Promise<SocketServer> {
 
   await configureSocketAdapter(io);
 
+  const { registerMessagingSocketBridge } = await import(
+    "../modules/unified-messaging/messaging-socket.bridge.js"
+  );
+  registerMessagingSocketBridge(io);
+
   return io;
 }
 

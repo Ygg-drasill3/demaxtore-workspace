@@ -39,7 +39,7 @@ export const BUYER_NAV_GROUPS: NavGroup[] = [
   {
     id: "home", label: "Home", testId: "nav-group-home",
     items: [
-      { to: "/buyer/inbox", label: "Workspace Inbox", icon: Inbox, testId: "buyer-inbox", end: true },
+      { to: "/messages", label: "Workspace Inbox", icon: Inbox, testId: "buyer-inbox", end: true },
       { to: "/buyer/dashboard", label: "Dashboard", icon: LayoutDashboard, testId: "buyer-dashboard" },
     ],
   },
@@ -67,8 +67,7 @@ export const BUYER_NAV_GROUPS: NavGroup[] = [
   {
     id: "collaboration", label: "Collaboration", testId: "nav-group-collaboration",
     items: [
-      { to: "/buyer/messages",  label: "Messages",      icon: MessageSquare, testId: "buyer-messages" },
-      { to: "/buyer/freightiq/messages", label: "FreightIQ Messages", icon: MessageSquare, testId: "buyer-freightiq-messages" },
+      { to: "/messages",  label: "Messages",      icon: MessageSquare, testId: "buyer-messages" },
       { to: "/notifications",   label: "Notifications", icon: Bell,          testId: "buyer-notifications" },
     ],
   },
@@ -91,7 +90,7 @@ export const BUYER_QUICK_ACTIONS: QuickAction[] = [
   { label: "Create Bid",         to: "/buyer/commoditybid/new",   testId: "qa-create-cb",        icon: Gavel },
   { label: "New RFQ",            to: "/buyer/rfq/new",           testId: "qa-new-rfq",          icon: Plus },
   { label: "Mixed Container",    to: "/buyer/mixed-container",   testId: "qa-mixed-container",  icon: Container },
-  { label: "Open Messages",      to: "/buyer/messages",            testId: "qa-open-messages",    icon: MessageSquare },
+  { label: "Open Messages",      to: "/messages",            testId: "qa-open-messages",    icon: MessageSquare },
   { label: "My Shipments",       to: "/shipments/portfolio",       testId: "qa-view-shipments",   icon: Ship },
   { label: "Open Documents",     to: "/documents",                 testId: "qa-open-documents",   icon: FileCheck },
 ];
@@ -124,7 +123,7 @@ export const SUPPLIER_NAV_GROUPS: NavGroup[] = [
   {
     id: "collaboration", label: "Collaboration", testId: "nav-group-collaboration",
     items: [
-      { to: "/supplier/messages", label: "Messages",      icon: MessageSquare, testId: "supplier-messages" },
+      { to: "/messages", label: "Messages",      icon: MessageSquare, testId: "supplier-messages" },
       { to: "/notifications",     label: "Notifications", icon: Bell,          testId: "supplier-notifications" },
     ],
   },
@@ -146,7 +145,7 @@ export const SUPPLIER_QUICK_ACTIONS: QuickAction[] = [
   { label: "Open RFQs",      to: "/supplier/rfq",            testId: "sqa-open-rfqs",      icon: Inbox },
   { label: "Join Auction",   to: "/supplier/commoditybid",   testId: "sqa-join-auction",   icon: Gavel },
   { label: "View Orders",    to: "/supplier/orders",         testId: "sqa-view-orders",    icon: Package },
-  { label: "Open Messages",  to: "/supplier/messages",       testId: "sqa-open-messages",  icon: MessageSquare },
+  { label: "Open Messages",  to: "/messages",       testId: "sqa-open-messages",  icon: MessageSquare },
   { label: "Upload Docs",    to: "/supplier/trade-documents", testId: "sqa-upload-docs",    icon: FileCheck },
 ];
 
@@ -165,6 +164,7 @@ export const ADMIN_NAV_GROUPS: NavGroup[] = [
     items: [
       { to: "/operations",                       label: "Operations center",  icon: Radar,           testId: "admin-operations" },
       { to: "/operations/freight",               label: "Freight ops",        icon: Package,         testId: "admin-freight-ops" },
+      { to: "/operations/reference-freight",      label: "Reference freight",  icon: Ship,            testId: "admin-reference-freight" },
       { to: "/operations/freight-commercial",    label: "Freight commercial", icon: Package,         testId: "admin-freight-commercial" },
       { to: "/operations/executive",             label: "Executive",          icon: LayoutDashboard, testId: "admin-executive" },
       { to: "/operations/growth",                label: "Growth",             icon: Workflow,        testId: "admin-growth" },
@@ -182,7 +182,7 @@ export const ADMIN_NAV_GROUPS: NavGroup[] = [
       { to: "/admin/commoditybid", label: "Commodity Bids", icon: Workflow,        testId: "admin-commoditybid" },
       { to: "/admin/freightiq",         label: "FreightIQ", icon: Route, testId: "admin-freightiq" },
       { to: "/admin/conversations",     label: "All Conversations", icon: MessageSquare, testId: "admin-conversations" },
-      { to: "/admin/whatsapp-inbox",    label: "WhatsApp Inbox",    icon: MessageSquare, testId: "admin-whatsapp-inbox" },
+      { to: "/messages?channel=WHATSAPP",    label: "WhatsApp Inbox",    icon: MessageSquare, testId: "admin-whatsapp-inbox" },
       { to: "/operations/freight-intake", label: "Freight operations (ops)", icon: Route, testId: "admin-freight-intake" },
       { to: "/admin/orders",       label: "Orders",         icon: Package,         testId: "admin-orders" },
       { to: "/admin/mixed-container", label: "Mixed Containers", icon: Container, testId: "admin-mixed-container" },

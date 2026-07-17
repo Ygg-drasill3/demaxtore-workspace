@@ -95,12 +95,23 @@ const EnvSchema = z.object({
   FSM_ORCHESTRATOR_SHADOW_MODE: z.coerce.boolean().optional(),
   FSM_ORCHESTRATOR_AUTO_APPLY: z.coerce.boolean().optional(),
 
+  // ── Online payment collection (PAY-001) ─────────────────────────────────────
+  /** When true with a non-stub PAYMENT_PROVIDER, online intents are allowed. */
+  ONLINE_PAYMENTS_ENABLED: z.coerce.boolean().optional(),
+  PAYMENT_PROVIDER: z.enum(["stub", "stripe"]).default("stub"),
+
   // ── Faz 3–6 feature flags ───────────────────────────────────────────────────
   PAYMENT_GATES_ENABLED: z.coerce.boolean().optional(),
   CARRIER_AUTO_TRANSITION_ENABLED: z.coerce.boolean().optional(),
   INCOTERMS_PRECONDITIONS_ENABLED: z.coerce.boolean().optional(),
   EXCEPTION_ENGINE_V2_ENABLED: z.coerce.boolean().optional(),
   RBAC_EXPANDED_ROLES_ENABLED: z.coerce.boolean().optional(),
+  UNIFIED_MESSAGING_ENABLED: z.coerce.boolean().optional(),
+  UNIFIED_MESSAGING_LEGACY_ADAPTER_ENABLED: z.coerce.boolean().optional(),
+  UNIFIED_MESSAGING_SHADOW_READ_ENABLED: z.coerce.boolean().optional(),
+  UNIFIED_MESSAGING_READ_MODE: z.string().optional(),
+  UNIFIED_MESSAGING_SHADOW_TIMEOUT_MS: z.coerce.number().int().positive().optional(),
+  UNIFIED_MESSAGING_WRITE_MODE: z.string().optional(),
   WHATSAPP_ACCESS_TOKEN:     z.string().optional(),
   WHATSAPP_PHONE_NUMBER_ID:  z.string().optional(),
   WHATSAPP_VERIFY_TOKEN:     z.string().optional(),
@@ -142,6 +153,33 @@ if (parsed.data.NODE_ENV === "production") {
 
 export const env = parsed.data;
 export const isProd = env.NODE_ENV === "production";
+
+/** Unified messaging API — default off in production until Phase 8 rollout. */
+export function isUnifiedMessagingEnabled(): boolean {
+  if (env.UNIFIED_MESSAGING_ENABLED !== undefined) return env.UNIFIED_MESSAGING_ENABLED;
+  return env.NODE_ENV !== "production";
+}
+
+export type UnifiedMessagingWriteMode =
+  | "legacy_only"
+  | "legacy_primary_unified_mirror"
+  | "unified_primary_legacy_mirror"
+  | "unified_only";
+
+const VALID_WRITE_MODES = new Set<UnifiedMessagingWriteMode>([
+  "legacy_only",
+  "legacy_primary_unified_mirror",
+  "unified_primary_legacy_mirror",
+  "unified_only",
+]);
+
+export function getUnifiedMessagingWriteMode(): UnifiedMessagingWriteMode {
+  const raw = (env.UNIFIED_MESSAGING_WRITE_MODE ?? "legacy_only").toLowerCase();
+  if (!VALID_WRITE_MODES.has(raw as UnifiedMessagingWriteMode)) {
+    return "legacy_only";
+  }
+  return raw as UnifiedMessagingWriteMode;
+}
 
 export function passwordlessAccessSecret(): string {
   return env.PASSWORDLESS_ACCESS_SECRET ?? env.JWT_SECRET;

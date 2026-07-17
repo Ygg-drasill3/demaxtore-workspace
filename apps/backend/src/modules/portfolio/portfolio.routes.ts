@@ -4,8 +4,14 @@ import { requireAuth } from "../../middleware/auth.js";
 import { asyncHandler } from "../../middleware/asyncHandler.js";
 import { prisma } from "../../db/prisma.js";
 import { PortfolioService } from "./portfolio.service.js";
+import {
+  getLegacyMessagingAdapters,
+  shouldUseAdapterLayer,
+  toMessagingActor,
+} from "../unified-messaging/adapters/legacy/index.js";
 
 const service = new PortfolioService(prisma);
+const adapters = () => getLegacyMessagingAdapters(prisma);
 
 export const portfolioRouter = Router();
 
@@ -39,6 +45,16 @@ portfolioRouter.get(
   "/messages",
   asyncHandler(async (req, res) => {
     const q = ListPortfolioQuery.parse(req.query);
-    res.json(await service.listMessages(req.user!, q));
+    const actor = req.user!;
+    if (!shouldUseAdapterLayer()) {
+      res.json(await service.listMessages(actor, q));
+      return;
+    }
+    res.json(
+      await adapters().portfolioMessages.listMessages(
+        () => service.listMessages(actor, q),
+        toMessagingActor(actor),
+      ),
+    );
   }),
 );

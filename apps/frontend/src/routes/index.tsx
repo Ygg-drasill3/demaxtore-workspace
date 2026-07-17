@@ -1,8 +1,8 @@
 // apps/frontend/src/routes/index.tsx
 import { Suspense } from "react";
 import { lazyWithRetry as lazy } from "@/lib/lazyWithRetry";
-import { Routes, Route, Navigate, useLocation } from "react-router-dom";
-import { ROLE_DASHBOARD } from "@dmx/contracts/auth";
+import { Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
+import { ROLE_DASHBOARD, OPERATIONS_PLATFORM_ROLES } from "@dmx/contracts/auth";
 import { PageSkeleton } from "@/components/ui/SkeletonLoader";
 import { useAuthGate } from "@/hooks/useAuthGate";
 import { AuthLoadingScreen } from "@/components/ui/AuthLoadingScreen";
@@ -19,10 +19,15 @@ const AdminMixedContainerProcurementPage = lazy(() => import("@/features/mixed-c
 const AdminMixedContainerAllocationsPage = lazy(() => import("@/features/mixed-container/pages/AdminMixedContainerAllocationsPage"));
 const MixedContainerCoordinationPage = lazy(() => import("@/features/mixed-container/pages/MixedContainerCoordinationPage"));
 const MixedContainerExecutionPage = lazy(() => import("@/features/mixed-container/pages/MixedContainerExecutionPage"));
+const MixedContainerOrganizationPage = lazy(() => import("@/features/mixed-container/pages/MixedContainerOrganizationPage"));
+const AdminMixedContainerOrganizationPage = lazy(() => import("@/features/mixed-container/pages/AdminMixedContainerOrganizationPage"));
 const MixedContainerOfferPage = lazy(() => import("@/features/mixed-container/pages/MixedContainerOfferPage"));
 const MixedContainerHomePage = lazy(() => import("@/features/mixed-container/pages/MixedContainerHomePage"));
 const CatalogCategoriesPage = lazy(() => import("@/features/mixed-container/pages/CatalogCategoriesPage"));
 const CatalogProductsPage = lazy(() => import("@/features/mixed-container/pages/CatalogProductsPage"));
+const CatalogProductDetailPage = lazy(() => import("@/features/mixed-container/pages/CatalogProductDetailPage"));
+const CatalogSearchPage = lazy(() => import("@/features/mixed-container/pages/CatalogSearchPage"));
+const SmartContainerDiscoveryLayout = lazy(() => import("@/features/mixed-container/layouts/SmartContainerDiscoveryLayout"));
 const MixedContainerRequestsPage = lazy(() => import("@/features/mixed-container/pages/MixedContainerRequestsPage"));
 const MixedContainerBuilderPage = lazy(() => import("@/features/mixed-container/pages/MixedContainerBuilderPage"));
 const CatalogAdminPage = lazy(() => import("@/features/mixed-container/pages/CatalogAdminPage"));
@@ -79,10 +84,7 @@ const PoListPage = lazy(() => import("@/features/purchase-order/pages/PoListPage
 const ShipmentsListPage = lazy(() => import("@/features/shipment/pages/ShipmentsListPage"));
 const ShipmentPortfolioPage = lazy(() => import("@/features/shipment/pages/ShipmentPortfolioPage"));
 const TradeDocumentsListPage = lazy(() => import("@/features/trade-documents/pages/TradeDocumentsListPage"));
-const GeneralMessagesPage = lazy(() => import("@/features/chat/pages/GeneralMessagesPage"));
-const FreightIqMessagesPage = lazy(() => import("@/features/chat/pages/FreightIqMessagesPage"));
-const AdminConversationsPage = lazy(() => import("@/features/chat/pages/AdminConversationsPage"));
-const WhatsAppInboxPage = lazy(() => import("@/features/whatsapp-inbox/pages/WhatsAppInboxPage"));
+const UnifiedMessagesPage = lazy(() => import("@/features/unified-messages/pages/UnifiedMessagesPage"));
 const FreightIqEmbedPage = lazy(() => import("@/features/freightiq/pages/FreightIqEmbedPage"));
 const FreightOpsPage = lazy(() => import("@/features/freightiq/pages/FreightOpsPage"));
 const FreightCommercialPage = lazy(() => import("@/features/freightiq/pages/FreightCommercialPage"));
@@ -93,6 +95,7 @@ const ExecutivePage = lazy(() => import("@/features/scale/pages/ExecutivePage"))
 const GrowthPage = lazy(() => import("@/features/growth/pages/GrowthPage"));
 const MarketIntelligencePage = lazy(() => import("@/features/market/pages/MarketIntelligencePage"));
 const SystemOperationsPage = lazy(() => import("@/features/system/pages/SystemOperationsPage"));
+const AdminReferenceFreightRatesPage = lazy(() => import("@/features/reference-freight/pages/AdminReferenceFreightRatesPage"));
 const TradeWorkspacePage = lazy(() => import("@/features/trade/pages/TradeWorkspacePage"));
 const DocumentCenterPage = lazy(() => import("@/features/document-center/pages/DocumentCenterPage"));
 const DocumentDetailPage = lazy(() => import("@/features/document-center/pages/DocumentDetailPage"));
@@ -105,14 +108,18 @@ const SalesControlDashboardPage = lazy(() => import("@/features/sales-control/pa
 const ControlTowerDashboardPage = lazy(() => import("@/features/import-control-tower/pages/ControlTowerDashboard"));
 const ForwarderDashboardPage = lazy(() => import("@/features/forwarder/pages/ForwarderDashboardPage"));
 const ForwarderShipmentPage = lazy(() => import("@/features/forwarder/pages/ForwarderShipmentPage"));
-const WorkspaceInboxPage = lazy(() => import("@/features/workspace-inbox/pages/WorkspaceInboxPage"));
-const MessagesListPage = lazy(() => import("@/features/workspace-communication/pages/MessagesListPage"));
 const PasswordlessConversationPage = lazy(() =>
   import("@/features/passwordless-access/pages/PasswordlessConversationPage"),
 );
 
 function LazyPage({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<PageSkeleton />}>{children}</Suspense>;
+}
+
+function LegacyConversationRedirect({ query = "" }: { query?: string }) {
+  const { conversationId } = useParams<{ conversationId?: string }>();
+  const dest = conversationId ? `/messages/${conversationId}` : `/messages${query ? `?${query}` : ""}`;
+  return <Navigate to={dest} replace />;
 }
 
 /**
@@ -162,10 +169,10 @@ export function AppRoutes() {
           <Route element={<RequireRole allow={["ADMIN"]} />}>
             <Route path="/admin/freightiq" element={<LazyPage><FreightIqEmbedPage /></LazyPage>} />
             <Route path="/admin/freight-ops" element={<LazyPage><FreightRfqIntakePage /></LazyPage>} />
-            <Route path="/admin/conversations" element={<LazyPage><AdminConversationsPage /></LazyPage>} />
-            <Route path="/admin/conversations/:conversationId" element={<LazyPage><AdminConversationsPage /></LazyPage>} />
-            <Route path="/admin/whatsapp-inbox" element={<LazyPage><WhatsAppInboxPage /></LazyPage>} />
-            <Route path="/admin/whatsapp-inbox/:conversationId" element={<LazyPage><WhatsAppInboxPage /></LazyPage>} />
+            <Route path="/admin/conversations" element={<Navigate to="/messages" replace />} />
+            <Route path="/admin/conversations/:conversationId" element={<LegacyConversationRedirect />} />
+            <Route path="/admin/whatsapp-inbox" element={<Navigate to="/messages?channel=WHATSAPP" replace />} />
+            <Route path="/admin/whatsapp-inbox/:conversationId" element={<LegacyConversationRedirect />} />
             <Route path="/operations/freight-intake" element={<LazyPage><FreightRfqIntakePage /></LazyPage>} />
           </Route>
         </Route>
@@ -185,9 +192,27 @@ export function AppRoutes() {
           <Route path="/buyer/notifications" element={<Navigate to="/notifications" replace />} />
           <Route path="/buyer/payments" element={<Navigate to="/buyer/orders" replace />} />
 
+          {/* Unified Messages — canonical route */}
+          <Route path="/messages" element={<LazyPage><UnifiedMessagesPage /></LazyPage>} />
+          <Route path="/messages/:conversationId" element={<LazyPage><UnifiedMessagesPage /></LazyPage>} />
+
+          {/* Legacy message routes → /messages */}
+          <Route path="/buyer/inbox" element={<Navigate to="/messages?view=INBOX" replace />} />
+          <Route path="/buyer/messages" element={<Navigate to="/messages" replace />} />
+          <Route path="/buyer/messages/workspaces" element={<Navigate to="/messages?source=WORKSPACE" replace />} />
+          <Route path="/buyer/messages/:conversationId" element={<LegacyConversationRedirect />} />
+          <Route path="/buyer/freightiq/messages" element={<Navigate to="/messages?contextType=FREIGHT" replace />} />
+          <Route path="/supplier/messages" element={<Navigate to="/messages" replace />} />
+          <Route path="/supplier/messages/:conversationId" element={<LegacyConversationRedirect />} />
+          <Route path="/admin/conversations" element={<Navigate to="/messages" replace />} />
+          <Route path="/admin/conversations/:conversationId" element={<LegacyConversationRedirect />} />
+          <Route path="/admin/whatsapp-inbox" element={<Navigate to="/messages?channel=WHATSAPP" replace />} />
+          <Route path="/admin/whatsapp-inbox/:conversationId" element={<LegacyConversationRedirect />} />
+          <Route path="/sales/whatsapp" element={<Navigate to="/messages?channel=WHATSAPP" replace />} />
+          <Route path="/sales/whatsapp/:conversationId" element={<LegacyConversationRedirect />} />
+
           {/* Buyer */}
           <Route element={<RequireRole allow={["BUYER"]} />}>
-            <Route path="/buyer/inbox"              element={<LazyPage><WorkspaceInboxPage /></LazyPage>} />
             <Route path="/buyer/dashboard"          element={<LazyPage><BuyerDashboardPage /></LazyPage>} />
             <Route path="/buyer/control-tower"       element={<LazyPage><ControlTowerDashboardPage /></LazyPage>} />
             <Route path="/buyer/rfq"                element={<LazyPage><RfqListPage /></LazyPage>} />
@@ -198,16 +223,17 @@ export function AppRoutes() {
             <Route path="/buyer/purchase-orders"    element={<LazyPage><PoListPage /></LazyPage>} />
             <Route path="/buyer/shipments"          element={<LazyPage><ShipmentsListPage /></LazyPage>} />
             <Route path="/buyer/trade-documents"    element={<LazyPage><TradeDocumentsListPage /></LazyPage>} />
-            <Route path="/buyer/messages"           element={<LazyPage><GeneralMessagesPage /></LazyPage>} />
-            <Route path="/buyer/messages/workspaces" element={<LazyPage><MessagesListPage /></LazyPage>} />
-            <Route path="/buyer/messages/:conversationId" element={<LazyPage><GeneralMessagesPage /></LazyPage>} />
-            <Route path="/buyer/freightiq/messages" element={<LazyPage><FreightIqMessagesPage /></LazyPage>} />
             <Route path="/buyer/mixed-container" element={<LazyPage><MixedContainerHomePage /></LazyPage>} />
-            <Route path="/buyer/mixed-container/catalog" element={<LazyPage><CatalogCategoriesPage /></LazyPage>} />
-            <Route path="/buyer/mixed-container/catalog/:slug" element={<LazyPage><CatalogProductsPage /></LazyPage>} />
+            <Route path="/buyer/mixed-container/catalog" element={<LazyPage><SmartContainerDiscoveryLayout /></LazyPage>}>
+              <Route index element={<LazyPage><CatalogCategoriesPage /></LazyPage>} />
+              <Route path="search" element={<LazyPage><CatalogSearchPage /></LazyPage>} />
+              <Route path=":slug" element={<LazyPage><CatalogProductsPage /></LazyPage>} />
+              <Route path=":slug/:productRef" element={<LazyPage><CatalogProductDetailPage /></LazyPage>} />
+            </Route>
             <Route path="/buyer/mixed-container/requests" element={<LazyPage><MixedContainerRequestsPage /></LazyPage>} />
             <Route path="/buyer/mixed-container/requests/:id" element={<LazyPage><MixedContainerBuilderPage /></LazyPage>} />
             <Route path="/buyer/mixed-container/offers/:id" element={<LazyPage><MixedContainerOfferPage /></LazyPage>} />
+            <Route path="/buyer/mixed-container/organization/:id" element={<LazyPage><MixedContainerOrganizationPage /></LazyPage>} />
             <Route path="/buyer/mixed-container/coordination/:id" element={<LazyPage><MixedContainerCoordinationPage /></LazyPage>} />
             <Route path="/buyer/mixed-container/execution/:id" element={<LazyPage><MixedContainerExecutionPage /></LazyPage>} />
             <Route path="/buyer/bulk-container" element={<LazyPage><BulkContainerHomePage /></LazyPage>} />
@@ -230,8 +256,6 @@ export function AppRoutes() {
             <Route path="/supplier/orders"          element={<LazyPage><OrdersListPage /></LazyPage>} />
             <Route path="/supplier/shipments"       element={<LazyPage><ShipmentsListPage /></LazyPage>} />
             <Route path="/supplier/trade-documents" element={<LazyPage><TradeDocumentsListPage /></LazyPage>} />
-            <Route path="/supplier/messages"        element={<LazyPage><GeneralMessagesPage /></LazyPage>} />
-            <Route path="/supplier/messages/:conversationId" element={<LazyPage><GeneralMessagesPage /></LazyPage>} />
           </Route>
 
           {/* Forwarder portal */}
@@ -245,17 +269,16 @@ export function AppRoutes() {
             <Route path="/sales/dashboard" element={<LazyPage><SalesControlDashboardPage /></LazyPage>} />
             <Route path="/sales/rfq" element={<LazyPage><RfqListPage /></LazyPage>} />
             <Route path="/sales/control-tower" element={<LazyPage><ControlTowerDashboardPage /></LazyPage>} />
-            <Route path="/sales/whatsapp" element={<LazyPage><WhatsAppInboxPage /></LazyPage>} />
-            <Route path="/sales/whatsapp/:conversationId" element={<LazyPage><WhatsAppInboxPage /></LazyPage>} />
           </Route>
 
-          {/* Admin */}
-          <Route element={<RequireRole allow={["ADMIN"]} />}>
+          {/* Admin / operations platform */}
+          <Route element={<RequireRole allow={[...OPERATIONS_PLATFORM_ROLES]} />}>
             <Route path="/operations"               element={<LazyPage><OperationsPage /></LazyPage>} />
             <Route path="/operations/freight"              element={<LazyPage><FreightOpsPage /></LazyPage>} />
             <Route path="/operations/freight-commercial"  element={<LazyPage><FreightCommercialPage /></LazyPage>} />
             <Route path="/operations/forwarders"            element={<LazyPage><ForwardersPage /></LazyPage>} />
             <Route path="/operations/shippers"              element={<LazyPage><ShippersPage /></LazyPage>} />
+            <Route path="/operations/reference-freight"    element={<LazyPage><AdminReferenceFreightRatesPage /></LazyPage>} />
             <Route path="/operations/executive"             element={<LazyPage><ExecutivePage /></LazyPage>} />
             <Route path="/operations/growth"               element={<LazyPage><GrowthPage /></LazyPage>} />
             <Route path="/operations/market-intelligence" element={<LazyPage><MarketIntelligencePage /></LazyPage>} />
@@ -273,12 +296,11 @@ export function AppRoutes() {
             <Route path="/admin/bulk-container/procurement/:id" element={<LazyPage><AdminBulkContainerProcurementPage /></LazyPage>} />
             <Route path="/admin/bulk-container" element={<LazyPage><AdminBulkContainerInboxPage /></LazyPage>} />
             <Route path="/admin/packing-types" element={<LazyPage><PackingTypesAdminPage /></LazyPage>} />
+            <Route path="/admin/mixed-container/organization/:id" element={<LazyPage><AdminMixedContainerOrganizationPage /></LazyPage>} />
             <Route path="/admin/mixed-container/allocations/:id" element={<LazyPage><AdminMixedContainerAllocationsPage /></LazyPage>} />
             <Route path="/admin/mixed-container/allocations" element={<LazyPage><AdminMixedContainerAllocationsPage /></LazyPage>} />
             <Route path="/admin/mixed-container" element={<LazyPage><AdminMixedContainerInboxPage /></LazyPage>} />
             <Route path="/admin/mixed-container/:id" element={<LazyPage><AdminMixedContainerProcurementPage /></LazyPage>} />
-            <Route path="/admin/whatsapp-inbox" element={<LazyPage><WhatsAppInboxPage /></LazyPage>} />
-            <Route path="/admin/whatsapp-inbox/:conversationId" element={<LazyPage><WhatsAppInboxPage /></LazyPage>} />
           </Route>
 
           {/* Shared (all roles) */}

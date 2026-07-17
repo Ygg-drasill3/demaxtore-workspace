@@ -14,10 +14,16 @@ import {
 import type { CommWorkspaceType } from "@dmx/contracts/workspace-communication";
 import { CommunicationService } from "../workspace-communication/communication.service.js";
 import { streamStoredFileToResponse } from "../../lib/file-storage.js";
+import {
+  getLegacyMessagingAdapters,
+  shouldUseAdapterLayer,
+  toMessagingActor,
+} from "../unified-messaging/adapters/legacy/index.js";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 const hub = () => new ConversationHubService(prisma);
 const comm = () => new CommunicationService(prisma);
+const adapters = () => getLegacyMessagingAdapters(prisma);
 
 export const conversationHubRouter = Router({ mergeParams: true });
 
@@ -26,20 +32,55 @@ conversationHubRouter.use(requireAuth);
 conversationHubRouter.get("/", asyncHandler(async (req, res) => {
   const workspaceType = req.params.workspaceType!.toUpperCase() as CommWorkspaceType;
   const workspaceId = req.params.workspaceId!;
-  res.json(await hub().getHub(workspaceType, workspaceId, req.user!));
+  const actor = req.user!;
+  if (!shouldUseAdapterLayer()) {
+    res.json(await hub().getHub(workspaceType, workspaceId, actor));
+    return;
+  }
+  res.json(
+    await adapters().conversationHub.getHub(
+      () => hub().getHub(workspaceType, workspaceId, actor),
+      workspaceType,
+      workspaceId,
+      toMessagingActor(actor),
+    ),
+  );
 }));
 
 conversationHubRouter.get("/search", asyncHandler(async (req, res) => {
   const workspaceType = req.params.workspaceType!.toUpperCase() as CommWorkspaceType;
   const workspaceId = req.params.workspaceId!;
   const query = ConversationSearchQuerySchema.parse(req.query);
-  res.json(await hub().search(workspaceType, workspaceId, req.user!, query));
+  const actor = req.user!;
+  if (!shouldUseAdapterLayer()) {
+    res.json(await hub().search(workspaceType, workspaceId, actor, query));
+    return;
+  }
+  res.json(
+    await adapters().conversationHub.search(
+      () => hub().search(workspaceType, workspaceId, actor, query),
+      workspaceType,
+      workspaceId,
+      toMessagingActor(actor),
+    ),
+  );
 }));
 
 conversationHubRouter.get("/participants", asyncHandler(async (req, res) => {
   const workspaceType = req.params.workspaceType!.toUpperCase() as CommWorkspaceType;
   const workspaceId = req.params.workspaceId!;
-  const data = await hub().getHub(workspaceType, workspaceId, req.user!);
+  const actor = req.user!;
+  if (!shouldUseAdapterLayer()) {
+    const data = await hub().getHub(workspaceType, workspaceId, actor);
+    res.json(data.participants);
+    return;
+  }
+  const data = await adapters().conversationHub.getHub(
+    () => hub().getHub(workspaceType, workspaceId, actor),
+    workspaceType,
+    workspaceId,
+    toMessagingActor(actor),
+  ) as Awaited<ReturnType<ConversationHubService["getHub"]>>;
   res.json(data.participants);
 }));
 

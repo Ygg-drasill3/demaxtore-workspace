@@ -1,0 +1,353 @@
+import { createHash } from "node:crypto";
+import type { PrismaClient } from "@prisma/client";
+import { logger } from "../../config/logger.js";
+import { socketBus } from "../../realtime/socket-bus.js";
+import { UnifiedMessagingWriteOrchestrator } from "./unified-messaging-write.orchestrator.js";
+import { participantKeyForUser } from "./unified-messaging.constants.js";
+import type { AuthUser } from "./unified-messaging.types.js";
+
+export type MessagingWriteSurface =
+  | "workspace_communication"
+  | "conversation_hub"
+  | "direct_chat"
+  | "whatsapp_inbox"
+  | "rfq_clarification";
+
+const emittedEventKeys = new Set<string>();
+
+export function resetMessagingEventDedupForTests() {
+  emittedEventKeys.clear();
+}
+
+function eventKey(parts: string[]) {
+  return createHash("sha256").update(parts.join(":")).digest("hex").slice(0, 24);
+}
+
+export class MessagingEventEmitter {
+  emit(
+    event:
+      | "messaging:conversation:new"
+      | "messaging:conversation:updated"
+      | "messaging:message:new"
+      | "messaging:message:updated"
+      | "messaging:message:status"
+      | "messaging:conversation:read"
+      | "messaging:conversation:assigned"
+      | "messaging:conversation:archived"
+      | "messaging:participant:updated",
+    payload: {
+      conversationId: string;
+      messageId?: string;
+      workspaceId?: string;
+      audienceScope?: string;
+      idempotencyKey?: string;
+    },
+  ) {
+    const dedupeKey = payload.idempotencyKey ?? eventKey([
+      event,
+      payload.conversationId,
+      payload.messageId ?? "",
+    ]);
+    if (emittedEventKeys.has(dedupeKey)) return;
+    emittedEventKeys.add(dedupeKey);
+    setTimeout(() => emittedEventKeys.delete(dedupeKey), 60_000);
+
+    socketBus.scheduleEmit(() => {
+      const room = `messaging:conversation:${payload.conversationId}`;
+      socketBus.emitToRoom(room, event, {
+        conversationId: payload.conversationId,
+        messageId: payload.messageId,
+        workspaceId: payload.workspaceId,
+      });
+      if (payload.workspaceId) {
+        socketBus.emitToWorkspace(payload.workspaceId, event, payload);
+      }
+    });
+  }
+}
+
+export class MessagingNotificationDedup {
+  constructor(private readonly prisma: PrismaClient) {}
+
+  async shouldNotify(input: {
+    eventType: string;
+    conversationId: string;
+    messageId: string;
+    recipientId: string;
+  }): Promise<boolean> {
+    const key = `messaging:${input.eventType}:${input.conversationId}:${input.messageId}:${input.recipientId}`;
+    const hash = createHash("sha256").update(key).digest("hex").slice(0, 32);
+    const existing = await this.prisma.notification.findFirst({
+      where: {
+        metadata: { path: ["messagingDedupKey"], equals: hash },
+      },
+      select: { id: true },
+    });
+    return !existing;
+  }
+
+  messagingDedupMetadata(eventType: string, conversationId: string, messageId: string, recipientId: string) {
+    const key = `messaging:${eventType}:${conversationId}:${messageId}:${recipientId}`;
+    return { messagingDedupKey: createHash("sha256").update(key).digest("hex").slice(0, 32) };
+  }
+}
+
+export class MessagingWriteBridge {
+  private readonly orchestrator: UnifiedMessagingWriteOrchestrator;
+  private readonly events = new MessagingEventEmitter();
+  readonly notifications: MessagingNotificationDedup;
+
+  constructor(private readonly prisma: PrismaClient) {
+    this.orchestrator = new UnifiedMessagingWriteOrchestrator(prisma);
+    this.notifications = new MessagingNotificationDedup(prisma);
+  }
+
+  get writeMode() {
+    return this.orchestrator.writeMode;
+  }
+
+  /** Execute legacy write; mirror + events based on write mode. */
+  async runLegacyWrite<T>(input: {
+    surface: MessagingWriteSurface;
+    actor: AuthUser;
+    legacy: () => Promise<T>;
+    afterLegacy?: (result: T) => Promise<void>;
+  }): Promise<T> {
+    const result = await input.legacy();
+    try {
+      if (input.afterLegacy) await input.afterLegacy(result);
+    } catch (err) {
+      logger.warn({ err: String(err), surface: input.surface }, "messaging write bridge afterLegacy failed");
+    }
+    return result;
+  }
+
+  async onWorkspaceMessageCreated(input: {
+    actor: AuthUser;
+    workspaceType: string;
+    workspaceId: string;
+    auditWorkspaceId: string;
+    messageId: string;
+    body: string;
+    messageType: string;
+    visibility: string;
+    clientMessageId?: string | null;
+    legacySource?: string;
+  }) {
+    const conv = await this.prisma.workspaceConversation.findUnique({
+      where: { workspaceType_workspaceId: { workspaceType: input.workspaceType, workspaceId: input.workspaceId } },
+    });
+    if (!conv) return;
+
+    const isInternal =
+      input.messageType === "INTERNAL_NOTE" ||
+      input.visibility === "ADMIN_ONLY";
+
+    if (this.writeMode === "legacy_primary_unified_mirror") {
+      try {
+        const legacy = { legacyId: input.messageId, legacySource: input.legacySource ?? "workspace" };
+        if (isInternal) {
+          await this.orchestrator.mirrorFromLegacy(input.actor, {
+            conversationId: conv.id,
+            authorUserId: input.actor.id,
+            body: input.body,
+            messageType: "INTERNAL_NOTE",
+            visibility: "ADMIN_ONLY",
+          }, legacy);
+        } else {
+          await this.orchestrator.mirrorFromLegacy(input.actor, {
+            conversationId: conv.id,
+            authorUserId: input.actor.id,
+            body: input.body,
+            messageType: input.messageType,
+            visibility: input.visibility,
+            clientMessageId: input.clientMessageId ?? undefined,
+          }, legacy);
+        }
+      } catch (err) {
+        logger.warn({ err: String(err), surface: "workspace_communication" }, "unified mirror failed");
+      }
+    } else if (this.writeMode === "unified_primary_legacy_mirror" || this.writeMode === "unified_only") {
+      try {
+        if (isInternal) {
+          await this.orchestrator.createInternalNote(input.actor, {
+            conversationId: conv.id,
+            authorUserId: input.actor.id,
+            body: input.body,
+          });
+        } else {
+          await this.orchestrator.createExternalMessage(input.actor, {
+            conversationId: conv.id,
+            authorUserId: input.actor.id,
+            body: input.body,
+            messageType: input.messageType,
+            visibility: input.visibility,
+            clientMessageId: input.clientMessageId ?? undefined,
+          });
+        }
+      } catch (err) {
+        logger.warn({ err: String(err), surface: "workspace_communication" }, "unified write failed");
+      }
+    }
+
+    if (!isInternal) {
+      this.events.emit("messaging:message:new", {
+        conversationId: conv.id,
+        messageId: input.messageId,
+        workspaceId: input.auditWorkspaceId,
+        audienceScope: "EXTERNAL",
+        idempotencyKey: input.clientMessageId ?? input.messageId,
+      });
+    } else {
+      this.events.emit("messaging:message:new", {
+        conversationId: conv.id,
+        messageId: input.messageId,
+        workspaceId: input.auditWorkspaceId,
+        audienceScope: "INTERNAL",
+        idempotencyKey: input.messageId,
+      });
+    }
+  }
+
+  async onDirectMessageCreated(input: {
+    actor: AuthUser;
+    directConversationId: string;
+    messageId: string;
+    body: string;
+    source: string;
+  }) {
+    let unifiedConv = await this.prisma.workspaceConversation.findFirst({
+      where: { metadata: { path: ["legacyDirectConversationId"], equals: input.directConversationId } },
+    });
+
+    if (!unifiedConv && this.writeMode !== "legacy_only") {
+      const direct = await this.prisma.directConversation.findUnique({ where: { id: input.directConversationId } });
+      if (direct) {
+        unifiedConv = await this.prisma.workspaceConversation.findFirst({
+          where: {
+            contexts: {
+              some: { contextType: direct.contextType === "ORDER_FREIGHT" ? "FREIGHT" : direct.contextType, contextId: direct.contextWorkspaceId },
+            },
+          },
+        });
+      }
+    }
+
+    if (unifiedConv) {
+      this.events.emit("messaging:message:new", {
+        conversationId: unifiedConv.id,
+        messageId: input.messageId,
+        idempotencyKey: input.messageId,
+      });
+    }
+  }
+
+  async onWhatsAppMessageCreated(input: {
+    actor: AuthUser;
+    whatsappConversationId: string;
+    messageId: string;
+    direction: string;
+    metaMessageId?: string | null;
+  }) {
+    const unifiedConv = await this.prisma.workspaceConversation.findFirst({
+      where: { metadata: { path: ["whatsappConversationId"], equals: input.whatsappConversationId } },
+    });
+
+    if (this.writeMode !== "legacy_only" && unifiedConv) {
+      try {
+        await this.orchestrator.createExternalMessage(input.actor, {
+          conversationId: unifiedConv.id,
+          authorUserId: input.actor.id,
+          body: "",
+          channel: "WHATSAPP",
+          legacyMirror: async () => ({
+            legacyId: input.messageId,
+            legacySource: "whatsapp",
+          }),
+        });
+      } catch {
+        /* mirror optional */
+      }
+    }
+
+    const convId = unifiedConv?.id ?? input.whatsappConversationId;
+    this.events.emit("messaging:message:new", {
+      conversationId: convId,
+      messageId: input.messageId,
+      idempotencyKey: input.metaMessageId ?? input.messageId,
+    });
+  }
+
+  async onConversationRead(input: {
+    actor: AuthUser;
+    conversationId: string;
+    workspaceId?: string;
+  }) {
+    if (this.writeMode === "unified_primary_legacy_mirror" || this.writeMode === "unified_only") {
+      try {
+        await this.prisma.workspaceConversationParticipant.updateMany({
+          where: { conversationId: input.conversationId, userId: input.actor.id },
+          data: { lastReadAt: new Date() },
+        });
+      } catch {
+        /* optional */
+      }
+    }
+    this.events.emit("messaging:conversation:read", {
+      conversationId: input.conversationId,
+      workspaceId: input.workspaceId,
+      idempotencyKey: `${input.conversationId}:${input.actor.id}:read`,
+    });
+  }
+
+  async onAssignment(input: { conversationId: string; assignedUserId: string }) {
+    this.events.emit("messaging:conversation:assigned", {
+      conversationId: input.conversationId,
+      idempotencyKey: `${input.conversationId}:assign:${input.assignedUserId}`,
+    });
+  }
+
+  async onArchive(input: { conversationId: string }) {
+    this.events.emit("messaging:conversation:archived", {
+      conversationId: input.conversationId,
+      idempotencyKey: `${input.conversationId}:archive`,
+    });
+  }
+
+  async onDeliveryStatus(input: {
+    conversationId: string;
+    messageId: string;
+    status: string;
+  }) {
+    if (this.writeMode !== "legacy_only") {
+      await this.orchestrator.updateDeliveryStatus(input.messageId, input.status).catch(() => undefined);
+    }
+    this.events.emit("messaging:message:status", {
+      conversationId: input.conversationId,
+      messageId: input.messageId,
+      idempotencyKey: `${input.messageId}:${input.status}`,
+    });
+  }
+
+  async ensureParticipant(conversationId: string, userId: string) {
+    const key = participantKeyForUser(userId);
+    await this.prisma.workspaceConversationParticipant.upsert({
+      where: { conversationId_participantKey: { conversationId, participantKey: key } },
+      create: {
+        conversationId,
+        participantKey: key,
+        userId,
+        participantType: "USER",
+        participantRole: "MEMBER",
+      },
+      update: { leftAt: null },
+    });
+  }
+}
+
+let bridge: MessagingWriteBridge | null = null;
+
+export function getMessagingWriteBridge(prisma: PrismaClient): MessagingWriteBridge {
+  if (!bridge) bridge = new MessagingWriteBridge(prisma);
+  return bridge;
+}

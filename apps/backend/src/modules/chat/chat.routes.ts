@@ -4,18 +4,33 @@ import { asyncHandler } from "../../middleware/asyncHandler.js";
 import { prisma } from "../../db/prisma.js";
 import { TradeChatService } from "./chat.service.js";
 import { integrationStatus } from "./whatsapp.service.js";
+import {
+  getLegacyMessagingAdapters,
+  shouldUseAdapterLayer,
+  toMessagingActor,
+} from "../unified-messaging/adapters/legacy/index.js";
 
 /** Legacy alias — prefer /api/conversations */
 const router = Router();
 const chat = () => new TradeChatService(prisma);
+const adapters = () => getLegacyMessagingAdapters(prisma);
 
 router.get("/status", requireAuth, asyncHandler(async (_req, res) => {
   res.json(integrationStatus());
 }));
 
 router.get("/conversations", requireAuth, asyncHandler(async (req, res) => {
-  const rows = await chat().listConversations(req.user!.id, req.user!.role);
-  res.json(rows);
+  const actor = req.user!;
+  if (!shouldUseAdapterLayer()) {
+    res.json(await chat().listConversations(actor.id, actor.role));
+    return;
+  }
+  res.json(
+    await adapters().directChat.listConversations(
+      () => chat().listConversations(actor.id, actor.role),
+      toMessagingActor(actor),
+    ),
+  );
 }));
 
 router.get("/workspace/:contextType/:contextWorkspaceId", requireAuth, asyncHandler(async (req, res) => {
@@ -52,8 +67,18 @@ router.post("/order/:orderWorkspaceId/freight/:forwarderContactId/ensure", requi
 }));
 
 router.get("/conversations/:id", requireAuth, asyncHandler(async (req, res) => {
-  const data = await chat().getConversation(req.params.id, req.user!.id, req.user!.role);
-  res.json(data);
+  const actor = req.user!;
+  if (!shouldUseAdapterLayer()) {
+    res.json(await chat().getConversation(req.params.id, actor.id, actor.role));
+    return;
+  }
+  res.json(
+    await adapters().directChat.getConversation(
+      () => chat().getConversation(req.params.id, actor.id, actor.role),
+      req.params.id,
+      toMessagingActor(actor),
+    ),
+  );
 }));
 
 router.post("/conversations/:id/messages", requireAuth, asyncHandler(async (req, res) => {
