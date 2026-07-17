@@ -10,7 +10,7 @@ import { isAdminChatRole } from "./chat.types.js";
 import { socketBus } from "../../realtime/socket-bus.js";
 import { logger } from "../../config/logger.js";
 import { getMessagingWriteBridge } from "../unified-messaging/messaging-write.bridge.js";
-import { registerWiredSurface } from "../unified-messaging/messaging-write.registry.js";
+import { getMessagingWriteDispatcher } from "../unified-messaging/messaging-write.dispatcher.js";
 
 export type { ChatContextType };
 
@@ -359,13 +359,68 @@ export class TradeChatService {
   }
 
   async sendMessage(conversationId: string, actor: AuthUser, body: string) {
-    return getMessagingWriteBridge(this.db).runLegacyWrite({
+    const conv = await this.db.directConversation.findUnique({ where: { id: conversationId } });
+    const registryKey =
+      conv?.contextType === "ORDER_FREIGHT" ? "order_freight_chat_send" : "direct_chat_send";
+    const { buildSocketOutbox } = await import("../unified-messaging/messaging-write.registry.js");
+
+    return getMessagingWriteDispatcher(this.db).dispatchMutation({
       surface: "direct_chat",
-      registryKey: "direct_chat_send",
+      registryKey,
       actor,
-      idempotencyKey: `chat:${conversationId}:${Date.now()}`,
-      legacy: () => this.sendMessageDirect(conversationId, actor, body),
+      idempotencyKey: `chat:${conversationId}:${actor.id}:${Date.now()}`,
+      unifiedPrimary: async (tx) => {
+        const msg = await this.persistDirectMessageTx(tx, conversationId, actor, body);
+        const c = await tx.directConversation.findUnique({ where: { id: conversationId } });
+        if (!c) throw new AppError(404, "CONVERSATION_NOT_FOUND");
+        return mapMessageRow(msg, c, actor.id, actor.role);
+      },
+      buildOutbox: (result) => [
+        buildSocketOutbox("direct_chat", {
+          event: "messaging:message:new",
+          conversationId,
+          messageId: result.id,
+          idempotencyKey: `chat:${result.id}`,
+        }),
+      ],
+      legacyOnly: () => this.sendMessageDirect(conversationId, actor, body),
     });
+  }
+
+  private async persistDirectMessageTx(
+    tx: import("@prisma/client").Prisma.TransactionClient,
+    conversationId: string,
+    actor: AuthUser,
+    body: string,
+  ) {
+    const text = body.trim();
+    if (!text) throw new AppError(400, "EMPTY_MESSAGE");
+
+    const conv = await tx.directConversation.findUnique({ where: { id: conversationId } });
+    if (!conv || !this.canAccessConv(conv, actor.id, actor.role)) {
+      throw new AppError(404, "CONVERSATION_NOT_FOUND");
+    }
+
+    const senderType = resolveSenderType(actor.role, conv, actor.id);
+    const msg = await tx.directMessage.create({
+      data: {
+        conversationId,
+        authorUserId: actor.id,
+        senderType,
+        channel: "panel",
+        source: "platform",
+        body: text,
+        deliveryStatus: "sent",
+        status: "sent",
+      },
+    });
+
+    await tx.directConversation.update({
+      where: { id: conversationId },
+      data: { updatedAt: new Date() },
+    });
+
+    return msg;
   }
 
   private async sendMessageDirect(conversationId: string, actor: AuthUser, body: string) {
@@ -373,7 +428,6 @@ export class TradeChatService {
     if (!text) throw new AppError(400, "EMPTY_MESSAGE");
 
     const conv = await this.db.directConversation.findUnique({ where: { id: conversationId } });
-    if (conv?.contextType === "ORDER_FREIGHT") registerWiredSurface("order_freight_chat_send");
     if (!conv || !this.canAccessConv(conv, actor.id, actor.role)) {
       throw new AppError(404, "CONVERSATION_NOT_FOUND");
     }

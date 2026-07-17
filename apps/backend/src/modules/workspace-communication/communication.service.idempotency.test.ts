@@ -29,6 +29,14 @@ vi.mock("./communication.notifications.js", () => ({
   notifyCommEvent: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock("../../config/env.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../config/env.js")>();
+  return {
+    ...actual,
+    getUnifiedMessagingWriteMode: vi.fn(() => "unified_primary_legacy_mirror"),
+  };
+});
+
 const ACTOR = { id: "u-buyer", email: "buyer@test.io", role: "BUYER" as const };
 const CLIENT_ID = "11111111-1111-4111-8111-111111111111";
 
@@ -53,6 +61,7 @@ describe("CommunicationService — message idempotency (MSG-001)", () => {
     workspaceMessageAttachment: { updateMany: vi.fn() },
     workspaceParticipant: { findMany: vi.fn().mockResolvedValue([]) },
     workspaceMessageDelivery: { create: vi.fn() },
+    messagingOutboxEvent: { create: vi.fn().mockResolvedValue({ id: "outbox-1" }) },
     user: { findMany: vi.fn().mockResolvedValue([]) },
     workspace: { findUnique: vi.fn().mockResolvedValue({ state: "CONFIRMED" }) },
     auditLog: { create: vi.fn() },

@@ -35,10 +35,23 @@ export interface DispatchUnifiedInput<T> {
   surface: MessagingWriteSurface;
   actor: AuthUser;
   idempotencyKey: string;
+  registryKey?: MessagingMutationSurface;
   unified: (tx: Prisma.TransactionClient) => Promise<T>;
   outbox?: (result: T) => EnqueueOutboxInput[];
   legacyMirror?: (result: T) => Promise<{ legacyId: string; legacySource: string }>;
   socketEvents?: DispatchLegacyInput<T>["socketEvents"];
+}
+
+/** Canonical mutation entry — unified-primary in mirror/unified_only modes. */
+export interface DispatchMutationInput<T> {
+  surface: MessagingWriteSurface;
+  registryKey: MessagingMutationSurface;
+  actor: AuthUser;
+  idempotencyKey: string;
+  unifiedPrimary: (tx: Prisma.TransactionClient) => Promise<T>;
+  buildOutbox: (result: T) => EnqueueOutboxInput[];
+  legacyMirror?: (result: T) => Promise<{ legacyId: string; legacySource: string }>;
+  legacyOnly?: () => Promise<T>;
 }
 
 /** Central write-mode dispatcher — primary persistence + transactional outbox. */
@@ -86,6 +99,7 @@ export class MessagingWriteDispatcher {
 
   /** Unified-first path (unified API mutations, assign, archive, etc.). */
   async dispatchUnifiedFirst<T>(input: DispatchUnifiedInput<T>): Promise<T> {
+    if (input.registryKey) registerWiredSurface(input.registryKey);
     const mode = this.writeMode;
     if (mode === "legacy_only") {
       throw new Error("UNIFIED_WRITE_BLOCKED_IN_LEGACY_ONLY");
@@ -108,6 +122,38 @@ export class MessagingWriteDispatcher {
     }
 
     return result;
+  }
+
+  /**
+   * Canonical write entry for all 37 mutation surfaces.
+   * unified_primary_legacy_mirror / unified_only → unified primary + transactional outbox.
+   * legacy_primary_unified_mirror / legacy_only → legacyOnly callback when provided.
+   */
+  async dispatchMutation<T>(input: DispatchMutationInput<T>): Promise<T> {
+    registerWiredSurface(input.registryKey);
+    const mode = this.writeMode;
+
+    if (mode === "legacy_only" || mode === "legacy_primary_unified_mirror") {
+      if (!input.legacyOnly) {
+        throw new Error(`LEGACY_ONLY_HANDLER_REQUIRED:${input.registryKey}`);
+      }
+      return this.dispatchLegacyFirst({
+        surface: input.surface,
+        actor: input.actor,
+        idempotencyKey: input.idempotencyKey,
+        legacy: input.legacyOnly,
+      });
+    }
+
+    return this.dispatchUnifiedFirst({
+      surface: input.surface,
+      actor: input.actor,
+      idempotencyKey: input.idempotencyKey,
+      registryKey: input.registryKey,
+      unified: input.unifiedPrimary,
+      outbox: input.buildOutbox,
+      legacyMirror: input.legacyMirror,
+    });
   }
 
   /** Persist unified message in transaction with optional mirror outbox. */

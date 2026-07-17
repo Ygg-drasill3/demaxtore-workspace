@@ -35,7 +35,11 @@ import {
 } from "./communication.policy.js";
 import { notifyCommEvent } from "./communication.notifications.js";
 import { getMessagingWriteBridge } from "../unified-messaging/messaging-write.bridge.js";
-import { registerWiredSurface } from "../unified-messaging/messaging-write.registry.js";
+import { getMessagingWriteDispatcher } from "../unified-messaging/messaging-write.dispatcher.js";
+import {
+  buildNotificationOutbox,
+  buildSocketOutbox,
+} from "../unified-messaging/messaging-write.registry.js";
 
 const ALLOWED_MIMES = new Set([
   "application/pdf",
@@ -163,14 +167,13 @@ export class CommunicationService {
 
     switch (action) {
       case "create_message":
-        await getMessagingWriteBridge(this.db).runLegacyWrite({
-          surface: "workspace_communication",
-          registryKey: "workspace_external_message",
+        await this.createMessage(
+          workspaceType,
+          workspaceId,
           actor,
-          idempotencyKey: `ws:${workspaceType}:${workspaceId}:${String(payload.clientMessageId ?? Date.now())}`,
-          legacy: () =>
-            this.createMessage(workspaceType, workspaceId, actor, CreateMessagePayload.parse(payload), ctx),
-        });
+          CreateMessagePayload.parse(payload),
+          ctx,
+        );
         break;
       case "edit_message":
         await this.editMessage(workspaceType, workspaceId, actor, EditMessagePayload.parse(payload), ctx);
@@ -179,14 +182,13 @@ export class CommunicationService {
         await this.deleteMessage(workspaceType, workspaceId, actor, DeleteMessagePayload.parse(payload), ctx);
         break;
       case "mark_read":
-        await getMessagingWriteBridge(this.db).runLegacyWrite({
-          surface: "workspace_communication",
-          registryKey: "workspace_mark_read",
+        await this.markRead(
+          workspaceType,
+          workspaceId,
           actor,
-          idempotencyKey: `ws-read:${workspaceType}:${workspaceId}:${actor.id}`,
-          legacy: () =>
-            this.markRead(workspaceType, workspaceId, actor, MarkReadPayload.parse(payload), ctx),
-        });
+          MarkReadPayload.parse(payload),
+          ctx,
+        );
         break;
       default:
         throw new AppError(400, "UNKNOWN_ACTION");
@@ -201,13 +203,7 @@ export class CommunicationService {
     actor: AuthUser,
     file: { originalName: string; mimeType: string; sizeBytes: number; buffer: Buffer },
   ) {
-    return getMessagingWriteBridge(this.db).runLegacyWrite({
-      surface: "workspace_communication",
-      registryKey: "workspace_attachment",
-      actor,
-      idempotencyKey: `ws-attach:${workspaceType}:${workspaceId}:${file.originalName}:${Date.now()}`,
-      legacy: () => this.uploadAttachmentDirect(workspaceType, workspaceId, actor, file),
-    });
+    return this.uploadAttachmentDirect(workspaceType, workspaceId, actor, file);
   }
 
   private async uploadAttachmentDirect(
@@ -357,28 +353,251 @@ export class CommunicationService {
 
     const isInternal =
       input.messageType === "INTERNAL_NOTE" || input.visibility === "ADMIN_ONLY";
-    registerWiredSurface(isInternal ? "workspace_internal_note" : "workspace_external_message");
-    if (mentionIds.length) registerWiredSurface("mention");
+    const registryKey = isInternal ? "workspace_internal_note" : "workspace_external_message";
+    const idempotencyKey =
+      input.clientMessageId ?? `ws:${workspaceType}:${workspaceId}:${actor.id}:${Date.now()}`;
+    const link = this.workspaceLink(workspaceType, workspaceId);
+    const authorRole = actor.role;
 
-    let messageId: string;
-    let isReplay = false;
+    type CreateResult = {
+      msgId: string;
+      convId: string;
+      notifyPayloads: Array<Parameters<typeof notifyCommEvent>[1]>;
+      mentionUserIds: string[];
+    };
 
     try {
-      messageId = await this.db.$transaction(async (tx) => {
-        const conv = await this.ensureConversationTx(tx, resolved);
-        const msg = await tx.workspaceMessage.create({
-          data: {
-            conversationId: conv.id,
-            authorUserId: actor.id,
+      await getMessagingWriteDispatcher(this.db).dispatchMutation<CreateResult>({
+        surface: "workspace_communication",
+        registryKey,
+        actor,
+        idempotencyKey,
+        unifiedPrimary: async (tx) => {
+          if (mentionIds.length) {
+            const { registerWiredSurface } = await import(
+              "../unified-messaging/messaging-write.registry.js"
+            );
+            registerWiredSurface("mention");
+          }
+          const conv = await this.ensureConversationTx(tx, resolved);
+          const msg = await tx.workspaceMessage.create({
+            data: {
+              conversationId: conv.id,
+              authorUserId: actor.id,
+              messageType: input.messageType,
+              visibility: input.visibility,
+              body: input.body.trim(),
+              parentMessageId: input.parentMessageId ?? null,
+              clientMessageId: input.clientMessageId ?? null,
+              status: "ACTIVE",
+              audienceScope: isInternal ? "INTERNAL" : "EXTERNAL",
+              direction: isInternal ? "INTERNAL" : "OUTBOUND",
+              channelSource: "WORKSPACE",
+            },
+          });
+
+          if (mentionIds.length) {
+            await tx.workspaceMention.createMany({
+              data: mentionIds.map((mentionedUserId) => ({
+                messageId: msg.id,
+                mentionedUserId,
+              })),
+              skipDuplicates: true,
+            });
+          }
+
+          if (input.attachmentIds?.length) {
+            await tx.workspaceMessageAttachment.updateMany({
+              where: {
+                id: { in: input.attachmentIds },
+                workspaceType,
+                workspaceId,
+                uploadedById: actor.id,
+                messageId: null,
+              },
+              data: { messageId: msg.id },
+            });
+          }
+
+          await this.audit(tx, resolved, actor, "communication.created", {
+            messageId: msg.id,
             messageType: input.messageType,
             visibility: input.visibility,
-            body: input.body.trim(),
-            parentMessageId: input.parentMessageId ?? null,
-            clientMessageId: input.clientMessageId ?? null,
-            status: "ACTIVE",
-          },
-        });
+          }, ctx);
 
+          if (TIMELINE_MESSAGE_TYPES.includes(input.messageType)) {
+            await this.timeline(tx, resolved.auditWorkspaceId, actor.id, `communication.${input.messageType.toLowerCase()}`, {
+              messageId: msg.id,
+              body: input.body.slice(0, 200),
+            });
+          }
+
+          const notifyIds = await this.notifyRecipients(
+            tx,
+            resolved,
+            input.visibility,
+            actor.id,
+            mentionIds,
+          );
+
+          const notifyPayloads: CreateResult["notifyPayloads"] = [];
+          if (!isInternal) {
+            notifyPayloads.push({
+              userIds: notifyIds,
+              auditWorkspaceId: resolved.auditWorkspaceId,
+              commWorkspaceType: workspaceType,
+              commWorkspaceId: workspaceId,
+              eventType: "communication.message.created",
+              title: authorRole === "SUPPLIER" ? "New supplier message" : "New workspace message",
+              message: input.body.slice(0, 120),
+              link,
+              centerType: authorRole === "SUPPLIER" ? "NEW_SUPPLIER_MESSAGE" : undefined,
+              metadata: {
+                messageId: msg.id,
+                conversationId: conv.id,
+                messageVisibility: input.visibility,
+              },
+              messagingDedup: {
+                eventType: "message:new",
+                conversationId: conv.id,
+                messageId: msg.id,
+              },
+            });
+          }
+
+          for (const uid of mentionIds) {
+            if (uid === actor.id) continue;
+            const mentionedUser = await tx.user.findUnique({
+              where: { id: uid },
+              select: { role: true },
+            });
+            const isBuyer = mentionedUser?.role === "BUYER" || mentionedUser?.role === "ADMIN";
+            notifyPayloads.push({
+              userIds: [uid],
+              auditWorkspaceId: resolved.auditWorkspaceId,
+              commWorkspaceType: workspaceType,
+              commWorkspaceId: workspaceId,
+              eventType: isBuyer ? "communication.mentioned.buyer" : "communication.mentioned.supplier",
+              title: isBuyer ? "Buyer mentioned in conversation" : "Supplier mentioned in conversation",
+              message: input.body.slice(0, 120),
+              link,
+              centerType: isBuyer ? "BUYER_MENTIONED" : "SUPPLIER_MENTIONED",
+              metadata: { messageId: msg.id, conversationId: conv.id },
+              messagingDedup: {
+                eventType: "mention",
+                conversationId: conv.id,
+                messageId: msg.id,
+              },
+            });
+            await this.audit(tx, resolved, actor, "communication.mentioned", { messageId: msg.id, userId: uid }, ctx);
+          }
+
+          const parts = await tx.workspaceParticipant.findMany({
+            where: { workspaceId: resolved.auditWorkspaceId, leftAt: null },
+            select: { userId: true },
+          });
+          const now = new Date();
+          for (const p of parts) {
+            if (p.userId === actor.id) continue;
+            await tx.workspaceMessageDelivery.create({
+              data: { messageId: msg.id, userId: p.userId, sentAt: now },
+            });
+          }
+
+          return {
+            msgId: msg.id,
+            convId: conv.id,
+            notifyPayloads,
+            mentionUserIds: mentionIds,
+          };
+        },
+        buildOutbox: (result) => {
+          const events = [
+            buildSocketOutbox("workspace_communication", {
+              event: "messaging:message:new",
+              conversationId: result.convId,
+              messageId: result.msgId,
+              workspaceId: resolved.auditWorkspaceId,
+              audienceScope: isInternal ? "INTERNAL" : "EXTERNAL",
+              idempotencyKey,
+            }),
+          ];
+          for (const np of result.notifyPayloads) {
+            const dedup = np.messagingDedup;
+            events.push(
+              buildNotificationOutbox("workspace_communication", {
+                idempotencyKey: dedup
+                  ? `${dedup.eventType}:${dedup.conversationId}:${dedup.messageId}`
+                  : idempotencyKey,
+                conversationId: dedup?.conversationId ?? result.convId,
+                messageId: dedup?.messageId ?? result.msgId,
+                notifyInput: np as Record<string, unknown>,
+              }),
+            );
+          }
+          return events;
+        },
+        legacyOnly: async () => {
+          await this.createMessageLegacy(
+            workspaceType,
+            workspaceId,
+            actor,
+            input,
+            ctx,
+            resolved,
+            mentionIds,
+            isInternal,
+          );
+          return {
+            msgId: "",
+            convId: "",
+            notifyPayloads: [],
+            mentionUserIds: [],
+          };
+        },
+      });
+    } catch (e) {
+      const prismaCode =
+        e && typeof e === "object" && "code" in e
+          ? String((e as { code: unknown }).code)
+          : "";
+      if (input.clientMessageId && prismaCode === "P2002") {
+        const existingId = await this.findClientMessage(
+          resolved,
+          actor.id,
+          input.clientMessageId,
+        );
+        if (existingId) return;
+      }
+      throw e;
+    }
+  }
+
+  /** Legacy-primary path for legacy_primary_unified_mirror / legacy_only modes. */
+  private async createMessageLegacy(
+    workspaceType: CommWorkspaceType,
+    workspaceId: string,
+    actor: AuthUser,
+    input: CreateMessagePayload,
+    ctx: { ip?: string; userAgent?: string } | undefined,
+    resolved: ResolvedWorkspace,
+    mentionIds: string[],
+    isInternal: boolean,
+  ) {
+    const messageId = await this.db.$transaction(async (tx) => {
+      const conv = await this.ensureConversationTx(tx, resolved);
+      const msg = await tx.workspaceMessage.create({
+        data: {
+          conversationId: conv.id,
+          authorUserId: actor.id,
+          messageType: input.messageType,
+          visibility: input.visibility,
+          body: input.body.trim(),
+          parentMessageId: input.parentMessageId ?? null,
+          clientMessageId: input.clientMessageId ?? null,
+          status: "ACTIVE",
+        },
+      });
       if (mentionIds.length) {
         await tx.workspaceMention.createMany({
           data: mentionIds.map((mentionedUserId) => ({
@@ -388,7 +607,6 @@ export class CommunicationService {
           skipDuplicates: true,
         });
       }
-
       if (input.attachmentIds?.length) {
         await tx.workspaceMessageAttachment.updateMany({
           where: {
@@ -401,20 +619,11 @@ export class CommunicationService {
           data: { messageId: msg.id },
         });
       }
-
       await this.audit(tx, resolved, actor, "communication.created", {
         messageId: msg.id,
         messageType: input.messageType,
         visibility: input.visibility,
       }, ctx);
-
-      if (TIMELINE_MESSAGE_TYPES.includes(input.messageType)) {
-        await this.timeline(tx, resolved.auditWorkspaceId, actor.id, `communication.${input.messageType.toLowerCase()}`, {
-          messageId: msg.id,
-          body: input.body.slice(0, 200),
-        });
-      }
-
       const notifyIds = await this.notifyRecipients(
         tx,
         resolved,
@@ -423,95 +632,22 @@ export class CommunicationService {
         mentionIds,
       );
       const link = this.workspaceLink(workspaceType, workspaceId);
-      const authorRole = actor.role;
       await notifyCommEvent(tx, {
         userIds: notifyIds,
         auditWorkspaceId: resolved.auditWorkspaceId,
         commWorkspaceType: workspaceType,
         commWorkspaceId: workspaceId,
-        eventType: input.messageType === "INTERNAL_NOTE"
-          ? "communication.internal_note"
-          : "communication.message.created",
-        title: authorRole === "SUPPLIER" ? "New supplier message" : "New workspace message",
+        eventType: isInternal ? "communication.internal_note" : "communication.message.created",
+        title: "New workspace message",
         message: input.body.slice(0, 120),
         link,
-        centerType: authorRole === "SUPPLIER" ? "NEW_SUPPLIER_MESSAGE" : undefined,
-        metadata: {
-          messageId: msg.id,
-          conversationId: conv.id,
-          sensitiveContent: input.messageType === "INTERNAL_NOTE",
-          messageVisibility: input.visibility,
-        },
-        messagingDedup: input.messageType === "INTERNAL_NOTE"
+        metadata: { messageId: msg.id, conversationId: conv.id },
+        messagingDedup: isInternal
           ? undefined
-          : {
-              eventType: "message:new",
-              conversationId: conv.id,
-              messageId: msg.id,
-            },
+          : { eventType: "message:new", conversationId: conv.id, messageId: msg.id },
       });
-
-      for (const uid of mentionIds) {
-        if (uid === actor.id) continue;
-        const mentionedUser = await tx.user.findUnique({ where: { id: uid }, select: { role: true } });
-        const isBuyer = mentionedUser?.role === "BUYER" || mentionedUser?.role === "ADMIN";
-        await notifyCommEvent(tx, {
-          userIds: [uid],
-          auditWorkspaceId: resolved.auditWorkspaceId,
-          commWorkspaceType: workspaceType,
-          commWorkspaceId: workspaceId,
-          eventType: isBuyer ? "communication.mentioned.buyer" : "communication.mentioned.supplier",
-          title: isBuyer ? "Buyer mentioned in conversation" : "Supplier mentioned in conversation",
-          message: input.body.slice(0, 120),
-          link,
-          centerType: isBuyer ? "BUYER_MENTIONED" : "SUPPLIER_MENTIONED",
-          metadata: { messageId: msg.id, conversationId: conv.id },
-          messagingDedup: {
-            eventType: "mention",
-            conversationId: conv.id,
-            messageId: msg.id,
-          },
-        });
-        await this.audit(tx, resolved, actor, "communication.mentioned", { messageId: msg.id, userId: uid }, ctx);
-      }
-
-      const parts = await tx.workspaceParticipant.findMany({
-        where: { workspaceId: resolved.auditWorkspaceId, leftAt: null },
-        select: { userId: true },
-      });
-      const now = new Date();
-      for (const p of parts) {
-        if (p.userId === actor.id) continue;
-        await tx.workspaceMessageDelivery.create({
-          data: { messageId: msg.id, userId: p.userId, sentAt: now },
-        });
-      }
-
       return msg.id;
     });
-    } catch (e) {
-      const prismaCode =
-        e && typeof e === "object" && "code" in e
-          ? String((e as { code: unknown }).code)
-          : "";
-      if (input.clientMessageId && prismaCode === "P2002") {
-        const existingId = await this.findClientMessage(
-          resolved,
-          actor.id,
-          input.clientMessageId,
-        );
-        if (existingId) {
-          messageId = existingId;
-          isReplay = true;
-        } else {
-          throw e;
-        }
-      } else {
-        throw e;
-      }
-    }
-
-    if (isReplay) return;
 
     socketBus.scheduleEmit(() => {
       socketBus.emitToWorkspace(resolved.auditWorkspaceId, SocketEvents.COMMUNICATION_CREATED, {
@@ -519,13 +655,6 @@ export class CommunicationService {
         workspaceId,
         messageId,
       });
-      for (const uid of mentionIds) {
-        socketBus.emitToUser(uid, SocketEvents.COMMUNICATION_MENTIONED, {
-          workspaceType,
-          workspaceId,
-          messageId,
-        });
-      }
     });
 
     void getMessagingWriteBridge(this.db)

@@ -55,6 +55,8 @@ import { chatRouter } from "./modules/chat/chat.routes.js";
 import { conversationsRouter } from "./modules/chat/conversations.routes.js";
 import { whatsappInboxRouter } from "./modules/whatsapp-inbox/whatsapp-inbox.routes.js";
 import { unifiedMessagingRouter } from "./modules/unified-messaging/unified-messaging.routes.js";
+import { getMessagingWriteBridge } from "./modules/unified-messaging/messaging-write.bridge.js";
+import { prisma } from "./db/prisma.js";
 import { isUnifiedMessagingEnabled } from "./config/env.js";
 import { freightEstimateRouter } from "./modules/freight-estimate/freight-estimate.routes.js";
 import { freightBookingRouter } from "./modules/freight-booking/freight-booking.routes.js";
@@ -137,5 +139,19 @@ api.use(
   "/workspace-communication/:workspaceType/:workspaceId",
   workspaceCommunicationRouter,
 );
+
+if (process.env.NODE_ENV === "test") {
+  api.post(
+    "/internal/messaging/socket-emit-test",
+    asyncHandler(async (req, res) => {
+      const body = req.body as {
+        event: Parameters<ReturnType<typeof getMessagingWriteBridge>["publishEvent"]>[0];
+        payload: Parameters<ReturnType<typeof getMessagingWriteBridge>["publishEvent"]>[1];
+      };
+      getMessagingWriteBridge(prisma).publishEvent(body.event, body.payload);
+      res.json({ ok: true });
+    }),
+  );
+}
 
 export default api;
