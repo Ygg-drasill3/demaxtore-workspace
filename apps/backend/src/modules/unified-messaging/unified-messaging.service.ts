@@ -27,22 +27,25 @@ import { UnifiedMessagingPolicy } from "./unified-messaging.policy.js";
 import { UnifiedMessagingRepository } from "./unified-messaging.repository.js";
 import type { AuthUser } from "./unified-messaging.types.js";
 import { getMessagingWriteBridge } from "./messaging-write.bridge.js";
+import { getMessagingWriteDispatcher } from "./messaging-write.dispatcher.js";
 import { UnifiedMessagingWriteOrchestrator } from "./unified-messaging-write.orchestrator.js";
 
 export class UnifiedMessagingService {
   private readonly repo: UnifiedMessagingRepository;
   private readonly policy: UnifiedMessagingPolicy;
-  private readonly dispatcher: MessagingChannelDispatcher;
+  private readonly channelDispatcher: MessagingChannelDispatcher;
   private readonly writeOrchestrator: UnifiedMessagingWriteOrchestrator;
+  private readonly writeDispatcher: ReturnType<typeof getMessagingWriteDispatcher>;
 
   constructor(private readonly prisma: PrismaClient) {
     this.repo = new UnifiedMessagingRepository(prisma);
     this.policy = new UnifiedMessagingPolicy(prisma);
-    this.dispatcher = new MessagingChannelDispatcher([
+    this.channelDispatcher = new MessagingChannelDispatcher([
       new WorkspaceChannelAdapter(),
       new WhatsAppChannelAdapterStub(),
     ]);
     this.writeOrchestrator = new UnifiedMessagingWriteOrchestrator(prisma);
+    this.writeDispatcher = getMessagingWriteDispatcher(prisma);
   }
 
   async listConversations(user: AuthUser, filters: ConversationListFilters) {
@@ -110,14 +113,14 @@ export class UnifiedMessagingService {
     if (!message) throw UnifiedMessagingErrors.cannotAccessConversation();
 
     if (channel === "WHATSAPP") {
-      await this.dispatcher.dispatch("WHATSAPP", {
+      await this.channelDispatcher.dispatch("WHATSAPP", {
         conversationId,
         messageId: message.id,
         body: input.body,
         audienceScope,
       });
     } else {
-      await this.dispatcher.dispatch("WORKSPACE", {
+      await this.channelDispatcher.dispatch("WORKSPACE", {
         conversationId,
         messageId: message.id,
         body: input.body,
@@ -264,10 +267,34 @@ export class UnifiedMessagingService {
     if (!this.policy.canAssignConversation(user)) {
       throw UnifiedMessagingErrors.cannotAssign();
     }
-    await this.repo.assignConversation(conversationId, input.assignedUserId);
-    void getMessagingWriteBridge(this.prisma)
-      .onAssignment({ conversationId, assignedUserId: input.assignedUserId })
-      .catch(() => undefined);
+    await this.writeDispatcher.dispatchUnifiedFirst({
+      surface: "unified_api",
+      actor: user,
+      idempotencyKey: `assign:${conversationId}:${input.assignedUserId}`,
+      unified: async (tx) => {
+        await tx.workspaceConversation.update({
+          where: { id: conversationId },
+          data: { assignedUserId: input.assignedUserId },
+        });
+        return { conversationId, assignedUserId: input.assignedUserId };
+      },
+      outbox: () => [
+        {
+          eventType: "SOCKET_EMIT",
+          aggregateType: "unified_api",
+          aggregateId: conversationId,
+          conversationId,
+          idempotencyKey: `socket:assign:${conversationId}:${input.assignedUserId}`,
+          payload: {
+            event: "messaging:conversation:assigned",
+            eventPayload: {
+              conversationId,
+              idempotencyKey: `assign:${conversationId}:${input.assignedUserId}`,
+            },
+          },
+        },
+      ],
+    });
     return this.getConversation(user, conversationId);
   }
 
@@ -275,10 +302,31 @@ export class UnifiedMessagingService {
     if (!this.policy.canArchiveConversation(user)) {
       throw UnifiedMessagingErrors.cannotArchive();
     }
-    await this.repo.archiveConversation(conversationId);
-    void getMessagingWriteBridge(this.prisma)
-      .onArchive({ conversationId })
-      .catch(() => undefined);
+    await this.writeDispatcher.dispatchUnifiedFirst({
+      surface: "unified_api",
+      actor: user,
+      idempotencyKey: `archive:${conversationId}`,
+      unified: async (tx) => {
+        await tx.workspaceConversation.update({
+          where: { id: conversationId },
+          data: { isArchived: true, status: "ARCHIVED" },
+        });
+        return { conversationId };
+      },
+      outbox: () => [
+        {
+          eventType: "SOCKET_EMIT",
+          aggregateType: "unified_api",
+          aggregateId: conversationId,
+          conversationId,
+          idempotencyKey: `socket:archive:${conversationId}`,
+          payload: {
+            event: "messaging:conversation:archived",
+            eventPayload: { conversationId, idempotencyKey: `archive:${conversationId}` },
+          },
+        },
+      ],
+    });
     return this.getConversation(user, conversationId);
   }
 }

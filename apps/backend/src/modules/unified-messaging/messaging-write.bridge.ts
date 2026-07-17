@@ -7,13 +7,20 @@ import { participantKeyForUser } from "./unified-messaging.constants.js";
 import type { AuthUser } from "./unified-messaging.types.js";
 import { getMessagingDedupStore } from "./messaging-dedup.store.js";
 import { getMessagingOutboxService } from "./messaging-outbox.service.js";
+import { getMessagingWriteDispatcher } from "./messaging-write.dispatcher.js";
 
 export type MessagingWriteSurface =
   | "workspace_communication"
   | "conversation_hub"
   | "direct_chat"
   | "whatsapp_inbox"
-  | "rfq_clarification";
+  | "rfq_clarification"
+  | "freightiq"
+  | "system_event"
+  | "passwordless"
+  | "unified_api"
+  | "general_messages"
+  | "order_freight_chat";
 
 const emittedEventKeys = new Set<string>();
 
@@ -109,12 +116,18 @@ export class MessagingWriteBridge {
   private readonly events: MessagingEventEmitter;
   readonly notifications: MessagingNotificationDedup;
   private readonly outbox: ReturnType<typeof getMessagingOutboxService>;
+  private readonly dispatcher: ReturnType<typeof getMessagingWriteDispatcher>;
 
   constructor(private readonly prisma: PrismaClient) {
     this.orchestrator = new UnifiedMessagingWriteOrchestrator(prisma);
     this.events = new MessagingEventEmitter(prisma);
     this.notifications = new MessagingNotificationDedup(prisma);
     this.outbox = getMessagingOutboxService(prisma);
+    this.dispatcher = getMessagingWriteDispatcher(prisma);
+  }
+
+  get dispatcherInstance() {
+    return this.dispatcher;
   }
 
   get writeMode() {

@@ -176,7 +176,12 @@ export class CommunicationService {
         await this.deleteMessage(workspaceType, workspaceId, actor, DeleteMessagePayload.parse(payload), ctx);
         break;
       case "mark_read":
-        await this.markRead(workspaceType, workspaceId, actor, MarkReadPayload.parse(payload), ctx);
+        await getMessagingWriteBridge(this.db).runLegacyWrite({
+          surface: "workspace_communication",
+          actor,
+          legacy: () =>
+            this.markRead(workspaceType, workspaceId, actor, MarkReadPayload.parse(payload), ctx),
+        });
         break;
       default:
         throw new AppError(400, "UNKNOWN_ACTION");
@@ -186,6 +191,19 @@ export class CommunicationService {
   }
 
   async uploadAttachment(
+    workspaceType: CommWorkspaceType,
+    workspaceId: string,
+    actor: AuthUser,
+    file: { originalName: string; mimeType: string; sizeBytes: number; buffer: Buffer },
+  ) {
+    return getMessagingWriteBridge(this.db).runLegacyWrite({
+      surface: "workspace_communication",
+      actor,
+      legacy: () => this.uploadAttachmentDirect(workspaceType, workspaceId, actor, file),
+    });
+  }
+
+  private async uploadAttachmentDirect(
     workspaceType: CommWorkspaceType,
     workspaceId: string,
     actor: AuthUser,

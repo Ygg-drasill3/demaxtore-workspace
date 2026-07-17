@@ -2,6 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import { AppError } from "../../utils/httpErrors.js";
 import { normalizePhone } from "../chat/whatsapp.service.js";
 import { socketBus } from "../../realtime/socket-bus.js";
+import { getMessagingWriteBridge } from "../unified-messaging/messaging-write.bridge.js";
 import { logger } from "../../config/logger.js";
 import { parseInboundMessages, parseStatusUpdates } from "./whatsapp-inbox.parser.js";
 import { downloadWhatsAppMedia } from "./whatsapp-inbox.media.js";
@@ -14,7 +15,6 @@ import {
   type SendMessageInput,
 } from "./whatsapp-inbox.types.js";
 import type { AuthUser } from "../../types/auth-user.js";
-import { getMessagingWriteBridge } from "../unified-messaging/messaging-write.bridge.js";
 
 function previewForMessage(type: string, body: string | null, caption: string | null): string {
   if (body?.trim()) return body.trim().slice(0, 200);
@@ -284,6 +284,15 @@ export class WhatsAppInboxService {
     });
     this.emitConversationEvent(conversation.id, "whatsapp:conversation:updated", convDto);
 
+    void getMessagingWriteBridge(this.db)
+      .onWhatsAppInbound({
+        whatsappConversationId: conversation.id,
+        messageId: msg.id,
+        metaMessageId: item.metaMessageId,
+        duplicate: false,
+      })
+      .catch(() => undefined);
+
     return { messageId: msg.id, conversationId: conversation.id, duplicate: false };
   }
 
@@ -323,6 +332,19 @@ export class WhatsAppInboxService {
       status: st.status,
       message: messageDto,
     });
+
+    const unifiedConv = await this.db.workspaceConversation.findFirst({
+      where: { metadata: { path: ["whatsappConversationId"], equals: msg.conversationId } },
+      select: { id: true },
+    });
+    void getMessagingWriteBridge(this.db)
+      .onDeliveryStatus({
+        conversationId: unifiedConv?.id ?? msg.conversationId,
+        messageId: msg.id,
+        status: st.status,
+      })
+      .catch(() => undefined);
+
     return true;
   }
 
@@ -379,6 +401,14 @@ export class WhatsAppInboxService {
   }
 
   async markRead(actor: AuthUser, conversationId: string) {
+    return getMessagingWriteBridge(this.db).runLegacyWrite({
+      surface: "whatsapp_inbox",
+      actor,
+      legacy: () => this.markReadDirect(actor, conversationId),
+    });
+  }
+
+  private async markReadDirect(actor: AuthUser, conversationId: string) {
     const conv = await this.db.whatsAppConversation.findUnique({ where: { id: conversationId } });
     if (!conv) throw new AppError(404, "CONVERSATION_NOT_FOUND");
     this.assertAccess(actor, conv);
@@ -394,6 +424,28 @@ export class WhatsAppInboxService {
   }
 
   async sendMessage(
+    actor: AuthUser,
+    input: {
+      to?: string;
+      conversationId?: string;
+      type: SendMessageInput["type"];
+      text?: string;
+      templateName?: string;
+      templateLanguage?: string;
+      replyToMessageId?: string;
+      mediaId?: string;
+      caption?: string;
+      filename?: string;
+    },
+  ) {
+    return getMessagingWriteBridge(this.db).runLegacyWrite({
+      surface: "whatsapp_inbox",
+      actor,
+      legacy: () => this.sendMessageDirect(actor, input),
+    });
+  }
+
+  private async sendMessageDirect(
     actor: AuthUser,
     input: {
       to?: string;

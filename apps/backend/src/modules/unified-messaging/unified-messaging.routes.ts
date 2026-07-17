@@ -5,6 +5,11 @@ import { prisma } from "../../db/prisma.js";
 import { isUnifiedMessagingEnabled } from "../../config/env.js";
 import { UnifiedMessagingService } from "./unified-messaging.service.js";
 import { UnifiedMessagingErrors } from "./unified-messaging.errors.js";
+import { UnifiedMessagingAttachmentsService } from "./unified-messaging-attachments.service.js";
+import multer from "multer";
+import { createUploadFileFilter } from "../../lib/multer-file-guard.js";
+import { streamStoredFileToResponse } from "../../lib/file-storage.js";
+
 import {
   AddContextRequestSchema,
   AssignConversationRequestSchema,
@@ -14,6 +19,12 @@ import {
   CreateMessageRequestSchema,
   MessageListQuerySchema,
 } from "@dmx/contracts/unified-messaging.zod";
+
+const uploadAttachment = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 },
+  fileFilter: createUploadFileFilter(),
+});
 
 const router = Router();
 const service = () => new UnifiedMessagingService(prisma);
@@ -56,6 +67,30 @@ router.post(
     const body = CreateConversationRequestSchema.parse(req.body);
     const created = await service().createConversation(req.user!, body);
     res.status(201).json(created);
+  }),
+);
+
+const attachments = () => new UnifiedMessagingAttachmentsService(prisma);
+
+router.get(
+  "/attachments/:attachmentId",
+  asyncHandler(async (req, res) => {
+    res.json(await attachments().getMetadata(req.user!, req.params.attachmentId));
+  }),
+);
+
+router.get(
+  "/attachments/:attachmentId/download",
+  asyncHandler(async (req, res) => {
+    const file = await attachments().download(req.user!, req.params.attachmentId);
+    await streamStoredFileToResponse(file.storageKey, res, file);
+  }),
+);
+
+router.delete(
+  "/attachments/:attachmentId",
+  asyncHandler(async (req, res) => {
+    res.json(await attachments().remove(req.user!, req.params.attachmentId));
   }),
 );
 
@@ -130,6 +165,22 @@ router.delete(
     res.json(
       await service().removeContext(req.user!, req.params.conversationId, req.params.contextId),
     );
+  }),
+);
+
+router.post(
+  "/:conversationId/attachments",
+  uploadAttachment.single("file"),
+  asyncHandler(async (req, res) => {
+    const file = req.file;
+    if (!file) return res.status(400).json({ error: { code: "FILE_REQUIRED" } });
+    const row = await attachments().upload(req.user!, req.params.conversationId, {
+      originalName: file.originalname,
+      mimeType: file.mimetype,
+      sizeBytes: file.size,
+      buffer: file.buffer,
+    });
+    res.status(201).json(row);
   }),
 );
 
