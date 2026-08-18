@@ -1,0 +1,1 @@
+import{d as e}from"./index-uArFAU5Y.js";const o={forgotPassword:t=>e.post("/auth/forgot-password",t).then(a=>a.data),resetPassword:t=>e.post("/auth/reset-password",t).then(a=>a.data),register:t=>e.post("/auth/register",t).then(a=>a.data),me:()=>e.get("/auth/me").then(t=>t.data),updateProfile:t=>e.patch("/auth/me",t).then(a=>a.data)};export{o as a};

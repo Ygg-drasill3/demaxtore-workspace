@@ -1,0 +1,1 @@
+import"./index-Digu1c2v.js";import{p as a}from"./supplier-portfolio-ERMsEOaM.js";async function i(e={}){const t=await a.shipments(e);return{items:t.items,total:t.total}}async function r(e={}){const t=await a.tradeDocuments(e);return{items:t.items,total:t.total}}export{r as a,i as f};

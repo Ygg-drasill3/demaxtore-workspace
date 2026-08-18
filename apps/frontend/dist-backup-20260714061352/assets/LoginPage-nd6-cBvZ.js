@@ -1,0 +1,1 @@
+import{b as t,r as e}from"./vendor-DqkjOYAJ.js";import{h as a}from"./index-2H_3snr9.js";import"./query-DAlYPQFt.js";import"./motion-DVJS88Ue.js";import"./socket-BcxXcwBL.js";function f(){const o=t();return e.useEffect(()=>{const r=new URLSearchParams(o.search).get("from")??void 0;a(r??void 0)},[o]),null}export{f as default};

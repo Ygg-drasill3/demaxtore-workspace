@@ -1,0 +1,1 @@
+import{j as t}from"./query-DAlYPQFt.js";import{f as a,c as r}from"./vendor-DqkjOYAJ.js";function n(){const{id:e}=a();return t.jsx(r,{to:`/buyer/mixed-container/organization/${e}`,replace:!0})}export{n as default};

@@ -1,0 +1,6 @@
+import{j as e}from"./query-DAlYPQFt.js";import{L as t}from"./vendor-DqkjOYAJ.js";import{d as a,B as o}from"./index-2H_3snr9.js";import"./motion-DVJS88Ue.js";import"./socket-BcxXcwBL.js";/**
+ * @license lucide-react v0.439.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const s=a("Compass",[["path",{d:"m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z",key:"9ktpf1"}],["circle",{cx:"12",cy:"12",r:"10",key:"1mglay"}]]);function d(){return e.jsxs("div",{"data-testid":"not-found-page",className:"max-w-md mx-auto text-center py-20 animate-fade-in",children:[e.jsx("div",{className:"h-14 w-14 mx-auto rounded-full bg-paper-100 grid place-items-center text-zinc-500",children:e.jsx(s,{className:"h-6 w-6"})}),e.jsx("h1",{className:"font-display text-3xl font-semibold tracking-tight mt-5",children:"Page not found"}),e.jsx("p",{className:"text-sm text-zinc-500 mt-2",children:"The page you're looking for doesn't exist or you don't have permission to view it."}),e.jsx(t,{to:"/",className:"inline-block mt-6",children:e.jsx(o,{children:"Take me home"})})]})}export{d as default};

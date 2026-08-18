@@ -1,0 +1,1 @@
+import{c as e}from"./index-2H_3snr9.js";const o={get:r=>e.get(`/purchase-orders/${r}`).then(a=>a.data),byOrder:r=>e.get(`/orders/${r}/purchase-order`).then(a=>a.data),dashboard:()=>e.get("/purchase-orders/dashboard").then(r=>r.data),action:(r,a,t={})=>e.post(`/purchase-orders/${r}/actions/${a}`,t).then(s=>s.data)};export{o as p};

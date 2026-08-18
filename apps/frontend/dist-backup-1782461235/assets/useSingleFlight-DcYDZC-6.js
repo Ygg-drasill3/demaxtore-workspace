@@ -1,0 +1,1 @@
+import{r as e}from"./vendor-DqkjOYAJ.js";function c(r){const t=e.useRef(!1),[u,s]=e.useState(!1);return{run:e.useCallback(async(...n)=>{if(!t.current){t.current=!0,s(!0);try{await r(...n)}finally{t.current=!1,s(!1)}}},[r]),busy:u}}export{c as u};

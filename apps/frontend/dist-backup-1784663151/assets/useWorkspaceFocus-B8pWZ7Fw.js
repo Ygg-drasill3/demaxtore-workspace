@@ -1,0 +1,6 @@
+import{f as u}from"./index-BSc_e-9o.js";import{h as n,r as i}from"./vendor-DqkjOYAJ.js";import{f as d}from"./focus-conversation-hub-E711gpmL.js";/**
+ * @license lucide-react v0.439.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const h=u("CloudUpload",[["path",{d:"M12 13v8",key:"1l5pq0"}],["path",{d:"M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242",key:"1pljnt"}],["path",{d:"m8 17 4-4 4 4",key:"1quai1"}]]);function w(o="workspace-communication"){document.querySelector(`[data-testid="${o}"]`)?.scrollIntoView({behavior:"smooth",block:"start"}),window.setTimeout(()=>{document.querySelector('[data-testid="comm-input"]')?.focus()},350)}function m(o){document.querySelector(`[data-testid="${o}"]`)?.scrollIntoView({behavior:"smooth",block:"start"}),window.setTimeout(()=>{document.querySelector('[data-testid^="trade-docs-upload-"]')?.focus()},350)}function k({communicationTestId:o,documentsTestId:t}){const[e,s]=n();i.useEffect(()=>{const a=e.get("focus");if(!a)return;const c=window.setTimeout(()=>{a==="messages"&&o?d(o):a==="documents"&&t&&m(t);const r=new URLSearchParams(e);r.delete("focus"),s(r,{replace:!0})},400);return()=>window.clearTimeout(c)},[e,s,o,t])}export{h as C,m as a,w as f,k as u};

@@ -1,0 +1,1 @@
+import{j as e}from"./query-CXNMX7BQ.js";import{U as i}from"./UnifiedConversationPanel-BCTz65dB.js";function s({contextType:n,contextId:o,testId:t="container-communication",compact:r=!0}){return e.jsx(i,{contextType:n,contextId:o,compact:r,allowInternalNote:!0,testId:t})}export{s as C};

@@ -1,0 +1,1 @@
+import{j as t}from"./query-CXNMX7BQ.js";import{O as i}from"./index-BSc_e-9o.js";import"./vendor-DqkjOYAJ.js";import"./motion-xztEcLB9.js";import"./socket-BcxXcwBL.js";function r(){return t.jsx("div",{"data-testid":"notifications-page",className:"max-w-4xl mx-auto pb-10 animate-fade-in",children:t.jsx(i,{limit:80})})}export{r as default};
