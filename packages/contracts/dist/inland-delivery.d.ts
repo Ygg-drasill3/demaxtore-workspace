@@ -1,0 +1,245 @@
+/**
+ * Sprint 41 — Turkey Inland Execution V1 (operational lifecycle after Customs CLEARED).
+ * No marketplace / GPS / D&D / landed cost.
+ */
+import { z } from "zod";
+export declare const INLAND_DELIVERY_STATUSES: readonly ["DRAFT", "REQUESTED", "TRUCKER_ASSIGNED", "PICKUP_SCHEDULED", "READY_FOR_PICKUP", "PICKED_UP", "GATE_OUT", "IN_TRANSIT", "DELIVERED", "CANCELLED"];
+export type InlandDeliveryStatus = (typeof INLAND_DELIVERY_STATUSES)[number];
+export declare const INLAND_STATUS_SOURCES: readonly ["BUYER", "DEMAXTORE_OPERATIONS", "TRUCKER", "SYSTEM"];
+export declare const INLAND_POD_STATUSES: readonly ["NOT_REQUIRED", "PENDING", "AVAILABLE"];
+export declare const INLAND_TRANSITIONS: Record<InlandDeliveryStatus, InlandDeliveryStatus[]>;
+/** Physical release transitions require Customs CLEARED. */
+export declare const INLAND_CUSTOMS_GATED_STATUSES: InlandDeliveryStatus[];
+export declare function canTransitionInland(from: InlandDeliveryStatus, to: InlandDeliveryStatus): boolean;
+export declare const RequestInlandDeliverySchema: z.ZodObject<{
+    shipmentWorkspaceId: z.ZodString;
+    deliveryName: z.ZodNullable<z.ZodOptional<z.ZodString>>;
+    deliveryAddress: z.ZodString;
+    deliveryCity: z.ZodNullable<z.ZodOptional<z.ZodString>>;
+    deliveryPostalCode: z.ZodNullable<z.ZodOptional<z.ZodString>>;
+    deliveryContactName: z.ZodNullable<z.ZodOptional<z.ZodString>>;
+    deliveryContactPhone: z.ZodNullable<z.ZodOptional<z.ZodString>>;
+    pickupLocation: z.ZodNullable<z.ZodOptional<z.ZodString>>;
+    preferredPickupAt: z.ZodNullable<z.ZodOptional<z.ZodString>>;
+    instructions: z.ZodNullable<z.ZodOptional<z.ZodString>>;
+}, "strip", z.ZodTypeAny, {
+    shipmentWorkspaceId: string;
+    deliveryAddress: string;
+    pickupLocation?: string | null | undefined;
+    deliveryName?: string | null | undefined;
+    deliveryCity?: string | null | undefined;
+    deliveryPostalCode?: string | null | undefined;
+    deliveryContactName?: string | null | undefined;
+    deliveryContactPhone?: string | null | undefined;
+    preferredPickupAt?: string | null | undefined;
+    instructions?: string | null | undefined;
+}, {
+    shipmentWorkspaceId: string;
+    deliveryAddress: string;
+    pickupLocation?: string | null | undefined;
+    deliveryName?: string | null | undefined;
+    deliveryCity?: string | null | undefined;
+    deliveryPostalCode?: string | null | undefined;
+    deliveryContactName?: string | null | undefined;
+    deliveryContactPhone?: string | null | undefined;
+    preferredPickupAt?: string | null | undefined;
+    instructions?: string | null | undefined;
+}>;
+export type RequestInlandDeliveryInput = z.infer<typeof RequestInlandDeliverySchema>;
+export declare const SchedulePickupSchema: z.ZodObject<{
+    pickupAt: z.ZodString;
+    pickupWindow: z.ZodNullable<z.ZodOptional<z.ZodString>>;
+    appointmentRef: z.ZodNullable<z.ZodOptional<z.ZodString>>;
+    pickupLocation: z.ZodNullable<z.ZodOptional<z.ZodString>>;
+    instructions: z.ZodNullable<z.ZodOptional<z.ZodString>>;
+    driverName: z.ZodNullable<z.ZodOptional<z.ZodString>>;
+    driverPhone: z.ZodNullable<z.ZodOptional<z.ZodString>>;
+    vehiclePlate: z.ZodNullable<z.ZodOptional<z.ZodString>>;
+}, "strip", z.ZodTypeAny, {
+    pickupAt: string;
+    pickupLocation?: string | null | undefined;
+    instructions?: string | null | undefined;
+    pickupWindow?: string | null | undefined;
+    appointmentRef?: string | null | undefined;
+    driverName?: string | null | undefined;
+    driverPhone?: string | null | undefined;
+    vehiclePlate?: string | null | undefined;
+}, {
+    pickupAt: string;
+    pickupLocation?: string | null | undefined;
+    instructions?: string | null | undefined;
+    pickupWindow?: string | null | undefined;
+    appointmentRef?: string | null | undefined;
+    driverName?: string | null | undefined;
+    driverPhone?: string | null | undefined;
+    vehiclePlate?: string | null | undefined;
+}>;
+export type SchedulePickupInput = z.infer<typeof SchedulePickupSchema>;
+export declare const InlandConfirmSchema: z.ZodObject<{
+    note: z.ZodNullable<z.ZodOptional<z.ZodString>>;
+    timestamp: z.ZodNullable<z.ZodOptional<z.ZodString>>;
+}, "strip", z.ZodTypeAny, {
+    note?: string | null | undefined;
+    timestamp?: string | null | undefined;
+}, {
+    note?: string | null | undefined;
+    timestamp?: string | null | undefined;
+}>;
+export type InlandConfirmInput = z.infer<typeof InlandConfirmSchema>;
+export declare const InlandCancelSchema: z.ZodObject<{
+    reason: z.ZodString;
+}, "strip", z.ZodTypeAny, {
+    reason: string;
+}, {
+    reason: string;
+}>;
+export type InlandCancelInput = z.infer<typeof InlandCancelSchema>;
+export declare const InlandCostSchema: z.ZodObject<{
+    amount: z.ZodNumber;
+    currency: z.ZodDefault<z.ZodString>;
+    kind: z.ZodDefault<z.ZodEnum<["ESTIMATED", "ACTUAL"]>>;
+    source: z.ZodDefault<z.ZodEnum<["MANUAL", "BROKER_ENTERED", "SYSTEM"]>>;
+}, "strip", z.ZodTypeAny, {
+    currency: string;
+    amount: number;
+    source: "MANUAL" | "SYSTEM" | "BROKER_ENTERED";
+    kind: "ESTIMATED" | "ACTUAL";
+}, {
+    amount: number;
+    currency?: string | undefined;
+    source?: "MANUAL" | "SYSTEM" | "BROKER_ENTERED" | undefined;
+    kind?: "ESTIMATED" | "ACTUAL" | undefined;
+}>;
+export type InlandCostInput = z.infer<typeof InlandCostSchema>;
+export declare const InlandDeliveryDtoSchema: z.ZodObject<{
+    id: z.ZodString;
+    organisationId: z.ZodString;
+    shipmentWorkspaceId: z.ZodString;
+    orderWorkspaceId: z.ZodString;
+    customsCaseId: z.ZodNullable<z.ZodString>;
+    status: z.ZodEnum<["DRAFT", "REQUESTED", "TRUCKER_ASSIGNED", "PICKUP_SCHEDULED", "READY_FOR_PICKUP", "PICKED_UP", "GATE_OUT", "IN_TRANSIT", "DELIVERED", "CANCELLED"]>;
+    statusSource: z.ZodEnum<["BUYER", "DEMAXTORE_OPERATIONS", "TRUCKER", "SYSTEM"]>;
+    customsCleared: z.ZodBoolean;
+    readyForInland: z.ZodBoolean;
+    shipmentRef: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    containerNumber: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    destinationPort: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    deliveryName: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    deliveryAddress: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    deliveryCity: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    deliveryPostalCode: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    deliveryContactName: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    deliveryContactPhone: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    pickupLocation: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    pickupAt: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    pickupWindow: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    appointmentRef: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    instructions: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    truckerUserId: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    truckerAssignmentId: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    driverName: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    driverPhone: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    vehiclePlate: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    releaseReference: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    pickedUpAt: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    gateOutAt: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    inTransitAt: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    deliveredAt: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    podStatus: z.ZodEnum<["NOT_REQUIRED", "PENDING", "AVAILABLE"]>;
+    podTradeDocumentId: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    inlandCostAmount: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+    inlandCostCurrency: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    inlandCostKind: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    allowedActions: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+    nextAction: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    createdAt: z.ZodString;
+    updatedAt: z.ZodString;
+}, "strip", z.ZodTypeAny, {
+    status: "DRAFT" | "REQUESTED" | "CANCELLED" | "DELIVERED" | "IN_TRANSIT" | "PICKED_UP" | "READY_FOR_PICKUP" | "TRUCKER_ASSIGNED" | "PICKUP_SCHEDULED" | "GATE_OUT";
+    id: string;
+    createdAt: string;
+    updatedAt: string;
+    organisationId: string;
+    shipmentWorkspaceId: string;
+    orderWorkspaceId: string;
+    statusSource: "BUYER" | "TRUCKER" | "DEMAXTORE_OPERATIONS" | "SYSTEM";
+    customsCaseId: string | null;
+    customsCleared: boolean;
+    readyForInland: boolean;
+    podStatus: "PENDING" | "AVAILABLE" | "NOT_REQUIRED";
+    shipmentRef?: string | null | undefined;
+    destinationPort?: string | null | undefined;
+    nextAction?: string | null | undefined;
+    allowedActions?: string[] | undefined;
+    containerNumber?: string | null | undefined;
+    pickupLocation?: string | null | undefined;
+    pickedUpAt?: string | null | undefined;
+    deliveredAt?: string | null | undefined;
+    deliveryName?: string | null | undefined;
+    deliveryAddress?: string | null | undefined;
+    deliveryCity?: string | null | undefined;
+    deliveryPostalCode?: string | null | undefined;
+    deliveryContactName?: string | null | undefined;
+    deliveryContactPhone?: string | null | undefined;
+    instructions?: string | null | undefined;
+    pickupAt?: string | null | undefined;
+    pickupWindow?: string | null | undefined;
+    appointmentRef?: string | null | undefined;
+    driverName?: string | null | undefined;
+    driverPhone?: string | null | undefined;
+    vehiclePlate?: string | null | undefined;
+    truckerUserId?: string | null | undefined;
+    truckerAssignmentId?: string | null | undefined;
+    releaseReference?: string | null | undefined;
+    gateOutAt?: string | null | undefined;
+    inTransitAt?: string | null | undefined;
+    podTradeDocumentId?: string | null | undefined;
+    inlandCostAmount?: number | null | undefined;
+    inlandCostCurrency?: string | null | undefined;
+    inlandCostKind?: string | null | undefined;
+}, {
+    status: "DRAFT" | "REQUESTED" | "CANCELLED" | "DELIVERED" | "IN_TRANSIT" | "PICKED_UP" | "READY_FOR_PICKUP" | "TRUCKER_ASSIGNED" | "PICKUP_SCHEDULED" | "GATE_OUT";
+    id: string;
+    createdAt: string;
+    updatedAt: string;
+    organisationId: string;
+    shipmentWorkspaceId: string;
+    orderWorkspaceId: string;
+    statusSource: "BUYER" | "TRUCKER" | "DEMAXTORE_OPERATIONS" | "SYSTEM";
+    customsCaseId: string | null;
+    customsCleared: boolean;
+    readyForInland: boolean;
+    podStatus: "PENDING" | "AVAILABLE" | "NOT_REQUIRED";
+    shipmentRef?: string | null | undefined;
+    destinationPort?: string | null | undefined;
+    nextAction?: string | null | undefined;
+    allowedActions?: string[] | undefined;
+    containerNumber?: string | null | undefined;
+    pickupLocation?: string | null | undefined;
+    pickedUpAt?: string | null | undefined;
+    deliveredAt?: string | null | undefined;
+    deliveryName?: string | null | undefined;
+    deliveryAddress?: string | null | undefined;
+    deliveryCity?: string | null | undefined;
+    deliveryPostalCode?: string | null | undefined;
+    deliveryContactName?: string | null | undefined;
+    deliveryContactPhone?: string | null | undefined;
+    instructions?: string | null | undefined;
+    pickupAt?: string | null | undefined;
+    pickupWindow?: string | null | undefined;
+    appointmentRef?: string | null | undefined;
+    driverName?: string | null | undefined;
+    driverPhone?: string | null | undefined;
+    vehiclePlate?: string | null | undefined;
+    truckerUserId?: string | null | undefined;
+    truckerAssignmentId?: string | null | undefined;
+    releaseReference?: string | null | undefined;
+    gateOutAt?: string | null | undefined;
+    inTransitAt?: string | null | undefined;
+    podTradeDocumentId?: string | null | undefined;
+    inlandCostAmount?: number | null | undefined;
+    inlandCostCurrency?: string | null | undefined;
+    inlandCostKind?: string | null | undefined;
+}>;
+export type InlandDeliveryDto = z.infer<typeof InlandDeliveryDtoSchema>;
+export type InlandPartnerQueueGroup = "ACTION_REQUIRED" | "PICKUP_TODAY" | "UPCOMING_PICKUPS" | "READY_FOR_PICKUP" | "IN_TRANSIT" | "DELIVERED";

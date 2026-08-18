@@ -1,0 +1,85 @@
+{
+  "project_name": "DeMaxtore B2B Sourcing Platform",
+  "theme": "LIGHT",
+  "archetype": "Archetype 4 (Swiss & High-Contrast) adapted for Premium SaaS",
+  "mood": "Professional, authoritative, clean, and highly organized.",
+  "design_philosophy": "Enterprise dashboard shell reminiscent of Linear, Ramp, or Mercury. Content is king, organized via strict grids, generous whitespace, and high-contrast typography. Avoiding typical marketplace visual tropes.",
+  "colors": {
+    "background": "#FAFAFA",
+    "surface": "#FFFFFF",
+    "border": "#E5E7EB",
+    "primary": "#18181B",
+    "primary_hover": "#27272A",
+    "text_primary": "#09090B",
+    "text_secondary": "#52525B",
+    "accent_blue": "#2563EB",
+    "status": {
+      "info_bg": "#DBEAFE",
+      "info_text": "#1D4ED8",
+      "success_bg": "#DCFCE7",
+      "success_text": "#15803D",
+      "warning_bg": "#FEF3C7",
+      "warning_text": "#B45309",
+      "error_bg": "#FEE2E2",
+      "error_text": "#B91C1C"
+    }
+  },
+  "typography": {
+    "heading_font": "Outfit",
+    "body_font": "Inter",
+    "rules": {
+      "h1": "text-3xl font-semibold tracking-tight text-zinc-950",
+      "h2": "text-2xl font-medium tracking-tight text-zinc-900",
+      "h3": "text-lg font-medium tracking-tight text-zinc-900",
+      "body": "text-sm text-zinc-600 leading-relaxed",
+      "label": "text-xs font-semibold tracking-wider text-zinc-500 uppercase"
+    }
+  },
+  "layout_and_spacing": {
+    "app_shell": {
+      "sidebar": "w-64 border-r border-gray-200 bg-white h-screen flex flex-col fixed left-0 top-0",
+      "top_nav": "h-16 border-b border-gray-200 bg-white flex items-center justify-between px-6 sticky top-0 z-40 ml-64",
+      "main_content": "ml-64 p-8 min-h-screen bg-[#FAFAFA]"
+    },
+    "grid_system": "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6",
+    "card": "bg-white rounded-xl border border-gray-200 shadow-[0_2px_8px_rgb(0,0,0,0.04)] p-6 flex flex-col h-full"
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-zinc-900 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-zinc-800 transition-colors shadow-sm",
+      "secondary": "bg-white text-zinc-700 border border-gray-200 rounded-lg px-4 py-2 text-sm font-medium hover:bg-gray-50 transition-colors"
+    },
+    "badges": {
+      "base": "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border"
+    },
+    "inputs": {
+      "default": "flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent transition-all"
+    }
+  },
+  "motion": {
+    "hover": "transition-all duration-200 ease-in-out",
+    "menu_dropdown": "animate-in fade-in slide-in-from-top-2 duration-200"
+  },
+  "media": {
+    "icons": "lucide-react",
+    "images": {
+      "user_avatar": {
+        "url": "https://images.unsplash.com/photo-1580489944761-15a19d654956?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzZ8MHwxfHNlYXJjaHwzfHxwcm9mZXNzaW9uYWwlMjBoZWFkc2hvdCUyMGF2YXRhcnxlbnwwfHx8fDE3ODAzMjI3OTR8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Professional female avatar for user menu",
+        "category": "avatar"
+      }
+    }
+  },
+  "views_and_pages": {
+    "dashboard": "Role-gated grids (Buyer, Supplier, Admin) using Cards. Layout emphasizes metrics and recent activities. Use empty states where data is missing.",
+    "workspace_page": "A centralized view representing a specific transaction or context (RFQ, Order). Needs sections for Timeline (left/main area), Documents (right sidebar), Next Actions (top/prominent), and Participants (sidebar)."
+  },
+  "instructions_to_main_agent": [
+    "Install `lucide-react` for icons.",
+    "Import Google Fonts for `Outfit` and `Inter` in the main CSS file.",
+    "Do NOT use a typical marketplace look. No large colorful banners or product grids. Treat this as an operations command center.",
+    "Use Shadcn UI components extensively for forms, buttons, dropdowns, and dialogs. Heavily customize their styles (especially border-radius and shadows) to match the premium, soft enterprise feel.",
+    "Ensure all interactive elements have `data-testid` attributes as specified in testing rules.",
+    "Use the layout structure defined in `layout_and_spacing.app_shell` to build the core shell."
+  ]
+}

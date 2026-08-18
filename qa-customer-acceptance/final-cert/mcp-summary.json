@@ -1,0 +1,21 @@
+{
+  "buyer": {
+    "total": 17,
+    "passed": 17,
+    "failed": 0,
+    "consoleErrorCount": 11,
+    "failedApiCount": 11
+  },
+  "supplier": {
+    "total": 12,
+    "passed": 12,
+    "consoleErrorCount": 2,
+    "failedApiCount": 2
+  },
+  "admin": {
+    "total": 12,
+    "passed": 12,
+    "consoleErrorCount": 5,
+    "failedApiCount": 1
+  }
+}

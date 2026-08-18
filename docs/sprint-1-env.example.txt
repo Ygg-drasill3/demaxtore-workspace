@@ -1,0 +1,44 @@
+# DeMaxtore — Sprint 1 Environment Variables (REFERENCE)
+# Copy to backend/.env and frontend/.env respectively on your VPS / dev machine.
+
+# ============================================================
+# backend/.env  (Express + Prisma + Socket.io)
+# ============================================================
+
+NODE_ENV=development
+PORT=4000
+
+# --- Database (PostgreSQL via Prisma) ---
+DATABASE_URL="postgresql://demaxtore:demaxtore@localhost:5432/demaxtore?schema=public"
+
+# --- JWT (Access + Refresh) ---
+JWT_ACCESS_SECRET="<openssl rand -hex 32>"
+JWT_REFRESH_SECRET="<openssl rand -hex 32>"
+JWT_ACCESS_TTL="60m"
+JWT_REFRESH_TTL="7d"
+
+# --- CORS / Frontend origin ---
+FRONTEND_ORIGIN="http://localhost:5173"
+
+# --- Cookies (refresh token is set as httpOnly cookie) ---
+COOKIE_SECURE="false"        # set "true" in production behind HTTPS
+COOKIE_SAMESITE="lax"        # "none" if FE/BE on different domains + secure
+
+# --- Seed admin / demo accounts (idempotent on startup) ---
+SEED_ADMIN_EMAIL="admin@demaxtore.com"
+SEED_ADMIN_PASSWORD="Admin@123"
+SEED_BUYER_EMAIL="buyer@demaxtore.com"
+SEED_BUYER_PASSWORD="Buyer@123"
+SEED_SUPPLIER_EMAIL="supplier@demaxtore.com"
+SEED_SUPPLIER_PASSWORD="Supplier@123"
+
+# --- Logging ---
+LOG_LEVEL="info"            # debug|info|warn|error
+
+# ============================================================
+# frontend/.env  (Vite — variables must be prefixed VITE_)
+# ============================================================
+
+VITE_API_BASE_URL="http://localhost:4000/api"
+VITE_SOCKET_URL="http://localhost:4000"
+VITE_APP_NAME="DeMaxtore"

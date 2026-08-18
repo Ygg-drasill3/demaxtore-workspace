@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "/var/www/demaxtore/DemaxtoreSolitions-main/node_modules/.bin/playwright-mcp",
+      "args": [
+        "--config",
+        "/var/www/demaxtore/DemaxtoreSolitions-main/.cursor/playwright-mcp.config.json"
+      ],
+      "cwd": "/var/www/demaxtore/DemaxtoreSolitions-main"
+    }
+  }
+}

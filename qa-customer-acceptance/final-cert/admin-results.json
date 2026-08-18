@@ -1,0 +1,106 @@
+{
+  "role": "ADMIN",
+  "tests": [
+    {
+      "name": "auth-login",
+      "pass": true,
+      "url": "https://workspace.demaxtore.com/admin/dashboard"
+    },
+    {
+      "name": "mod-dashboard",
+      "path": "/admin/dashboard",
+      "pass": true,
+      "loadMs": 3085,
+      "url": "https://workspace.demaxtore.com/admin/dashboard"
+    },
+    {
+      "name": "mod-users",
+      "path": "/admin/users",
+      "pass": true,
+      "loadMs": 2642,
+      "url": "https://workspace.demaxtore.com/sales/dashboard"
+    },
+    {
+      "name": "mod-orders",
+      "path": "/admin/orders",
+      "pass": true,
+      "loadMs": 2732,
+      "url": "https://workspace.demaxtore.com/admin/orders"
+    },
+    {
+      "name": "mod-shipments",
+      "path": "/admin/shipments",
+      "pass": true,
+      "loadMs": 2895,
+      "url": "https://workspace.demaxtore.com/shipments/portfolio"
+    },
+    {
+      "name": "mod-rfq",
+      "path": "/admin/rfq",
+      "pass": true,
+      "loadMs": 2706,
+      "url": "https://workspace.demaxtore.com/admin/rfq"
+    },
+    {
+      "name": "mod-commoditybid",
+      "path": "/admin/commoditybid",
+      "pass": true,
+      "loadMs": 2964,
+      "url": "https://workspace.demaxtore.com/admin/commoditybid"
+    },
+    {
+      "name": "mod-freightiq",
+      "path": "/admin/freightiq",
+      "pass": true,
+      "loadMs": 2647,
+      "url": "https://workspace.demaxtore.com/admin/freightiq"
+    },
+    {
+      "name": "mod-notifications",
+      "path": "/admin/notifications",
+      "pass": true,
+      "loadMs": 2676,
+      "url": "https://workspace.demaxtore.com/notifications"
+    },
+    {
+      "name": "mod-analytics",
+      "path": "/admin/analytics",
+      "pass": true,
+      "loadMs": 2656,
+      "url": "https://workspace.demaxtore.com/operations/executive"
+    },
+    {
+      "name": "mod-settings",
+      "path": "/admin/settings",
+      "pass": true,
+      "loadMs": 2708,
+      "url": "https://workspace.demaxtore.com/operations/system"
+    },
+    {
+      "name": "mod-demo-vessels-ext",
+      "path": "https://freightiq.demaxtore.com/admin/demo-vessels",
+      "pass": true,
+      "url": "https://freightiq.demaxtore.com/admin/demo-vessels"
+    }
+  ],
+  "bugs": [],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 404 ()",
+    "Failed to load resource: the server responded with a status of 404 ()",
+    "Failed to load resource: the server responded with a status of 404 ()",
+    "Failed to load resource: the server responded with a status of 404 ()"
+  ],
+  "failedRequests": [
+    {
+      "url": "https://workspace.demaxtore.com/api/auth/refresh",
+      "status": 401
+    }
+  ],
+  "summary": {
+    "total": 12,
+    "passed": 12,
+    "consoleErrorCount": 5,
+    "failedApiCount": 1
+  }
+}

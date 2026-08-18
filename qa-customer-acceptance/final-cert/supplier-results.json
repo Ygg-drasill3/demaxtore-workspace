@@ -1,0 +1,102 @@
+{
+  "role": "SUPPLIER",
+  "tests": [
+    {
+      "name": "auth-login",
+      "pass": true,
+      "url": "https://workspace.demaxtore.com/supplier/dashboard"
+    },
+    {
+      "name": "mod-dashboard",
+      "path": "/supplier/dashboard",
+      "pass": true,
+      "loadMs": 2460,
+      "url": "https://workspace.demaxtore.com/supplier/dashboard"
+    },
+    {
+      "name": "mod-orders",
+      "path": "/supplier/orders",
+      "pass": true,
+      "loadMs": 2302,
+      "url": "https://workspace.demaxtore.com/supplier/orders"
+    },
+    {
+      "name": "mod-messages",
+      "path": "/supplier/messages",
+      "pass": true,
+      "loadMs": 2203,
+      "url": "https://workspace.demaxtore.com/supplier/messages"
+    },
+    {
+      "name": "mod-rfq",
+      "path": "/supplier/rfq",
+      "pass": true,
+      "loadMs": 2225,
+      "url": "https://workspace.demaxtore.com/supplier/rfq"
+    },
+    {
+      "name": "mod-commoditybid",
+      "path": "/supplier/commoditybid",
+      "pass": true,
+      "loadMs": 2465,
+      "url": "https://workspace.demaxtore.com/supplier/commoditybid"
+    },
+    {
+      "name": "mod-freightiq",
+      "path": "/supplier/freightiq",
+      "pass": true,
+      "loadMs": 2623,
+      "url": "https://workspace.demaxtore.com/supplier/freightiq"
+    },
+    {
+      "name": "mod-settings",
+      "path": "/supplier/settings",
+      "pass": true,
+      "loadMs": 2129,
+      "url": "https://workspace.demaxtore.com/supplier/settings"
+    },
+    {
+      "name": "rbac-buyer-dashboard",
+      "path": "/buyer/dashboard",
+      "pass": true,
+      "loadMs": 2433,
+      "url": "https://workspace.demaxtore.com/supplier/dashboard"
+    },
+    {
+      "name": "supplier-cannot-access-buyer-dashboard",
+      "pass": true
+    },
+    {
+      "name": "rbac-admin",
+      "path": "/admin/users",
+      "pass": true,
+      "loadMs": 2411,
+      "url": "https://workspace.demaxtore.com/supplier/dashboard"
+    },
+    {
+      "name": "supplier-cannot-access-admin",
+      "pass": true
+    }
+  ],
+  "bugs": [],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+  ],
+  "failedRequests": [
+    {
+      "url": "https://workspace.demaxtore.com/api/auth/refresh",
+      "status": 401
+    },
+    {
+      "url": "https://workspace.demaxtore.com/api/auth/refresh",
+      "status": 401
+    }
+  ],
+  "summary": {
+    "total": 12,
+    "passed": 12,
+    "consoleErrorCount": 2,
+    "failedApiCount": 2
+  }
+}

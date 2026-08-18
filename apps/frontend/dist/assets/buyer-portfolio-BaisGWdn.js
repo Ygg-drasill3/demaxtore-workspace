@@ -1,0 +1,1 @@
+import"./index-DU-9k7Kb.js";import{p as a}from"./supplier-portfolio-C22PZ18x.js";async function i(e={}){const t=await a.shipments(e);return{items:t.items,total:t.total}}async function r(e={}){const t=await a.tradeDocuments(e);return{items:t.items,total:t.total}}export{r as a,i as f};

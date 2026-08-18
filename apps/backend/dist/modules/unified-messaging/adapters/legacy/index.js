@@ -1,0 +1,11 @@
+export * from "./legacy-adapter.config.js";
+export * from "./legacy-adapter.types.js";
+export * from "./legacy-adapter.service.js";
+export * from "./legacy-adapter.normalizer.js";
+export * from "./legacy-adapter.comparator.js";
+export * from "./legacy-adapter.metrics.js";
+export * from "./legacy-adapter.facade.js";
+export * from "./legacy-adapter.registry.js";
+export * from "./legacy-write.adapter.js";
+export * from "./unified-shadow-projector.js";
+//# sourceMappingURL=index.js.map

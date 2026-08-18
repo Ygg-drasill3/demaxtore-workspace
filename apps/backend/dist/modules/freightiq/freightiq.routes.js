@@ -1,0 +1,22 @@
+import { Router } from "express";
+import { requireAuth, requireRole } from "../auth/auth.middleware.js";
+import { asyncHandler } from "../../utils/asyncHandler.js";
+import { freightiqController } from "./freightiq.controller.js";
+import { freightiqExtController } from "./freightiq-ext.controller.js";
+import { freightCommercialRouter } from "./commercial/freight-commercial.routes.js";
+export const freightiqRouter = Router();
+freightiqRouter.use("/commercial", freightCommercialRouter);
+freightiqRouter.get("/my-portfolio", requireAuth, requireRole("BUYER", "SUPPLIER", "ADMIN", "SUPER_ADMIN", "SALES_CONTROL"), asyncHandler(freightiqExtController.myPortfolio));
+freightiqRouter.get("/operations/overview", requireAuth, requireRole("ADMIN"), asyncHandler(freightiqExtController.enrichedOpsOverview));
+freightiqRouter.get("/forwarders", requireAuth, requireRole("ADMIN"), asyncHandler(freightiqExtController.listForwarders));
+freightiqRouter.post("/forwarders", requireAuth, requireRole("ADMIN"), asyncHandler(freightiqExtController.createForwarder));
+freightiqRouter.patch("/forwarders/:id", requireAuth, requireRole("ADMIN"), asyncHandler(freightiqExtController.updateForwarder));
+freightiqRouter.post("/forwarders/:id/deactivate", requireAuth, requireRole("ADMIN"), asyncHandler(freightiqExtController.deactivateForwarder));
+freightiqRouter.get("/shippers", requireAuth, requireRole("ADMIN"), asyncHandler(freightiqExtController.listShippers));
+freightiqRouter.post("/shippers", requireAuth, requireRole("ADMIN"), asyncHandler(freightiqExtController.createShipper));
+freightiqRouter.delete("/shippers/:id", requireAuth, requireRole("ADMIN"), asyncHandler(freightiqExtController.deleteShipper));
+freightiqRouter.get("/orders/:orderId", requireAuth, asyncHandler(freightiqExtController.enrichedSummary));
+freightiqRouter.get("/orders/:orderId/email-template", requireAuth, requireRole("ADMIN"), asyncHandler(freightiqExtController.emailTemplate));
+freightiqRouter.post("/orders/:orderId/actions/:action", requireAuth, asyncHandler(freightiqController.action));
+freightiqRouter.post("/orders/:orderId/communications/:action", requireAuth, requireRole("ADMIN"), asyncHandler(freightiqExtController.communicationAction));
+//# sourceMappingURL=freightiq.routes.js.map

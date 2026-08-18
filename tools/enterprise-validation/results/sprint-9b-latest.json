@@ -1,0 +1,735 @@
+{
+  "generatedAt": "2026-06-04T10:19:14.381Z",
+  "sprint": "9B",
+  "phases": {
+    "A_pool_review": {
+      "phase": "A_pool_review",
+      "verdict": "PASS",
+      "apiBase": "http://localhost:8001",
+      "databaseUrlRedacted": "postgresql://dmx:***@127.0.0.1:5432/dmx?schema=public",
+      "prismaPool": {
+        "connection_limit": null,
+        "pool_timeout": null,
+        "connect_timeout": null
+      },
+      "postgres": {
+        "maxConnections": 100,
+        "activeConnections": 27,
+        "headroom": 73
+      },
+      "pingMs": 12,
+      "recommendations": [
+        "Set DATABASE_CONNECTION_LIMIT ≤ (max_connections − reserved) / backend_instances",
+        "Use PgBouncer in transaction mode for >2 API replicas",
+        "Keep scheduler advisory work off Prisma pool (dedicated pg pool in scheduler-lock.ts)"
+      ]
+    },
+    "A_concurrency_batched": {
+      "phase": "A_concurrency_batched",
+      "verdict": "PASS",
+      "note": "Batched client requests (50 at a time). Compare with unbatched Sprint 9 B_concurrency for burst behavior.",
+      "levels": [
+        {
+          "concurrentUsers": 250,
+          "batchSize": 50,
+          "stats": {
+            "count": 250,
+            "min": 2,
+            "max": 31,
+            "avg": 14,
+            "p50": 11,
+            "p95": 27,
+            "p99": 29,
+            "errors": 0,
+            "httpErrors": 0,
+            "verdict": "PASS"
+          },
+          "sampleErrors": []
+        },
+        {
+          "concurrentUsers": 500,
+          "batchSize": 50,
+          "stats": {
+            "count": 500,
+            "min": 2,
+            "max": 34,
+            "avg": 15,
+            "p50": 12,
+            "p95": 28,
+            "p99": 33,
+            "errors": 0,
+            "httpErrors": 0,
+            "verdict": "PASS"
+          },
+          "sampleErrors": []
+        },
+        {
+          "concurrentUsers": 1000,
+          "batchSize": 50,
+          "stats": {
+            "count": 1000,
+            "min": 2,
+            "max": 71,
+            "avg": 16,
+            "p50": 13,
+            "p95": 32,
+            "p99": 70,
+            "errors": 0,
+            "httpErrors": 0,
+            "verdict": "PASS"
+          },
+          "sampleErrors": []
+        }
+      ]
+    },
+    "A_load_testing": {
+      "phase": "A_load_testing",
+      "verdict": "PASS",
+      "rfqCountInDb": 1000,
+      "note": "Read-path benchmarks executed against live API.",
+      "tiers": [
+        {
+          "targetRfqs": 1000,
+          "actualRfqsInDb": 1000,
+          "iterations": 20,
+          "endpoints": {
+            "healthz": {
+              "count": 20,
+              "min": 0,
+              "max": 0,
+              "avg": 0,
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "errors": 0,
+              "verdict": "PASS"
+            },
+            "system_health": {
+              "count": 20,
+              "min": 2,
+              "max": 3,
+              "avg": 2,
+              "p50": 2,
+              "p95": 3,
+              "p99": 3,
+              "errors": 0,
+              "verdict": "PASS"
+            },
+            "rfq_list": {
+              "count": 20,
+              "min": 1,
+              "max": 2,
+              "avg": 1,
+              "p50": 1,
+              "p95": 2,
+              "p99": 2,
+              "errors": 0,
+              "verdict": "PASS"
+            },
+            "control_tower_metrics": {
+              "count": 20,
+              "min": 10,
+              "max": 11,
+              "avg": 10,
+              "p50": 10,
+              "p95": 11,
+              "p99": 11,
+              "errors": 0,
+              "verdict": "PASS"
+            }
+          },
+          "dbCountMs": 1,
+          "extrapolated": "measured_at_scale",
+          "verdict": "PASS"
+        },
+        {
+          "targetRfqs": 5000,
+          "actualRfqsInDb": 1000,
+          "iterations": 100,
+          "endpoints": {
+            "healthz": {
+              "count": 100,
+              "min": 0,
+              "max": 1,
+              "avg": 0,
+              "p50": 0,
+              "p95": 0,
+              "p99": 1,
+              "errors": 0,
+              "verdict": "PASS"
+            },
+            "system_health": {
+              "count": 100,
+              "min": 2,
+              "max": 5,
+              "avg": 2,
+              "p50": 2,
+              "p95": 3,
+              "p99": 4,
+              "errors": 0,
+              "verdict": "PASS"
+            },
+            "rfq_list": {
+              "count": 100,
+              "min": 1,
+              "max": 2,
+              "avg": 1,
+              "p50": 1,
+              "p95": 2,
+              "p99": 2,
+              "errors": 0,
+              "verdict": "PASS"
+            },
+            "control_tower_metrics": {
+              "count": 100,
+              "min": 10,
+              "max": 13,
+              "avg": 11,
+              "p50": 10,
+              "p95": 11,
+              "p99": 12,
+              "errors": 0,
+              "verdict": "PASS"
+            }
+          },
+          "dbCountMs": 1,
+          "extrapolated": "linear_extrapolation_from_1000_rfqs",
+          "verdict": "PASS"
+        },
+        {
+          "targetRfqs": 10000,
+          "actualRfqsInDb": 1000,
+          "iterations": 200,
+          "endpoints": {
+            "healthz": {
+              "count": 200,
+              "min": 0,
+              "max": 1,
+              "avg": 0,
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "errors": 0,
+              "verdict": "PASS"
+            },
+            "system_health": {
+              "count": 200,
+              "min": 2,
+              "max": 4,
+              "avg": 2,
+              "p50": 2,
+              "p95": 3,
+              "p99": 3,
+              "errors": 0,
+              "verdict": "PASS"
+            },
+            "rfq_list": {
+              "count": 200,
+              "min": 1,
+              "max": 2,
+              "avg": 1,
+              "p50": 1,
+              "p95": 2,
+              "p99": 2,
+              "errors": 0,
+              "verdict": "PASS"
+            },
+            "control_tower_metrics": {
+              "count": 200,
+              "min": 10,
+              "max": 13,
+              "avg": 10,
+              "p50": 10,
+              "p95": 11,
+              "p99": 11,
+              "errors": 0,
+              "verdict": "PASS"
+            }
+          },
+          "dbCountMs": 0,
+          "extrapolated": "linear_extrapolation_from_1000_rfqs",
+          "verdict": "PASS"
+        },
+        {
+          "targetRfqs": 50000,
+          "actualRfqsInDb": 1000,
+          "iterations": 200,
+          "endpoints": {
+            "healthz": {
+              "count": 200,
+              "min": 0,
+              "max": 1,
+              "avg": 0,
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "errors": 0,
+              "verdict": "PASS"
+            },
+            "system_health": {
+              "count": 200,
+              "min": 2,
+              "max": 3,
+              "avg": 2,
+              "p50": 2,
+              "p95": 3,
+              "p99": 3,
+              "errors": 0,
+              "verdict": "PASS"
+            },
+            "rfq_list": {
+              "count": 200,
+              "min": 1,
+              "max": 3,
+              "avg": 1,
+              "p50": 1,
+              "p95": 2,
+              "p99": 2,
+              "errors": 0,
+              "verdict": "PASS"
+            },
+            "control_tower_metrics": {
+              "count": 200,
+              "min": 10,
+              "max": 27,
+              "avg": 11,
+              "p50": 10,
+              "p95": 12,
+              "p99": 20,
+              "errors": 0,
+              "verdict": "PASS"
+            }
+          },
+          "dbCountMs": 0,
+          "extrapolated": "linear_extrapolation_from_1000_rfqs",
+          "verdict": "PASS"
+        }
+      ],
+      "cpuNote": "CPU not sampled in-process; use host metrics during staging runs.",
+      "memoryNote": "Validator process memory only; use APM for API server RSS under load."
+    },
+    "C_database_performance": {
+      "phase": "C_database_performance",
+      "verdict": "PASS",
+      "probes": [
+        {
+          "name": "workspaces_all",
+          "ms": 7
+        },
+        {
+          "name": "rfq_by_state",
+          "ms": 1
+        },
+        {
+          "name": "audit_recent",
+          "ms": 2
+        },
+        {
+          "name": "job_executions_recent",
+          "ms": 0
+        },
+        {
+          "name": "prisma_rfq_pagination_50",
+          "ms": 1
+        },
+        {
+          "name": "explain_rfq_open_list",
+          "ms": 0,
+          "ok": true
+        }
+      ],
+      "aggregate": {
+        "count": 6,
+        "min": 0,
+        "max": 7,
+        "avg": 2,
+        "p50": 1,
+        "p95": 7,
+        "p99": 7,
+        "errors": 0
+      },
+      "tableStats": [
+        {
+          "table_name": "timeline_events",
+          "row_estimate": 17584
+        },
+        {
+          "table_name": "notifications",
+          "row_estimate": 9865
+        },
+        {
+          "table_name": "audit_logs",
+          "row_estimate": 9369
+        },
+        {
+          "table_name": "shipment_tracking_events",
+          "row_estimate": 8410
+        },
+        {
+          "table_name": "refresh_tokens",
+          "row_estimate": 6323
+        },
+        {
+          "table_name": "shipment_tracking_snapshots",
+          "row_estimate": 4203
+        },
+        {
+          "table_name": "workspace_participants",
+          "row_estimate": 2161
+        },
+        {
+          "table_name": "workspaces",
+          "row_estimate": 1627
+        },
+        {
+          "table_name": "idempotency_keys",
+          "row_estimate": 1452
+        },
+        {
+          "table_name": "freight_commercial_snapshots",
+          "row_estimate": 1029
+        },
+        {
+          "table_name": "control_tower_alerts",
+          "row_estimate": 1003
+        },
+        {
+          "table_name": "rfq_details",
+          "row_estimate": 1000
+        },
+        {
+          "table_name": "document_requirements",
+          "row_estimate": 624
+        },
+        {
+          "table_name": "trade_documents",
+          "row_estimate": 624
+        },
+        {
+          "table_name": "rfq_line_items",
+          "row_estimate": 462
+        }
+      ],
+      "lowUseIndexes": [
+        {
+          "relname": "timeline_events",
+          "indexrelname": "timeline_events_pkey",
+          "idx_scan": 0
+        },
+        {
+          "relname": "password_reset_tokens",
+          "indexrelname": "password_reset_tokens_pkey",
+          "idx_scan": 0
+        },
+        {
+          "relname": "rfq_line_items",
+          "indexrelname": "rfq_line_items_pkey",
+          "idx_scan": 0
+        },
+        {
+          "relname": "supplier_assignments",
+          "indexrelname": "supplier_assignments_pkey",
+          "idx_scan": 0
+        },
+        {
+          "relname": "quotation_line_items",
+          "indexrelname": "quotation_line_items_pkey",
+          "idx_scan": 0
+        },
+        {
+          "relname": "clarification_threads",
+          "indexrelname": "clarification_threads_pkey",
+          "idx_scan": 0
+        },
+        {
+          "relname": "clarification_messages",
+          "indexrelname": "clarification_messages_pkey",
+          "idx_scan": 0
+        },
+        {
+          "relname": "clarification_read_receipts",
+          "indexrelname": "clarification_read_receipts_pkey",
+          "idx_scan": 0
+        },
+        {
+          "relname": "notifications",
+          "indexrelname": "notifications_pkey",
+          "idx_scan": 0
+        },
+        {
+          "relname": "audit_logs",
+          "indexrelname": "audit_logs_pkey",
+          "idx_scan": 0
+        }
+      ],
+      "recommendedIndexes": [
+        {
+          "item": "workspace (type, state, deadline_at) composite index",
+          "source": "docs/performance-review-report.md",
+          "severity": "WARN"
+        },
+        {
+          "item": "CommodityBid loadFull N+1 under high bid volume",
+          "source": "docs/performance-review-report.md",
+          "severity": "WARN"
+        }
+      ],
+      "searchNote": "Full-text search not a primary path; list filters use indexed workspace.type/state."
+    },
+    "C_stale_job_recovery": {
+      "phase": "C_stale_job_recovery",
+      "verdict": "PASS",
+      "stuckRunning": [],
+      "reconcile": {
+        "reconciled": 0,
+        "jobIds": [],
+        "oldestStartedAt": null
+      },
+      "reconcileMs": 2
+    },
+    "D_multi_instance": {
+      "phase": "D_multi_instance",
+      "verdict": "PASS",
+      "instancesSimulated": [
+        2,
+        3,
+        5
+      ],
+      "lockMechanism": "Postgres pg_try_advisory_lock per scheduler (903901–903904)",
+      "jobExecutions": {
+        "success": 266,
+        "failed": 54,
+        "skipped": 0,
+        "running": 0
+      },
+      "stuckRunningOlderThan30m": 0,
+      "recentSkippedLockHeld": [],
+      "duplicateTickSuspicion": [],
+      "schedulerSafety": "Run 2+ backends in staging to populate SKIPPED rows",
+      "stateConsistency": "FSM enforced app-layer + SQL state guard; no cross-instance state writes in schedulers"
+    },
+    "E_job_reliability": {
+      "phase": "E_job_reliability",
+      "verdict": "PASS WITH RISK",
+      "controlTowerScan": {
+        "ok": true,
+        "ms": 646,
+        "status": 200
+      },
+      "jobRegistry": 4,
+      "staleJobs": [],
+      "failedEndpoint": [
+        {
+          "jobName": "control_tower_alert_scan",
+          "failures": 43,
+          "lastError": "stale RUNNING cleared (Sprint 9 validation)",
+          "lastFailedAt": "2026-06-04T09:34:43.765Z",
+          "longRunning": false
+        },
+        {
+          "jobName": "maritime_tracking_sync",
+          "failures": 11,
+          "lastError": "stale RUNNING cleared (Sprint 9 validation)",
+          "lastFailedAt": "2026-06-04T09:34:33.465Z",
+          "longRunning": false
+        }
+      ],
+      "stuckRunning": [],
+      "recentFailures": [
+        {
+          "id": "c70adc9c-30a3-44b9-a369-37dd980fb014",
+          "jobName": "control_tower_alert_scan",
+          "startedAt": "2026-06-04T09:34:43.765Z",
+          "finishedAt": "2026-06-04T09:56:15.890Z",
+          "status": "FAILED",
+          "durationMs": null,
+          "errorMessage": "stale RUNNING cleared (Sprint 9 validation)",
+          "metadata": null,
+          "createdAt": "2026-06-04T09:34:43.765Z"
+        },
+        {
+          "id": "f0eabfec-65cb-4eb8-9ab7-dcf07996490a",
+          "jobName": "control_tower_alert_scan",
+          "startedAt": "2026-06-04T09:34:43.127Z",
+          "finishedAt": "2026-06-04T09:56:15.890Z",
+          "status": "FAILED",
+          "durationMs": null,
+          "errorMessage": "stale RUNNING cleared (Sprint 9 validation)",
+          "metadata": null,
+          "createdAt": "2026-06-04T09:34:43.128Z"
+        },
+        {
+          "id": "f10c957b-d672-424a-aa7b-3f89ad004cd0",
+          "jobName": "control_tower_alert_scan",
+          "startedAt": "2026-06-04T09:34:33.907Z",
+          "finishedAt": "2026-06-04T09:34:34.428Z",
+          "status": "FAILED",
+          "durationMs": 521,
+          "errorMessage": "resolveOpenAlertsForTestWorkspaces is not defined",
+          "metadata": null,
+          "createdAt": "2026-06-04T09:34:33.908Z"
+        },
+        {
+          "id": "59bc12aa-419a-4120-9ba1-a8ff93f08ac3",
+          "jobName": "maritime_tracking_sync",
+          "startedAt": "2026-06-04T09:34:33.465Z",
+          "finishedAt": "2026-06-04T09:56:15.890Z",
+          "status": "FAILED",
+          "durationMs": null,
+          "errorMessage": "stale RUNNING cleared (Sprint 9 validation)",
+          "metadata": null,
+          "createdAt": "2026-06-04T09:34:33.466Z"
+        },
+        {
+          "id": "11c7dbc5-9dd9-48ca-9127-e64e19b6811b",
+          "jobName": "control_tower_alert_scan",
+          "startedAt": "2026-06-04T09:34:33.465Z",
+          "finishedAt": "2026-06-04T09:56:15.890Z",
+          "status": "FAILED",
+          "durationMs": null,
+          "errorMessage": "stale RUNNING cleared (Sprint 9 validation)",
+          "metadata": null,
+          "createdAt": "2026-06-04T09:34:33.465Z"
+        },
+        {
+          "id": "9d4a974e-1d26-4b82-b90b-062222fcce44",
+          "jobName": "control_tower_alert_scan",
+          "startedAt": "2026-06-04T09:34:32.412Z",
+          "finishedAt": "2026-06-04T09:34:32.985Z",
+          "status": "FAILED",
+          "durationMs": 573,
+          "errorMessage": "resolveOpenAlertsForTestWorkspaces is not defined",
+          "metadata": null,
+          "createdAt": "2026-06-04T09:34:32.412Z"
+        },
+        {
+          "id": "0e552f75-f811-42d9-ae14-52dd1bfe58c4",
+          "jobName": "control_tower_alert_scan",
+          "startedAt": "2026-06-04T09:34:30.066Z",
+          "finishedAt": "2026-06-04T09:34:30.599Z",
+          "status": "FAILED",
+          "durationMs": 533,
+          "errorMessage": "resolveOpenAlertsForTestWorkspaces is not defined",
+          "metadata": null,
+          "createdAt": "2026-06-04T09:34:30.067Z"
+        },
+        {
+          "id": "4b079634-89fc-46ce-a4ca-969dfeba2038",
+          "jobName": "control_tower_alert_scan",
+          "startedAt": "2026-06-04T09:34:29.463Z",
+          "finishedAt": "2026-06-04T09:56:15.890Z",
+          "status": "FAILED",
+          "durationMs": null,
+          "errorMessage": "stale RUNNING cleared (Sprint 9 validation)",
+          "metadata": null,
+          "createdAt": "2026-06-04T09:34:29.464Z"
+        },
+        {
+          "id": "59817da0-d81a-4d20-9cc6-dba6a502d949",
+          "jobName": "control_tower_alert_scan",
+          "startedAt": "2026-06-04T09:34:26.140Z",
+          "finishedAt": "2026-06-04T09:34:26.660Z",
+          "status": "FAILED",
+          "durationMs": 520,
+          "errorMessage": "resolveOpenAlertsForTestWorkspaces is not defined",
+          "metadata": null,
+          "createdAt": "2026-06-04T09:34:26.141Z"
+        },
+        {
+          "id": "92cbe5c4-019b-4776-92e3-15d29b906d29",
+          "jobName": "control_tower_alert_scan",
+          "startedAt": "2026-06-04T09:34:21.793Z",
+          "finishedAt": "2026-06-04T09:34:22.406Z",
+          "status": "FAILED",
+          "durationMs": 613,
+          "errorMessage": "resolveOpenAlertsForTestWorkspaces is not defined",
+          "metadata": null,
+          "createdAt": "2026-06-04T09:34:21.794Z"
+        }
+      ],
+      "retryMechanism": "Scheduler re-runs on interval; failures logged in job_executions",
+      "deadLetter": "Control Tower system.job.failed alerts; no external queue DLQ (in-process schedulers)",
+      "jobsStressTested": [
+        "control_tower_alert_scan",
+        "proforma_sla_email",
+        "commoditybid_system_fsm",
+        "maritime_tracking_sync"
+      ]
+    },
+    "F_disaster_recovery": {
+      "phase": "F_disaster_recovery",
+      "verdict": "PASS WITH RISK",
+      "backupStatus": {
+        "lastBackupCheck": "2026-06-04T10:18:56.521Z",
+        "lastBackupStatus": "ok",
+        "lastRestoreCheck": null,
+        "lastRestoreStatus": null,
+        "backupOverdue": false,
+        "restoreUnverified": true,
+        "notes": "Sprint 9 validation drill — logical backup assumed per runbook"
+      },
+      "verificationRecorded": true,
+      "verifyMs": 2,
+      "rtoTargetMinutes": 60,
+      "rpoTargetMinutes": 15,
+      "rtoMeasured": "Not executed — requires staged pg_restore drill",
+      "rpoMeasured": "Depends on backup cadence per docs/backup-runbook.md",
+      "runbooks": [
+        "docs/backup-runbook.md",
+        "docs/restore-runbook.md"
+      ],
+      "restoreDrill": "Manual pg_restore + uploads tar; validate GET /api/healthz db:up",
+      "recoveryPointObjective": "PASS WITH RISK until restore drill completed in staging"
+    },
+    "I_observability": {
+      "phase": "I_observability",
+      "verdict": "PASS",
+      "checks": {
+        "healthz": {
+          "ok": true,
+          "ms": 1,
+          "status": 200
+        },
+        "systemHealth": {
+          "ok": true,
+          "ms": 3,
+          "status": 200
+        },
+        "systemInsights": {
+          "ok": true,
+          "ms": 7,
+          "status": 200
+        },
+        "systemJobs": {
+          "ok": true,
+          "ms": 2,
+          "status": 200
+        },
+        "controlTowerMetrics": {
+          "ok": true,
+          "ms": 10,
+          "status": 200
+        }
+      },
+      "structuredLogging": "Pino JSON logger (LOG_LEVEL env)",
+      "healthComponents": 8,
+      "systemAlertKeysReady": [
+        "system.job.failed",
+        "system.job.stale",
+        "system.storage.error",
+        "system.backup.overdue"
+      ],
+      "dashboardRecommendations": [
+        "Grafana: API latency, healthz, Postgres connections",
+        "Use /operations/system for job + storage + backup widgets",
+        "Control Tower for operational alerts",
+        "Track job_executions failure rate and SKIPPED ratio per instance"
+      ]
+    }
+  },
+  "summary": {
+    "pass": 7,
+    "passWithRisk": 2,
+    "fail": 0
+  }
+}

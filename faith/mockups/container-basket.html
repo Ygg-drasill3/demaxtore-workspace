@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1440" />
+  <title>Container Planner — DeMaxtore</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=Fraunces:wght@600&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter Tight', sans-serif; background: #fafafa; color: #18181b; }
+    .layout { display: flex; min-height: 100vh; }
+    .sidebar { width: 244px; background: #0f172a; color: #e2e8f0; padding: 24px 16px; }
+    .sidebar .logo { font-family: Fraunces, serif; font-size: 20px; font-weight: 600; margin-bottom: 32px; }
+    .main { flex: 1; padding: 32px; max-width: 1196px; }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
+    .eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #71717a; }
+    h1 { font-family: Fraunces, serif; font-size: 32px; font-weight: 600; margin: 4px 0; }
+    .ref { font-size: 14px; color: #71717a; }
+    .steps { display: flex; gap: 24px; margin-bottom: 24px; font-size: 13px; }
+    .steps span { color: #a1a1aa; }
+    .steps span.active { color: #1e3a8a; font-weight: 600; }
+    .hero { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 20px 24px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; }
+    .hero p { font-size: 14px; color: #1e40af; max-width: 500px; line-height: 1.5; }
+    .btn-primary { background: #1e3a8a; color: #fff; border: none; height: 44px; padding: 0 24px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .content { display: grid; grid-template-columns: 2fr 1fr; gap: 24px; }
+    .panel { background: #fff; border: 1px solid #e4e4e7; border-radius: 12px; padding: 24px; }
+    .panel h2 { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th { text-align: left; font-size: 11px; text-transform: uppercase; color: #71717a; padding: 8px 12px; border-bottom: 1px solid #e4e4e7; }
+    td { padding: 14px 12px; border-bottom: 1px solid #f4f4f5; vertical-align: middle; }
+    .stepper { display: inline-flex; align-items: center; gap: 8px; border: 1px solid #e4e4e7; border-radius: 6px; padding: 2px; }
+    .stepper button { width: 28px; height: 28px; border: none; background: #f4f4f5; border-radius: 4px; cursor: pointer; }
+    .stepper span { min-width: 24px; text-align: center; font-weight: 600; }
+    .remove { color: #dc2626; font-size: 13px; cursor: pointer; background: none; border: none; }
+    .fill-bar { height: 12px; background: #e4e4e7; border-radius: 6px; overflow: hidden; margin: 12px 0 8px; }
+    .fill-bar div { height: 100%; width: 75%; background: #1e3a8a; border-radius: 6px; }
+    .stat { font-size: 13px; color: #52525b; margin-bottom: 6px; }
+    .stat strong { color: #18181b; }
+    .value { font-size: 28px; font-weight: 600; font-family: Fraunces, serif; margin: 8px 0 4px; }
+    .value-note { font-size: 11px; color: #a1a1aa; }
+    .cat-bar { margin-top: 16px; }
+    .cat-row { display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0; color: #52525b; }
+    select { height: 36px; border: 1px solid #e4e4e7; border-radius: 6px; padding: 0 10px; font-size: 13px; width: 100%; margin-bottom: 12px; }
+    .add-link { display: inline-block; margin-top: 16px; color: #1e3a8a; font-size: 14px; font-weight: 500; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar"><div class="logo">DeMaxtore</div></aside>
+    <main class="main">
+      <div class="header">
+        <div>
+          <span class="eyebrow">Buyer · Mixed Container · DRAFT</span>
+          <h1>Container Builder</h1>
+          <div class="ref">MC-2026-00042</div>
+        </div>
+      </div>
+      <div class="steps">
+        <span class="active">● Build</span>
+        <span>○ Price</span>
+        <span>○ Review</span>
+        <span>○ Execute</span>
+      </div>
+      <div class="hero">
+        <p>Add products by pallet, then request live pricing. Indicative totals are for planning only — final pricing comes after submission.</p>
+        <button class="btn-primary">Request Live Pricing</button>
+      </div>
+      <div class="content">
+        <div class="panel">
+          <h2>Product Breakdown</h2>
+          <table>
+            <thead>
+              <tr><th>Product</th><th>Pallets</th><th>Indicative/pallet</th><th></th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Premium Basmati 5kg</strong><br/><span style="font-size:12px;color:#71717a">Grains · Rice</span></td>
+                <td><div class="stepper"><button>−</button><span>4</span><button>+</button></div></td>
+                <td>$1,200 – $1,320</td>
+                <td><button class="remove">Remove</button></td>
+              </tr>
+              <tr>
+                <td><strong>Extra Virgin Olive Oil 1L</strong><br/><span style="font-size:12px;color:#71717a">Oils</span></td>
+                <td><div class="stepper"><button>−</button><span>6</span><button>+</button></div></td>
+                <td>$890 – $980</td>
+                <td><button class="remove">Remove</button></td>
+              </tr>
+              <tr>
+                <td><strong>Canned Tuna</strong><br/><span style="font-size:12px;color:#71717a">Canned</span></td>
+                <td><div class="stepper"><button>−</button><span>4</span><button>+</button></div></td>
+                <td>$720 – $810</td>
+                <td><button class="remove">Remove</button></td>
+              </tr>
+              <tr>
+                <td><strong>Roasted Almonds</strong><br/><span style="font-size:12px;color:#71717a">Snacks</span></td>
+                <td><div class="stepper"><button>−</button><span>4</span><button>+</button></div></td>
+                <td>$1,100 – $1,200</td>
+                <td><button class="remove">Remove</button></td>
+              </tr>
+            </tbody>
+          </table>
+          <a class="add-link" href="#">+ Add from catalog</a>
+        </div>
+        <div class="panel">
+          <h2>Container Summary</h2>
+          <label style="font-size:11px;text-transform:uppercase;color:#71717a">Container type</label>
+          <select><option>40ft Standard</option></select>
+          <label style="font-size:11px;text-transform:uppercase;color:#71717a">Destination market</label>
+          <select><option>Germany (DE)</option></select>
+          <div style="margin-top:20px">
+            <div class="stat">FILL METER</div>
+            <div class="fill-bar"><div></div></div>
+            <div class="stat"><strong>18</strong> of 24 pallets · <strong>6</strong> slots remaining (optional)</div>
+          </div>
+          <div style="margin-top:24px">
+            <div class="stat">ESTIMATED VALUE</div>
+            <div class="value">$42,800</div>
+            <div class="value-note">Indicative — not a price offer</div>
+          </div>
+          <div class="cat-bar">
+            <div class="stat" style="margin-top:16px">BY CATEGORY</div>
+            <div class="cat-row"><span>Grains</span><span>42%</span></div>
+            <div class="cat-row"><span>Oils</span><span>28%</span></div>
+            <div class="cat-row"><span>Canned</span><span>18%</span></div>
+            <div class="cat-row"><span>Snacks</span><span>12%</span></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

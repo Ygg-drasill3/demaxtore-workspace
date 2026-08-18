@@ -1,0 +1,858 @@
+{
+  "generatedAt": "2026-07-16T07:32:46.542Z",
+  "phases": {
+    "A_load_testing": {
+      "phase": "A_load_testing",
+      "verdict": "PASS WITH RISK",
+      "rfqCountInDb": 83,
+      "note": "Full 1k–50k RFQ datasets require tools/enterprise-validation seed:scale in staging.",
+      "tiers": [
+        {
+          "targetRfqs": 100,
+          "actualRfqsInDb": 83,
+          "iterations": 10,
+          "endpoints": {
+            "healthz": {
+              "count": 10,
+              "min": 6,
+              "max": 22,
+              "avg": 14,
+              "p50": 12,
+              "p95": 22,
+              "p99": 22,
+              "errors": 0,
+              "verdict": "PASS"
+            },
+            "system_health": {
+              "count": 10,
+              "min": 54,
+              "max": 240,
+              "avg": 102,
+              "p50": 73,
+              "p95": 240,
+              "p99": 240,
+              "errors": 0,
+              "verdict": "PASS"
+            },
+            "rfq_list": {
+              "count": 10,
+              "min": 62,
+              "max": 133,
+              "avg": 78,
+              "p50": 69,
+              "p95": 133,
+              "p99": 133,
+              "errors": 0,
+              "verdict": "PASS"
+            },
+            "control_tower_metrics": {
+              "count": 10,
+              "min": 7,
+              "max": 828,
+              "avg": 98,
+              "p50": 16,
+              "p95": 828,
+              "p99": 828,
+              "errors": 0,
+              "verdict": "PASS WITH RISK"
+            }
+          },
+          "dbCountMs": 13,
+          "extrapolated": "linear_extrapolation_from_83_rfqs",
+          "verdict": "PASS WITH RISK"
+        },
+        {
+          "targetRfqs": 500,
+          "actualRfqsInDb": 83,
+          "iterations": 25,
+          "endpoints": {
+            "healthz": {
+              "count": 25,
+              "min": 3,
+              "max": 31,
+              "avg": 12,
+              "p50": 10,
+              "p95": 28,
+              "p99": 31,
+              "errors": 0,
+              "verdict": "PASS"
+            },
+            "system_health": {
+              "count": 25,
+              "min": 57,
+              "max": 112,
+              "avg": 82,
+              "p50": 82,
+              "p95": 106,
+              "p99": 112,
+              "errors": 0,
+              "verdict": "PASS"
+            },
+            "rfq_list": {
+              "count": 25,
+              "min": 39,
+              "max": 228,
+              "avg": 83,
+              "p50": 75,
+              "p95": 169,
+              "p99": 228,
+              "errors": 0,
+              "verdict": "PASS"
+            },
+            "control_tower_metrics": {
+              "count": 25,
+              "min": 2,
+              "max": 14,
+              "avg": 6,
+              "p50": 5,
+              "p95": 12,
+              "p99": 14,
+              "errors": 0,
+              "verdict": "PASS"
+            }
+          },
+          "dbCountMs": 4,
+          "extrapolated": "linear_extrapolation_from_83_rfqs",
+          "verdict": "PASS WITH RISK"
+        }
+      ],
+      "cpuNote": "CPU not sampled in-process; use host metrics during staging runs.",
+      "memoryNote": "Validator process memory only; use APM for API server RSS under load."
+    },
+    "B_concurrency": {
+      "phase": "B_concurrency",
+      "verdict": "PASS WITH RISK",
+      "levels": [
+        {
+          "concurrentUsers": 50,
+          "stats": {
+            "count": 50,
+            "min": 62,
+            "max": 1166,
+            "avg": 627,
+            "p50": 630,
+            "p95": 1139,
+            "p99": 1166,
+            "errors": 0,
+            "verdict": "PASS",
+            "raceConditionsObserved": "none_detected",
+            "lockingNote": "Advisory locks protect schedulers; API idempotency on mutations."
+          },
+          "sampleErrors": []
+        },
+        {
+          "concurrentUsers": 100,
+          "stats": {
+            "count": 100,
+            "min": 101,
+            "max": 1883,
+            "avg": 971,
+            "p50": 1042,
+            "p95": 1831,
+            "p99": 1871,
+            "errors": 0,
+            "verdict": "PASS WITH RISK",
+            "raceConditionsObserved": "none_detected",
+            "lockingNote": "Advisory locks protect schedulers; API idempotency on mutations."
+          },
+          "sampleErrors": []
+        }
+      ],
+      "workflowsValidated": [
+        "RFQ list (buyer)",
+        "System health (admin)",
+        "Public health (anonymous)"
+      ],
+      "workflowsNotMutated": [
+        "RFQ create",
+        "bidding",
+        "PO",
+        "order",
+        "shipment — read-only concurrency slice"
+      ]
+    },
+    "C_database_performance": {
+      "phase": "C_database_performance",
+      "verdict": "PASS WITH RISK",
+      "probes": [
+        {
+          "name": "workspaces_all",
+          "ms": 166
+        },
+        {
+          "name": "rfq_by_state",
+          "ms": 6
+        },
+        {
+          "name": "audit_recent",
+          "ms": 1514
+        },
+        {
+          "name": "job_executions_recent",
+          "ms": 534
+        },
+        {
+          "name": "prisma_rfq_pagination_50",
+          "ms": 54
+        },
+        {
+          "name": "explain_rfq_open_list",
+          "ms": 35,
+          "ok": true
+        }
+      ],
+      "aggregate": {
+        "count": 6,
+        "min": 6,
+        "max": 1514,
+        "avg": 385,
+        "p50": 54,
+        "p95": 1514,
+        "p99": 1514,
+        "errors": 0
+      },
+      "tableStats": [
+        {
+          "table_name": "job_executions",
+          "row_estimate": 35385
+        },
+        {
+          "table_name": "control_tower_alerts",
+          "row_estimate": 26392
+        },
+        {
+          "table_name": "audit_logs",
+          "row_estimate": 12693
+        },
+        {
+          "table_name": "notifications",
+          "row_estimate": 6267
+        },
+        {
+          "table_name": "refresh_tokens",
+          "row_estimate": 5524
+        },
+        {
+          "table_name": "freight_commercial_snapshots",
+          "row_estimate": 2438
+        },
+        {
+          "table_name": "telemetry_events",
+          "row_estimate": 1747
+        },
+        {
+          "table_name": "idempotency_keys",
+          "row_estimate": 1547
+        },
+        {
+          "table_name": "timeline_events",
+          "row_estimate": 999
+        },
+        {
+          "table_name": "workspace_conversations",
+          "row_estimate": 765
+        },
+        {
+          "table_name": "processed_events",
+          "row_estimate": 627
+        },
+        {
+          "table_name": "workspace_participants",
+          "row_estimate": 285
+        },
+        {
+          "table_name": "product_packing_types",
+          "row_estimate": 266
+        },
+        {
+          "table_name": "trade_documents",
+          "row_estimate": 224
+        },
+        {
+          "table_name": "document_requirements",
+          "row_estimate": 224
+        }
+      ],
+      "lowUseIndexes": [
+        {
+          "relname": "_prisma_migrations",
+          "indexrelname": "_prisma_migrations_pkey",
+          "idx_scan": 0
+        },
+        {
+          "relname": "password_reset_tokens",
+          "indexrelname": "password_reset_tokens_pkey",
+          "idx_scan": 0
+        },
+        {
+          "relname": "timeline_events",
+          "indexrelname": "timeline_events_pkey",
+          "idx_scan": 0
+        },
+        {
+          "relname": "rfq_details",
+          "indexrelname": "rfq_details_pkey",
+          "idx_scan": 0
+        },
+        {
+          "relname": "rfq_line_items",
+          "indexrelname": "rfq_line_items_pkey",
+          "idx_scan": 0
+        },
+        {
+          "relname": "rfq_attachments",
+          "indexrelname": "rfq_attachments_pkey",
+          "idx_scan": 0
+        },
+        {
+          "relname": "supplier_assignments",
+          "indexrelname": "supplier_assignments_pkey",
+          "idx_scan": 0
+        },
+        {
+          "relname": "quotations",
+          "indexrelname": "quotations_pkey",
+          "idx_scan": 0
+        },
+        {
+          "relname": "quotation_line_items",
+          "indexrelname": "quotation_line_items_pkey",
+          "idx_scan": 0
+        },
+        {
+          "relname": "clarification_threads",
+          "indexrelname": "clarification_threads_pkey",
+          "idx_scan": 0
+        }
+      ],
+      "recommendedIndexes": [
+        {
+          "item": "workspace (type, state, deadline_at) composite index",
+          "source": "docs/performance-review-report.md",
+          "severity": "WARN"
+        },
+        {
+          "item": "CommodityBid loadFull N+1 under high bid volume",
+          "source": "docs/performance-review-report.md",
+          "severity": "WARN"
+        }
+      ],
+      "searchNote": "Full-text search not a primary path; list filters use indexed workspace.type/state."
+    },
+    "D_multi_instance": {
+      "phase": "D_multi_instance",
+      "verdict": "PASS",
+      "instancesSimulated": [
+        2,
+        3,
+        5
+      ],
+      "lockMechanism": "Postgres pg_try_advisory_lock per scheduler (903901–903904)",
+      "jobExecutions": {
+        "success": 32836,
+        "failed": 2501,
+        "skipped": 53,
+        "running": 1
+      },
+      "stuckRunningOlderThan30m": 0,
+      "recentSkippedLockHeld": [
+        {
+          "jobName": "commoditybid_auction_engine",
+          "startedAt": "2026-07-16T07:31:40.510Z",
+          "metadata": {
+            "reason": "lock_held"
+          }
+        },
+        {
+          "jobName": "commoditybid_auction_engine",
+          "startedAt": "2026-07-16T07:31:40.374Z",
+          "metadata": {
+            "reason": "lock_held"
+          }
+        },
+        {
+          "jobName": "commoditybid_auction_engine",
+          "startedAt": "2026-07-16T07:31:40.299Z",
+          "metadata": {
+            "reason": "lock_held"
+          }
+        },
+        {
+          "jobName": "commoditybid_auction_engine",
+          "startedAt": "2026-07-16T07:31:40.225Z",
+          "metadata": {
+            "reason": "lock_held"
+          }
+        },
+        {
+          "jobName": "commoditybid_auction_engine",
+          "startedAt": "2026-07-16T07:31:40.158Z",
+          "metadata": {
+            "reason": "lock_held"
+          }
+        },
+        {
+          "jobName": "commoditybid_auction_engine",
+          "startedAt": "2026-07-16T07:31:40.089Z",
+          "metadata": {
+            "reason": "lock_held"
+          }
+        },
+        {
+          "jobName": "commoditybid_auction_engine",
+          "startedAt": "2026-07-16T07:31:40.022Z",
+          "metadata": {
+            "reason": "lock_held"
+          }
+        },
+        {
+          "jobName": "commoditybid_auction_engine",
+          "startedAt": "2026-07-14T09:10:43.573Z",
+          "metadata": {
+            "reason": "lock_held"
+          }
+        },
+        {
+          "jobName": "commoditybid_auction_engine",
+          "startedAt": "2026-07-14T09:10:43.515Z",
+          "metadata": {
+            "reason": "lock_held"
+          }
+        },
+        {
+          "jobName": "commoditybid_auction_engine",
+          "startedAt": "2026-07-14T09:10:43.453Z",
+          "metadata": {
+            "reason": "lock_held"
+          }
+        },
+        {
+          "jobName": "commoditybid_auction_engine",
+          "startedAt": "2026-07-14T06:37:42.254Z",
+          "metadata": {
+            "reason": "lock_held"
+          }
+        },
+        {
+          "jobName": "commoditybid_auction_engine",
+          "startedAt": "2026-07-14T06:33:45.091Z",
+          "metadata": {
+            "reason": "lock_held"
+          }
+        },
+        {
+          "jobName": "commoditybid_auction_engine",
+          "startedAt": "2026-07-14T06:33:29.310Z",
+          "metadata": {
+            "reason": "lock_held"
+          }
+        },
+        {
+          "jobName": "commoditybid_auction_engine",
+          "startedAt": "2026-07-14T06:33:29.248Z",
+          "metadata": {
+            "reason": "lock_held"
+          }
+        },
+        {
+          "jobName": "commoditybid_auction_engine",
+          "startedAt": "2026-07-14T06:33:29.189Z",
+          "metadata": {
+            "reason": "lock_held"
+          }
+        },
+        {
+          "jobName": "commoditybid_auction_engine",
+          "startedAt": "2026-07-14T06:33:29.131Z",
+          "metadata": {
+            "reason": "lock_held"
+          }
+        },
+        {
+          "jobName": "commoditybid_auction_engine",
+          "startedAt": "2026-07-14T06:33:29.070Z",
+          "metadata": {
+            "reason": "lock_held"
+          }
+        },
+        {
+          "jobName": "commoditybid_auction_engine",
+          "startedAt": "2026-07-14T06:33:05.965Z",
+          "metadata": {
+            "reason": "lock_held"
+          }
+        },
+        {
+          "jobName": "commoditybid_auction_engine",
+          "startedAt": "2026-07-14T06:33:05.907Z",
+          "metadata": {
+            "reason": "lock_held"
+          }
+        },
+        {
+          "jobName": "commoditybid_auction_engine",
+          "startedAt": "2026-07-14T06:33:05.803Z",
+          "metadata": {
+            "reason": "lock_held"
+          }
+        }
+      ],
+      "duplicateTickSuspicion": [],
+      "schedulerSafety": "SKIPPED rows confirm second instance defers work",
+      "stateConsistency": "FSM enforced app-layer + SQL state guard; no cross-instance state writes in schedulers"
+    },
+    "E_job_reliability": {
+      "phase": "E_job_reliability",
+      "verdict": "PASS WITH RISK",
+      "controlTowerScan": {
+        "ok": true,
+        "ms": 2325,
+        "status": 200
+      },
+      "jobRegistry": 6,
+      "staleJobs": [
+        {
+          "job": {
+            "name": "commoditybid_system_fsm",
+            "label": "CommodityBid system FSM",
+            "description": "Deadline close and award acceptance SLA transitions",
+            "intervalMs": 900000,
+            "advisoryLockId": "903902",
+            "enabled": true,
+            "category": "scheduler"
+          },
+          "lastRun": {
+            "id": "f865516c-da9f-4bb7-8370-0f1ca3e9722c",
+            "jobName": "commoditybid_system_fsm",
+            "startedAt": "2026-06-05T11:56:29.670Z",
+            "finishedAt": "2026-06-05T11:56:29.705Z",
+            "status": "SUCCESS",
+            "durationMs": 35,
+            "errorMessage": null,
+            "metadata": null,
+            "createdAt": "2026-06-05T11:56:29.672Z"
+          },
+          "lastSuccess": {
+            "id": "f865516c-da9f-4bb7-8370-0f1ca3e9722c",
+            "jobName": "commoditybid_system_fsm",
+            "startedAt": "2026-06-05T11:56:29.670Z",
+            "finishedAt": "2026-06-05T11:56:29.705Z",
+            "status": "SUCCESS",
+            "durationMs": 35,
+            "errorMessage": null,
+            "metadata": null,
+            "createdAt": "2026-06-05T11:56:29.672Z"
+          },
+          "lastFailure": null,
+          "nextRunEstimate": "2026-06-05T12:11:29.705Z",
+          "consecutiveFailures": 0,
+          "stale": true
+        }
+      ],
+      "failedEndpoint": [
+        {
+          "jobName": "test_reconcile_job",
+          "failures": 1,
+          "lastError": "Marked FAILED by stale RUNNING reconciler (worker crash, hot reload, or lock timeout)",
+          "lastFailedAt": "2026-07-14T08:10:48.994Z",
+          "longRunning": true
+        }
+      ],
+      "stuckRunning": [],
+      "recentFailures": [
+        {
+          "id": "51b87c67-aa7f-4c0a-a2df-53967b558f83",
+          "jobName": "test_reconcile_job",
+          "startedAt": "2026-07-14T08:10:48.994Z",
+          "finishedAt": "2026-07-14T09:10:49.003Z",
+          "status": "FAILED",
+          "durationMs": 3600009,
+          "errorMessage": "Marked FAILED by stale RUNNING reconciler (worker crash, hot reload, or lock timeout)",
+          "metadata": null,
+          "createdAt": "2026-07-14T09:10:48.996Z"
+        },
+        {
+          "id": "7e03ef0f-e09c-4c20-9116-fa93e8a19ff8",
+          "jobName": "control_tower_alert_scan",
+          "startedAt": "2026-07-03T09:43:53.702Z",
+          "finishedAt": "2026-07-03T10:13:59.295Z",
+          "status": "FAILED",
+          "durationMs": 1805593,
+          "errorMessage": "Marked FAILED by stale RUNNING reconciler (worker crash, hot reload, or lock timeout)",
+          "metadata": null,
+          "createdAt": "2026-07-03T09:43:53.740Z"
+        },
+        {
+          "id": "2580d631-e73f-43b9-a5a6-b38543178876",
+          "jobName": "control_tower_alert_scan",
+          "startedAt": "2026-07-03T07:14:05.311Z",
+          "finishedAt": "2026-07-03T07:44:12.357Z",
+          "status": "FAILED",
+          "durationMs": 1807046,
+          "errorMessage": "Marked FAILED by stale RUNNING reconciler (worker crash, hot reload, or lock timeout)",
+          "metadata": null,
+          "createdAt": "2026-07-03T07:14:05.316Z"
+        },
+        {
+          "id": "84c946d1-33bc-479e-8498-8613fa6f4db3",
+          "jobName": "control_tower_alert_scan",
+          "startedAt": "2026-07-03T06:58:03.773Z",
+          "finishedAt": "2026-07-03T07:28:05.437Z",
+          "status": "FAILED",
+          "durationMs": 1801664,
+          "errorMessage": "Marked FAILED by stale RUNNING reconciler (worker crash, hot reload, or lock timeout)",
+          "metadata": null,
+          "createdAt": "2026-07-03T06:58:03.774Z"
+        },
+        {
+          "id": "af25774b-3243-4aa9-b185-727757d2c70d",
+          "jobName": "control_tower_alert_scan",
+          "startedAt": "2026-07-03T06:45:06.077Z",
+          "finishedAt": "2026-07-03T06:45:06.970Z",
+          "status": "FAILED",
+          "durationMs": 893,
+          "errorMessage": "\nInvalid `prisma.freightRevenueLedger.findMany()` invocation:\n\n\nInconsistent query result: Field offer is required to return data, got `null` instead.",
+          "metadata": null,
+          "createdAt": "2026-07-03T06:45:06.078Z"
+        },
+        {
+          "id": "75a557da-786e-495c-8516-09b102fd671d",
+          "jobName": "control_tower_alert_scan",
+          "startedAt": "2026-07-03T06:30:06.094Z",
+          "finishedAt": "2026-07-03T06:30:07.413Z",
+          "status": "FAILED",
+          "durationMs": 1319,
+          "errorMessage": "\nInvalid `prisma.freightRevenueLedger.findMany()` invocation:\n\n\nInconsistent query result: Field offer is required to return data, got `null` instead.",
+          "metadata": null,
+          "createdAt": "2026-07-03T06:30:06.095Z"
+        },
+        {
+          "id": "2d172531-28d7-47e7-a548-216454115e94",
+          "jobName": "control_tower_alert_scan",
+          "startedAt": "2026-07-03T06:15:06.072Z",
+          "finishedAt": "2026-07-03T06:15:07.123Z",
+          "status": "FAILED",
+          "durationMs": 1051,
+          "errorMessage": "\nInvalid `prisma.freightRevenueLedger.findMany()` invocation:\n\n\nInconsistent query result: Field offer is required to return data, got `null` instead.",
+          "metadata": null,
+          "createdAt": "2026-07-03T06:15:06.073Z"
+        },
+        {
+          "id": "b1b8cff2-e2f2-46b1-9c98-ef44a9df42db",
+          "jobName": "control_tower_alert_scan",
+          "startedAt": "2026-07-03T06:00:06.578Z",
+          "finishedAt": "2026-07-03T06:00:08.352Z",
+          "status": "FAILED",
+          "durationMs": 1774,
+          "errorMessage": "\nInvalid `prisma.freightRevenueLedger.findMany()` invocation:\n\n\nInconsistent query result: Field offer is required to return data, got `null` instead.",
+          "metadata": null,
+          "createdAt": "2026-07-03T06:00:06.581Z"
+        },
+        {
+          "id": "86d2c404-722b-4957-a953-fdc20bb1987a",
+          "jobName": "control_tower_alert_scan",
+          "startedAt": "2026-07-03T05:45:06.012Z",
+          "finishedAt": "2026-07-03T05:45:07.094Z",
+          "status": "FAILED",
+          "durationMs": 1082,
+          "errorMessage": "\nInvalid `prisma.freightRevenueLedger.findMany()` invocation:\n\n\nInconsistent query result: Field offer is required to return data, got `null` instead.",
+          "metadata": null,
+          "createdAt": "2026-07-03T05:45:06.013Z"
+        },
+        {
+          "id": "aea63f69-a20b-4c67-bb59-29dbfd62d68e",
+          "jobName": "control_tower_alert_scan",
+          "startedAt": "2026-07-03T05:30:05.992Z",
+          "finishedAt": "2026-07-03T05:30:07.326Z",
+          "status": "FAILED",
+          "durationMs": 1334,
+          "errorMessage": "\nInvalid `prisma.freightRevenueLedger.findMany()` invocation:\n\n\nInconsistent query result: Field offer is required to return data, got `null` instead.",
+          "metadata": null,
+          "createdAt": "2026-07-03T05:30:05.993Z"
+        }
+      ],
+      "retryMechanism": "Scheduler re-runs on interval; failures logged in job_executions",
+      "deadLetter": "Control Tower system.job.failed alerts; no external queue DLQ (in-process schedulers)",
+      "jobsStressTested": [
+        "control_tower_alert_scan",
+        "proforma_sla_email",
+        "commoditybid_system_fsm",
+        "maritime_tracking_sync"
+      ]
+    },
+    "F_disaster_recovery": {
+      "phase": "F_disaster_recovery",
+      "verdict": "PASS WITH RISK",
+      "backupStatus": {
+        "lastBackupCheck": "2026-06-25T06:54:39.744Z",
+        "lastBackupStatus": "ok",
+        "lastRestoreCheck": null,
+        "lastRestoreStatus": null,
+        "backupOverdue": true,
+        "restoreUnverified": true,
+        "notes": "Sprint 9 validation drill — logical backup assumed per runbook"
+      },
+      "verificationRecorded": true,
+      "verifyMs": 34,
+      "rtoTargetMinutes": 60,
+      "rpoTargetMinutes": 15,
+      "rtoMeasured": "Not executed — requires staged pg_restore drill",
+      "rpoMeasured": "Depends on backup cadence per docs/backup-runbook.md",
+      "runbooks": [
+        "docs/backup-runbook.md",
+        "docs/restore-runbook.md"
+      ],
+      "restoreDrill": "Manual pg_restore + uploads tar; validate GET /api/healthz db:up",
+      "recoveryPointObjective": "PASS WITH RISK until restore drill completed in staging"
+    },
+    "G_chaos_testing": {
+      "phase": "G_chaos_testing",
+      "verdict": "PASS WITH RISK",
+      "scenarios": [
+        {
+          "scenario": "baseline_health",
+          "samples": [
+            {
+              "ms": 13,
+              "ok": true,
+              "db": "up"
+            },
+            {
+              "ms": 5,
+              "ok": true,
+              "db": "up"
+            },
+            {
+              "ms": 12,
+              "ok": true,
+              "db": "up"
+            },
+            {
+              "ms": 16,
+              "ok": true,
+              "db": "up"
+            },
+            {
+              "ms": 6,
+              "ok": true,
+              "db": "up"
+            }
+          ],
+          "recovered": true
+        },
+        {
+          "scenario": "after_heavy_read_load",
+          "samples": [
+            {
+              "ms": 6,
+              "ok": true,
+              "db": "up"
+            },
+            {
+              "ms": 11,
+              "ok": true,
+              "db": "up"
+            },
+            {
+              "ms": 9,
+              "ok": true,
+              "db": "up"
+            },
+            {
+              "ms": 12,
+              "ok": true,
+              "db": "up"
+            },
+            {
+              "ms": 8,
+              "ok": true,
+              "db": "up"
+            }
+          ],
+          "recovered": true
+        }
+      ],
+      "manualDrillsRequired": [
+        "Backend SIGTERM → confirm healthz recovers after restart",
+        "Postgres restart → confirm API returns 503 then recovers",
+        "Network partition → confirm clients retry idempotent mutations"
+      ],
+      "dataConsistency": "State guard trigger + FSM prevent illegal transitions after recovery",
+      "automaticRecovery": "Schedulers resume on process start; advisory locks prevent duplicate ticks"
+    },
+    "H_soak_testing": {
+      "phase": "H_soak_testing",
+      "verdict": "PASS WITH RISK",
+      "durationMs": 60000,
+      "durationLabel": "1m sample",
+      "sampleCount": 12,
+      "errors": 0,
+      "latencyP95": 15,
+      "memoryStart": {
+        "rssMb": 113,
+        "heapUsedMb": 20,
+        "heapTotalMb": 29,
+        "externalMb": 7
+      },
+      "memoryEnd": {
+        "rssMb": 96,
+        "heapUsedMb": 11,
+        "heapTotalMb": 11,
+        "externalMb": 6
+      },
+      "heapGrowthMb": -9,
+      "leakSuspected": false,
+      "full24hProcedure": "Run EV_SOAK_MS=86400000 with host-level CPU/RSS monitoring and job_executions growth watch."
+    },
+    "I_observability": {
+      "phase": "I_observability",
+      "verdict": "PASS",
+      "checks": {
+        "healthz": {
+          "ok": true,
+          "ms": 4,
+          "status": 200
+        },
+        "systemHealth": {
+          "ok": true,
+          "ms": 42,
+          "status": 200
+        },
+        "systemInsights": {
+          "ok": true,
+          "ms": 95,
+          "status": 200
+        },
+        "systemJobs": {
+          "ok": true,
+          "ms": 29,
+          "status": 200
+        },
+        "controlTowerMetrics": {
+          "ok": true,
+          "ms": 311,
+          "status": 200
+        }
+      },
+      "structuredLogging": "Pino JSON logger (LOG_LEVEL env)",
+      "healthComponents": 8,
+      "systemAlertKeysReady": [
+        "system.job.failed",
+        "system.job.stale",
+        "system.storage.error",
+        "system.backup.overdue"
+      ],
+      "dashboardRecommendations": [
+        "Grafana: API latency, healthz, Postgres connections",
+        "Use /operations/system for job + storage + backup widgets",
+        "Control Tower for operational alerts",
+        "Track job_executions failure rate and SKIPPED ratio per instance"
+      ]
+    }
+  },
+  "summary": {
+    "pass": 2,
+    "passWithRisk": 7,
+    "fail": 0
+  }
+}

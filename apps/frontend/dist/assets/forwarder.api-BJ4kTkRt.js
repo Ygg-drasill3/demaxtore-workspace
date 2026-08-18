@@ -1,0 +1,1 @@
+import{d as e}from"./index-CXuwP_Yr.js";const i={listShipments:()=>e.get("/forwarder/shipments").then(t=>t.data),submitMilestone:(t,s)=>e.post(`/forwarder/shipments/${t}/milestones`,s).then(r=>r.data)};export{i as f};

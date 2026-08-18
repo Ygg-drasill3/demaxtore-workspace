@@ -1,0 +1,49 @@
+{
+  "summary": "Sprint 1 end-to-end test for DeMaxtore. All 21 backend pytest cases pass (health, auth login/refresh/me/logout, forgot+reset with token reuse/short pwd rules + buyer password restored to Buyer@123, notifications role filtering + mark-one/all + 404). Frontend: 18 of 21 UI assertions pass on first pass. Confirmed: login form + demo quick-fill + wrong-pwd error, RBAC redirects to /unauthorized (buyer\u2192admin, buyer\u2192supplier, supplier\u2192admin, admin\u2192buyer), all 3 workspace placeholder pages render with timeline/next-actions/documents/participants and correct workspace-id, forgot\u2192reset deep-link prefills token, logout clears session + tampered access_token recovers to /login without crash, buyer/supplier/admin sidebars contain expected role-specific items. 1 real UI bug found in NotificationBell that intermittently breaks the next click after using 'View all notifications'.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "NotificationBell.jsx",
+        "issue": "Clicking 'View all notifications' (data-testid=notification-view-all) navigates to /notifications but does NOT call setOpen(false) on the Radix DropdownMenu. The bell trigger stays in data-state=\"open\" aria-expanded=\"true\" after navigation, and Radix leaves an invisible overlay on <html> that intercepts pointer events on the next page. Subsequent clicks (user-menu-trigger, login flows, even re-clicking the bell itself) time out with 'html intercepts pointer events'. Reproduces ~consistently in scripted tests. Suggested fix: call setOpen(false) inside the onClick of the 'View all notifications' Link, or wrap the Link in a DropdownMenuItem (Radix auto-closes on item select).",
+        "selector": "[data-testid=\"notification-view-all\"]",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_sprint1_api.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Fix NotificationBell 'View all notifications' to explicitly close the dropdown before navigation (setOpen(false) onClick, or convert anchor to DropdownMenuItem). This is the only blocking UI bug found.",
+    "Optional: also call setOpen(false) inside mark-all and item-row click handlers to prevent any leftover Radix overlay state when the user interacts then navigates."
+  ],
+  "critical_code_review_comments": [
+    "server.py: forgot-password unknown-email branch correctly returns HTTP 200 with reset_token=null (no enumeration) \u2014 good.",
+    "server.py: refresh endpoint properly rejects access-type tokens via payload['type'] != 'refresh' check.",
+    "server.py: get_current_user explicitly verifies payload['type'] == 'access', preventing refresh-token-as-access usage.",
+    "server.py: mark-all marks role-relevant AND role=None notifs; consistent with list filter.",
+    "server.py: CORS_ORIGINS defaults to '*' with allow_credentials=False \u2014 acceptable for Bearer-token model; consider tightening origins in prod.",
+    "NotificationBell.jsx: 'View all' uses a plain <Link>/<a> inside DropdownMenuContent and does not close the menu before navigating, causing the pointer-events bug described above.",
+    "Mock data in lib/mockData.js is intentional per Sprint 1 spec \u2014 not a defect."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_sprint1_api.py"
+  ],
+  "success_rate": {
+    "backend": "100%",
+    "frontend": "95%"
+  },
+  "test_credentials": "buyer@demaxtore.com/Buyer@123, supplier@demaxtore.com/Supplier@123, admin@demaxtore.com/Admin@123 \u2014 buyer password was changed during reset-password testing and restored to Buyer@123 before finishing.",
+  "seed_data_creation": "None added \u2014 used existing seeded users and notifications. Password reset tokens created during forgot-password tests (one used, one used to restore buyer pwd) \u2014 normal data.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend Sprint 1 is fully green via /app/backend/tests/test_sprint1_api.py (run: pytest /app/backend/tests/test_sprint1_api.py -v). Frontend bell-dropdown pointer-events bug should be retested after main agent's fix \u2014 the playbook: login as buyer \u2192 click notification-bell \u2192 click notification-view-all \u2192 on /notifications, immediately try to click any other interactive element (e.g., a sidebar nav link or user-menu-trigger). Before fix: the click is intercepted by an invisible <html> overlay. After fix: click should succeed without delay.",
+  "rca of the issue": "RCA for NotificationBell bug: NotificationBell uses Radix <DropdownMenu open={open} onOpenChange={setOpen}>. The 'View all notifications' link is a plain react-router <Link> inside DropdownMenuContent, NOT a DropdownMenuItem. Radix auto-closes only on item-select events. When user clicks the Link, react-router navigates to /notifications, NotificationBell may unmount, but Radix's portal/overlay element may persist briefly with pointer-events disabling. Even after remount on the new page, the trigger button shows data-state=open/aria-expanded=true, confirming that the open state was never reset. Mitigation: call setOpen(false) in onClick of the link, OR add Radix's DropdownMenuItem wrapper which auto-closes on select."
+}

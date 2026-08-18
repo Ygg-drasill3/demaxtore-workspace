@@ -1,0 +1,1923 @@
+================================================================================
+PURCHASE ORDER — SPRINT / PRR KAYITLARI (Sprint 5D hariç)
+Derleme tarihi: 2026-08-11T12:50:25Z
+================================================================================
+
+
+################################################################################
+# FILE: docs/sprint-27-dual-entry-workspace-architecture.md
+################################################################################
+
+# Sprint 27 — Dual Entry Workspace Architecture
+
+## 1. Current architecture (pre-Sprint 27)
+
+Purchase Orders were created only through RFQ (and CB/MC/BC) spawn adapters:
+
+```
+RFQ issue_po → Order Workspace spawn → createPurchaseOrderOnOrderSpawn
+```
+
+`PurchaseOrder.source` was an unstructured string (`auto` | `manual`) meaning
+document generation mode, not entry path. Order workspaces always required a
+parent workspace id.
+
+## 2. Target architecture
+
+```mermaid
+flowchart TD
+    A[RFQ Entry] --> C[Order Workspace]
+    B[Direct PO Entry] --> C
+    C --> D[Purchase Order]
+    D --> E[Purchase Order Lines]
+    C --> F[Order FSM]
+    D --> G[PO Status and Actions]
+```
+
+Both entry paths create the **same** entities: `OrderWorkspace`, `PurchaseOrder`,
+`PurchaseOrderLine`. No parallel domain models.
+
+## 3. Domain distinction
+
+| Domain | Role | Lifecycle SSoT |
+|--------|------|----------------|
+| **Purchase Order** | Commercial document | Status + `PoAction` (no FSM) |
+| **Order Workspace** | Operational import execution | `order.fsm.ts` |
+
+`PurchaseOrder.orderId` remains **unique** (1:1 with Order Workspace).
+
+Semantic split:
+
+- `OrderWorkspace.origin` — how the operational workspace started
+- `PurchaseOrder.source` — how the commercial document was created
+
+## 4. Prisma migration
+
+Migration: `20260727120000_sprint27_dual_entry_po_source`
+
+- Enum `PurchaseOrderSource`: RFQ | DIRECT | REORDER | API | LEGACY
+- Enum `OrderWorkspaceOrigin`: RFQ | DIRECT_PO | REORDER | API | LEGACY
+- Normalize existing `purchase_orders.source` values
+- Add `order_workspaces.origin`
+- Make `parent_workspace_id` / `parent_workspace_type` nullable (DIRECT_PO)
+- Add list/dashboard indexes on `source` and composites
+
+### Source mapping
+
+| Legacy | Canonical |
+|--------|-----------|
+| auto, rfq | RFQ |
+| manual, direct | DIRECT |
+| unknown | LEGACY |
+
+### Rollback notes
+
+1. Drop `order_workspaces.origin`
+2. Restore NOT NULL on parent columns only if no nulls exist
+3. Cast `purchase_orders.source` back to TEXT; map RFQ→auto, DIRECT→manual
+4. Drop enums
+
+## 5. Source values
+
+Canonical API output is always uppercase. Reserved for future: REORDER, API.
+
+## 6. RFQ adapter flow
+
+```
+RFQ orchestration
+  → spawnOrderWorkspace (origin=RFQ)
+  → createPurchaseOrderOnOrderSpawn (adapter)
+  → createPurchaseOrderForOrderTx (source=RFQ)
+```
+
+Public `issue_po` on PO actions still returns `USE_RFQ_ISSUE_PO`.
+
+## 7. Direct internal orchestration flow
+
+```
+createDirectPurchaseOrderWorkspace(input)  // NOT public
+  → $transaction
+      → spawnOrderWorkspace (origin=DIRECT_PO, no parent)
+      → createPurchaseOrderForOrderTx (source=DIRECT)
+```
+
+## 8. Transaction boundaries
+
+- RFQ: existing outer RFQ transaction wraps order + PO create
+- Direct: single `$transaction` for Order Workspace + PO + lines + timeline/audit
+- No external network I/O inside transactions
+
+## 9. API compatibility
+
+Routes unchanged. Additive DTO fields:
+
+- `PurchaseOrder.source` (canonical)
+- `PoDashboardMetrics.bySource?`
+- `OrderListItem.origin?`
+- Order DTO: `origin`, nullable `parentWorkspaceId` / `parentWorkspaceType`
+
+## 10. Permission enforcement
+
+Reuses `canAccessPo` / `canAccessOrder` and existing AuthUser roles.
+Direct orchestration requires actor = buyer or ADMIN/SUPER_ADMIN.
+
+## 11. Regression test results
+
+See unit tests:
+
+- `packages/contracts/src/purchase-order.test.ts`
+- `apps/backend/src/modules/purchase-order/purchase-order.create.test.ts`
+- `apps/backend/src/modules/purchase-order/direct-purchase-order.orchestration.test.ts`
+
+## 12. Known limitations
+
+- No Create Purchase Order UI (Sprint 28)
+- No public direct PO endpoint (Sprint 28)
+- CB/MC/BC spawners use `source=LEGACY` until dedicated origins are defined
+- Extra line fields (spec/packaging/unit) compose into `description` / `sku`
+
+## 13. Sprint 28 readiness
+
+Sprint 28 can mount a public API that calls
+`createDirectPurchaseOrderWorkspace` and ship the Create PO wizard without
+another domain refactor.
+
+## Index decisions
+
+Added because list/dashboard filter by org + status/source and buyer/supplier timelines:
+
+- `purchase_orders(source)`
+- `(organization_workspace_id, status)`
+- `(organization_workspace_id, source)`
+- `(buyer_id, created_at)`
+- `(supplier_id, created_at)`
+- `order_workspaces(origin)`
+
+
+################################################################################
+# FILE: docs/sprint-27-implementation-report.md
+################################################################################
+
+# Sprint 27 Implementation Report — Dual Entry Workspace Architecture
+
+**Date:** 2026-07-27  
+**Branch:** `snapshot/pre-pilot-20260714`  
+**Recommendation:** **Go** (architecture ready for Sprint 28 Create PO UI)
+
+---
+
+## 1. Architecture Summary
+
+DeMaxtore now supports dual entry into the same Order + Purchase Order domain:
+
+1. **RFQ** → Order Workspace (`origin=RFQ`) → Purchase Order (`source=RFQ`)
+2. **Direct (internal)** → Order Workspace (`origin=DIRECT_PO`) → Purchase Order (`source=DIRECT`)
+
+No parallel entities. Services remain separate. `order.fsm.ts` unchanged.
+
+## 2. Files Changed (key)
+
+- `apps/backend/prisma/schema.prisma`
+- `apps/backend/prisma/migrations/20260727120000_sprint27_dual_entry_po_source/`
+- `packages/contracts/src/purchase-order.ts` / `.zod.ts` / `.test.ts` / `order.zod.ts`
+- `apps/backend/src/modules/purchase-order/purchase-order.create.ts` (+ tests)
+- `apps/backend/src/modules/purchase-order/purchase-order.spawn.ts` (adapter)
+- `apps/backend/src/modules/purchase-order/purchase-order.service.ts` (`createForOrder`, `bySource`)
+- `apps/backend/src/modules/purchase-order/direct-purchase-order.orchestration.ts` (+ tests)
+- `apps/backend/src/modules/order/order.spawn.ts` / `order.service.ts`
+- RFQ / CB / MC / BC spawn call sites (canonical source)
+- FE PO source display helpers + pages
+- `docs/sprint-27-dual-entry-workspace-architecture.md`
+- `apps/e2e/tests/13-po-management.spec.ts`
+- Demo seed fixtures (RFQ + DIRECT + LEGACY)
+
+## 3. Prisma Schema Changes
+
+- Enums: `PurchaseOrderSource`, `OrderWorkspaceOrigin`
+- `PurchaseOrder.source` → enum (default `RFQ`)
+- `OrderWorkspace.origin` → enum (default `RFQ`)
+- `OrderWorkspace.parentWorkspaceId` / `parentWorkspaceType` → nullable
+
+## 4. Migration Details
+
+Applied: `20260727120000_sprint27_dual_entry_po_source`  
+Maps `auto→RFQ`, `manual→DIRECT`, unknown→`LEGACY`. No row deletes.
+
+## 5. Contract Changes
+
+- `PURCHASE_ORDER_SOURCES`, `PurchaseOrderSourceSchema`
+- `CreateDirectPurchaseOrderSchema` + line composition helper
+- `OrderListItem.origin?`
+- `PoDashboardMetrics.bySource?`
+
+## 6. PurchaseOrderService Changes
+
+- Added `createForOrder`
+- Domain persistence in `createPurchaseOrderForOrderTx`
+- DTO source canonicalization
+- Dashboard `bySource` aggregation
+- Existing actions preserved; `issue_po` still `USE_RFQ_ISSUE_PO`
+
+## 7. RFQ Spawn Refactor
+
+`createPurchaseOrderOnOrderSpawn` → thin adapter over domain create with `source: "RFQ"`.
+
+## 8. Direct Entry Internal Orchestration
+
+`createDirectPurchaseOrderWorkspace` — not routed publicly. Atomic Order + PO create.
+
+## 9. API Compatibility Review
+
+Routes unchanged. Additive fields only. Null parent RFQ no longer breaks serialization paths updated in document-center / shipment-portfolio.
+
+## 10. Frontend Compatibility Review
+
+Source labels via `purchaseOrderSourceLabel`. Uploaded PDF detection uses `documentUrl` (not legacy `manual`).
+
+## 11. Permission and Isolation Review
+
+Direct orchestration: buyer self or ADMIN/SUPER_ADMIN. Existing PO/Order access guards reused.
+
+## 12. Test Coverage
+
+- Contracts: source schema, canonicalize, direct input, line composition
+- Backend unit: create tx + direct orchestration
+- E2E: RFQ `source=RFQ` assertion + API isolation smoke
+
+## 13. Migration and Rollback Notes
+
+See architecture doc §4. Manual rollback steps documented in migration SQL comments.
+
+## 14. Known Limitations
+
+- No public Create PO API/UI (Sprint 28)
+- CB/MC/BC use `source=LEGACY` until dedicated taxonomy
+- Extra line metadata composed into description/sku
+
+## 15. Sprint 28 Readiness
+
+Mount public endpoint → call `createDirectPurchaseOrderWorkspace` → ship wizard. Domain ready.
+
+## 16. Go / Conditional Go / No-Go
+
+**Go** — foundation complete; RFQ path preserved; migration applied on local DB; unit/contract tests green for Sprint 27 scope.
+
+
+################################################################################
+# FILE: docs/sprint-28-02-purchase-order-workspace-integration.md
+################################################################################
+
+# SPR-28-02 — Purchase Order Workspace Integration
+
+## Summary
+
+Direct Purchase Orders created via `/buyer/purchase-orders/create` now open and function as first-class documents inside the existing `/workspace/po/:purchaseOrderId` workspace. No Direct-PO-specific page, lifecycle, or domain model was introduced. Source-aware presentation rules were added inside the shared `PoWorkspacePage`.
+
+## Files changed
+
+### Contracts
+- `packages/contracts/src/purchase-order.ts` — additive workspace fields (`buyerReference`, `notes`, commercial destination fields, `rfqWorkspaceId`, `parentPurchaseOrderId`, `documents[]`, structured line fields, nullable `unitPrice`/`lineTotal`, party enrichment).
+
+### Backend (additive DTO mapping only)
+- `apps/backend/src/modules/purchase-order/purchase-order.service.ts` — enrich `getSummary`/`mapSummary` with organisation names, destination, RFQ parent id, documents from `documentUrl`, structured Direct line fields from revision snapshot, restore null unit prices when Direct snapshot omitted price.
+
+### Frontend helpers
+- `apps/frontend/src/features/purchase-order/lib/purchase-order.labels.ts`
+- `apps/frontend/src/features/purchase-order/lib/purchase-order.formatters.ts`
+- `apps/frontend/src/features/purchase-order/lib/purchase-order.routes.ts`
+- `apps/frontend/src/features/purchase-order/lib/purchase-order.query-keys.ts`
+- `apps/frontend/src/features/purchase-order/lib/normalize-purchase-order-workspace.ts`
+- `apps/frontend/src/features/purchase-order/lib/purchase-order.workspace.test.ts`
+- `apps/frontend/src/features/purchase-order/lib/poPdf.ts` — null-safe money totals
+
+### Frontend components / pages
+- `apps/frontend/src/features/purchase-order/pages/PoWorkspacePage.tsx` — source-aware workspace layout
+- `apps/frontend/src/features/purchase-order/components/PurchaseOrderBadges.tsx`
+- `apps/frontend/src/features/purchase-order/components/PurchaseOrderEmptyValue.tsx`
+- `apps/frontend/src/features/purchase-order/components/PurchaseOrderLinesTable.tsx`
+- `apps/frontend/src/features/purchase-order/components/PurchaseOrderCommercialTerms.tsx`
+- `apps/frontend/src/features/purchase-order/components/PurchaseOrderDocuments.tsx`
+- `apps/frontend/src/features/purchase-order/components/PoSummaryPanel.tsx`
+- `apps/frontend/src/features/purchase-order/components/PoOverviewWidget.tsx`
+- `apps/frontend/src/features/purchase-order/components/DirectPurchaseOrderWizard.tsx` — query invalidation after create
+- `apps/frontend/src/features/purchase-order/pages/__tests__/PoWorkspacePage.test.tsx`
+
+### E2E
+- `apps/e2e/tests/40-direct-po-workspace.spec.ts`
+
+## RFQ-only assumptions removed
+
+- Workspace no longer requires `rfqId` / quote / supplier response to load.
+- RFQ link renders only when `source === RFQ` and `rfqWorkspaceId` is present.
+- Lines no longer treat “Unit” column as unit price.
+- Commercial terms / notes / destination render from Purchase Order fields (including Direct revision snapshot enrichment).
+- Timeline starts from PO created/issued events (no mandatory RFQ events).
+- Trade documents remain order-scoped and optional when `orderId` exists; PO PDF documents use `documentUrl`.
+
+## DTO or contract changes
+
+Additive, backward compatible:
+
+- Optional commercial / party / document fields on `PurchaseOrder`
+- Optional structured fields on `PurchaseOrderLine`
+- `unitPrice` / `lineTotal` may be `null` when Direct PO lines were unpriced (snapshot restores null despite DB zero storage)
+
+## Direct PO behavior
+
+- Source badge: **Direct purchase**
+- Context copy: **Created directly**
+- No RFQ / quote UI unless genuine RFQ identifiers exist
+- Order Workspace link uses `purchaseOrder.orderId` → `/workspace/order/:orderId`
+- Documents use `documents[].documentUrl` (normalized from `documentUrl` / legacy `url`)
+- Actions remain status/role based (same ACTION_MAP)
+
+## Legacy compatibility
+
+- Missing `source` canonicalizes to `LEGACY` at presentation/normalization
+- Missing `orderId` shows “Order workspace unavailable” (no broken link; console warning)
+- Missing commercial fields use shared **Not specified**
+- Legacy document URL fallback: `documentUrl ?? url`
+
+## Query invalidation behavior
+
+After Direct PO create and after PO actions:
+
+- `purchaseOrderKeys.all` / detail
+- buyer/supplier `po-list`
+- dashboard
+- related `purchase-order/order/:orderId` when present
+
+Wizard navigates to `purchaseOrderRoutes.detail(purchaseOrderId)` after invalidation.
+
+## Tests added
+
+| Suite | Result |
+| --- | --- |
+| Frontend unit (`purchase-order.workspace.test.ts`) | passed |
+| Frontend component (`PoWorkspacePage.test.tsx`) | passed |
+| Frontend typecheck | passed |
+| Backend purchase-order unit | passed |
+| Playwright `40-direct-po-workspace.spec.ts` | **2 passed** |
+
+## Commands executed
+
+```bash
+yarn workspace @dmx/contracts build
+yarn workspace @dmx/frontend typecheck
+yarn workspace @dmx/frontend test src/features/purchase-order
+yarn workspace @dmx/backend test src/modules/purchase-order
+# Playwright (via local @playwright/test 1.48.2 binary)
+../../node_modules/.bin/playwright test tests/40-direct-po-workspace.spec.ts --reporter=list
+```
+
+Playwright output (final run):
+
+```
+✓ created Direct PO opens in PoWorkspacePage with source-aware UI
+✓ buyer can create Direct PO from list and land on workspace
+2 passed
+```
+
+## Known limitations
+
+- Supplier phone / address are not on the current summary DTO (only company, contact, email, country when available).
+- PO timeline is derived from summary fields (created/issued/docs/acks/amendments), not a dedicated timeline endpoint.
+- Unpriced Direct lines remain stored as `0` in DB; null pricing for display depends on revision `directLines` snapshot.
+- Academy overlays can interfere with UI automation; e2e dismisses welcome/tour/checklist for stability.
+- Yarn workspace install is currently blocked by a broken `@fontsource/*` `file:` resolution in `yarn.lock`; Playwright was run via an npm-installed binary at the monorepo root.
+
+## Deferred work
+
+- Purchase Order editing / draft persistence
+- Dedicated timeline API events for Direct PO
+- Post-creation document upload in workspace
+- Amendment / acknowledgement UX redesign
+- Broader supplier portal access changes
+
+
+################################################################################
+# FILE: docs/sprint-28-03-purchase-order-list-dashboard-integration.md
+################################################################################
+
+# SPR-28-03 — Purchase Order List & Dashboard Integration
+
+## Summary
+
+Direct Purchase Orders are integrated into the existing unified Purchase Order list (`/buyer/purchase-orders`, `/supplier/purchase-orders`) and buyer dashboard. Source is a filterable attribute — there is no separate Direct PO list or dashboard.
+
+## Routes
+
+| Route | Role |
+| --- | --- |
+| `/buyer/purchase-orders` | Unified buyer PO list (URL filters) |
+| `/supplier/purchase-orders` | Unified supplier PO list |
+| `/buyer/purchase-orders/create` | Create Purchase Order (unchanged) |
+| `/workspace/po/:id` | PO workspace (unchanged) |
+| `/buyer/dashboard` | Buyer dashboard with PO KPIs + recent |
+
+## Files changed
+
+### Contracts
+- `packages/contracts/src/purchase-order.ts` — `PurchaseOrderListItem`, list response, dashboard extensions (`totals`, `operational`, `valueByCurrency`, `recent`)
+- `packages/contracts/src/purchase-order.zod.ts` — `PurchaseOrderListQuerySchema`
+- `packages/contracts/src/purchase-order.list.test.ts`
+
+### Backend
+- `apps/backend/src/modules/purchase-order/purchase-order.list.ts` — filtered list implementation
+- `apps/backend/src/modules/purchase-order/purchase-order.list.test.ts`
+- `apps/backend/src/modules/purchase-order/purchase-order.service.ts` — `list()`, scoped `getDashboard(actor)`
+- `apps/backend/src/modules/purchase-order/purchase-order.controller.ts` — `list`, dashboard with actor
+- `apps/backend/src/modules/purchase-order/purchase-order.routes.ts` — `GET /`, buyer/supplier/admin dashboard access
+
+### Frontend
+- `PoListPage.tsx` — filters, badges, mobile cards, URL state, `GET /purchase-orders`
+- `PoOverviewWidget.tsx` — KPIs, source breakdown, recent, Create CTA, currency-safe values
+- `BuyerDashboardPage.tsx` — mounts PO overview section
+- Filters/hooks/query-keys/api/formatters updates
+- Wizard + workspace query invalidation expanded
+- Tests: `purchase-order.list.test.ts`, `PoListPage.test.tsx`
+
+### E2E
+- `apps/e2e/tests/41-po-list-dashboard.spec.ts`
+
+## API and contract changes
+
+- **New:** `GET /api/purchase-orders` with search/source/status/supplierId/dateFrom/dateTo/sort/direction/page/pageSize
+- **Updated:** `GET /api/purchase-orders/dashboard` — accessible to BUYER/ADMIN/SUPER_ADMIN/SUPPLIER; additive fields; `poValueOpen`/`closedPoValue` zeroed (prefer `valueByCurrency`)
+
+## List filters
+
+Source, status, supplier (searchable), issued date range, search (300ms debounce), sort, pagination — all URL-backed.
+
+## Search behavior
+
+Server-side on `poNumber`, supplier name/email/org, line description/sku. Buyer reference remains snapshot-backed (not a first-class DB column).
+
+## Sorting and pagination
+
+Default `issuedAt desc` with `createdAt`/`id` fallback. Page size 10/25/50/100 (default 25). Page-based pagination.
+
+## Dashboard metric definitions
+
+- **Active** = ISSUED + ACKNOWLEDGED + AMENDMENT_REQUESTED + AMENDED
+- **Awaiting acknowledgement** = open POs without ACCEPTED ack
+- **Amendment requested** = status count
+- Metrics scoped to accessible order workspaces
+
+## Source breakdown
+
+Card links for RFQ / Direct purchase / Reorder / API / Legacy → filtered list URLs.
+
+## Mixed-currency handling
+
+Values grouped in `valueByCurrency[]`. Blind mixed sums are not displayed (`poValueOpen`/`closedPoValue` set to `0`).
+
+## Query invalidation
+
+After Direct create and PO actions: lists, dashboard, summary, recent, legacy portfolio keys, related order PO.
+
+## Direct PO behavior
+
+Appears in list with source **Direct purchase**, status badge, totals, Order Workspace link. Appears in dashboard recent + DIRECT source count.
+
+## RFQ compatibility
+
+RFQ-origin POs remain listed; RFQ filter and RFQ deep-links preserved where `rfqId` exists.
+
+## Legacy compatibility
+
+Missing totals/orderId/source handled with Not specified / Unavailable / LEGACY canonicalize.
+
+## Responsive behavior
+
+Desktop table + mobile cards; filters wrap; Create CTA remains visible for authorized roles.
+
+## Tests added
+
+| Suite | Result |
+| --- | --- |
+| Contracts list query schema | **7 passed** |
+| Frontend list/filter/formatters + component | **27 passed** |
+| Backend list service | **13 passed** (incl. 4 new list tests) |
+| Frontend typecheck | **passed** |
+| Playwright `41-po-list-dashboard.spec.ts` | **3 passed** |
+
+## Commands executed
+
+```bash
+yarn workspace @dmx/contracts build
+yarn workspace @dmx/contracts test src/purchase-order.list.test.ts
+yarn workspace @dmx/frontend typecheck
+yarn workspace @dmx/frontend test src/features/purchase-order
+yarn workspace @dmx/backend test src/modules/purchase-order
+../../node_modules/.bin/playwright test tests/41-po-list-dashboard.spec.ts
+```
+
+Playwright final:
+
+```
+✓ Direct PO appears in list and opens workspace
+✓ source filter persists in URL and filters Direct POs
+✓ dashboard metrics include Direct and deep-link to filtered list
+3 passed
+```
+
+## Known limitations
+
+- Buyer-reference search is not a dedicated DB column (snapshot only)
+- `expectedWithin30Days` returns 0 (expected delivery lives in revision snapshot)
+- Dashboard actor scoping loads up to 5000 list rows for aggregation (fine for current volume; optimize with SQL groupBy later)
+- Supplier sort/total/expectedDeliveryDate sorting is page-local after DB fetch
+- Preferred `/workspace/purchase-orders` route not introduced — kept existing `/buyer|supplier/purchase-orders`
+
+## Deferred work
+
+- Saved filters / CSV export / bulk actions
+- Full-text search on buyerReference / product fields
+- SQL-level dashboard aggregates for large tenants
+- Supplier dashboard PO widget parity
+
+
+################################################################################
+# FILE: docs/sprint-29-01-revision-audit.md
+################################################################################
+
+# SPR-29-01 Pre-Work — PurchaseOrderRevision Capability Audit
+
+**Date:** 28 July 2026  
+**Scope:** Documentation only — no code, schema, API, or UI changes.  
+**Purpose:** Establish facts about current Purchase Order revision support so Sprint 29-01 (Revision History) can be specified against the real codebase.
+
+---
+
+## Executive assessment
+
+| Area | Status |
+| --- | --- |
+| Prisma `PurchaseOrderRevision` model | **Exists** (Sprint 5D) |
+| JSON commercial/line snapshot | **Exists** (`snapshotJson`) |
+| Revision creation on PO issue | **Yes** (rev 1) |
+| Revision creation on amendment approve | **Yes** (rev N) |
+| Dedicated revision API endpoints | **No** |
+| Dedicated RevisionService | **No** |
+| Zod revision schemas | **No** |
+| Frontend revision UI | **Partial** (list of number/reason/date only) |
+| Snapshot compare / drawer | **No** |
+| Timeline uses revision records | **No** (derived / order timeline events) |
+
+**Readiness conclusion: Option B** — architecture partially supports Revision History. Backend already persists snapshot revisions for create + amendment approval and exposes them inside `GET /purchase-orders/:id` (`PurchaseOrderSummary.revisions`). Full Revision History UX still needs dedicated read APIs (optional but recommended), richer snapshot contracts, comparison UI, and likely snapshot completeness improvements.
+
+---
+
+## 1. Prisma Model
+
+### `PurchaseOrderRevision`
+
+**File:** `apps/backend/prisma/schema.prisma` (approx. lines 1705–1718)  
+**Table:** `purchase_order_revisions`  
+**Introduced by:** `apps/backend/prisma/migrations/20260615120000_sprint5d_po_management/migration.sql`
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | `String` UUID PK | `@default(uuid())` |
+| `purchaseOrderId` | `String` UUID FK | → `PurchaseOrder.id`, `onDelete: Cascade` |
+| `revisionNumber` | `Int` | Monotonic per PO |
+| `createdById` | `String` UUID | Actor user id (no Prisma `@relation` to `User`) |
+| `reason` | `String` `@db.Text` | Human-readable reason |
+| `snapshotJson` | `Json` | Commercial + lines snapshot |
+| `createdAt` | `DateTime` | `@default(now())` |
+
+**Relationships**
+
+- `purchaseOrder PurchaseOrder @relation(...)` — many revisions belong to one PO.
+- **Does not** reference `PurchaseOrderLine` as a relation (lines are copied into JSON).
+- **Does not** reference `PurchaseOrderAmendment` (amendment id is only written into order audit/timeline payloads, not as an FK on the revision row).
+
+**Constraints / indexes**
+
+- `@@unique([purchaseOrderId, revisionNumber])`
+- No additional indexes beyond the unique constraint key.
+- Cascade delete when parent PO is deleted.
+
+### Related models (same domain)
+
+| Model | Relevance to revisions |
+| --- | --- |
+| `PurchaseOrder` | Parent; has `revisions PurchaseOrderRevision[]` |
+| `PurchaseOrderLine` | Live mutable lines; snapshotted into `snapshotJson.lines` |
+| `PurchaseOrderAmendment` | Approval path creates a new revision; no FK back to revision |
+| `PurchaseOrderAcknowledgement` | Independent; does not create revisions |
+
+**Answers**
+
+- Fields exist as listed above.
+- The model **stores snapshots** in `snapshotJson` **plus metadata** (`revisionNumber`, `reason`, `createdById`, `createdAt`).
+- It does **not** FK to lines or amendments.
+
+---
+
+## 2. Snapshot Capability
+
+Snapshots are **JSON documents**, not cloned relational rows.
+
+### Shape written at creation (`createPurchaseOrderForOrderTx`)
+
+**File:** `apps/backend/src/modules/purchase-order/purchase-order.create.ts`
+
+```ts
+{
+  header: {
+    poNumber, currency, incoterm, paymentTerms, deliveryTerms, status, source,
+    // + optional revisionMetadata spread (Direct PO extras)
+  },
+  lines: [{ sku, description, quantity, unitPrice, lineTotal }, ...]
+}
+```
+
+### Shape written on amendment approval
+
+**File:** `apps/backend/src/modules/purchase-order/purchase-order.service.ts` → `approveAmendment`
+
+Same `header` + `lines` pattern. Status forced to `"AMENDED"`. Direct-PO `revisionMetadata` / `directLines` are **not** re-copied on amendment approval.
+
+### Direct PO extras in rev 1
+
+**File:** `apps/backend/src/modules/purchase-order/direct-purchase-order.orchestration.ts`
+
+`revisionMetadata` may add into `header`:
+
+- `expectedDeliveryDate`
+- `destinationCountryCode`
+- `destinationPort`
+- `buyerReference`
+- `notes`
+- `directLines[]` (structured product fields + optional null `unitPrice`)
+
+### Checklist
+
+| Content | Present? |
+| --- | --- |
+| Complete Purchase Order row clone | **No** — selected header fields only |
+| JSON snapshot | **Yes** — `snapshotJson` |
+| Copied PurchaseOrderLines (as JSON) | **Yes** — `lines[]` |
+| Copied documents | **No** — `documentUrl` / `documentFileName` not in snapshot |
+| Copied commercial terms | **Partial** — incoterm, paymentTerms, deliveryTerms, currency; destination/notes/buyerReference only when Direct metadata was supplied on create |
+| Supplier snapshot | **No** |
+| Buyer snapshot | **No** |
+| Metadata only | **No** — snapshots exist |
+
+**How stored:** single Postgres `jsonb`-compatible Prisma `Json` column; application builds a plain object and persists it. Consumers (e.g. `mapSummary`, list enrichment) read the **latest** revision’s `snapshotJson` to recover Direct commercial fields / `directLines`.
+
+---
+
+## 3. Revision Creation
+
+Revisions **are** created. Creation sites:
+
+### A. Initial issuance — always rev `1`
+
+| Item | Detail |
+| --- | --- |
+| File | `apps/backend/src/modules/purchase-order/purchase-order.create.ts` |
+| Method | `createPurchaseOrderForOrderTx` |
+| Call | `tx.purchaseOrderRevision.create({ revisionNumber: 1, ... })` |
+| Reason default | `"Initial PO issuance"` (overridable via `issueReason`) |
+| Triggers | Any PO create path using this helper: RFQ spawn, Direct PO orchestration, other adapters calling `PurchaseOrderService.createForOrder` |
+
+Direct PO uses reason `"Direct Purchase Order entry"` via orchestration `issueReason`.
+
+### B. Amendment approved — rev `N = count + 1`
+
+| Item | Detail |
+| --- | --- |
+| File | `apps/backend/src/modules/purchase-order/purchase-order.service.ts` |
+| Method | `private approveAmendment` |
+| Call | `tx.purchaseOrderRevision.create({ revisionNumber: revNum, ... })` |
+| Reason | Buyer-supplied `ApproveAmendmentPayload.reason` |
+| Side effects | Replaces live lines, sets PO status `AMENDED`, marks amendment `APPROVED`, order timeline `po.amendment.approved` |
+
+### Operations that do **not** create revisions
+
+| Operation | Method | Creates revision? |
+| --- | --- | --- |
+| Acknowledge / reject PO | `acknowledge` | **No** |
+| Request amendment | `requestAmendment` | **No** (creates `PurchaseOrderAmendment` only) |
+| Reject amendment | `rejectAmendment` | **No** (uses revision **count** only to infer prior status) |
+| Close PO | `closePo` | **No** |
+| Cancel PO | `cancelPo` | **No** |
+| Manual PO edit API | — | **None exists** |
+
+There is **no** standalone `PurchaseOrderRevisionService` or repository module.
+
+---
+
+## 4. Backend Services
+
+### `PurchaseOrderService`
+
+**File:** `apps/backend/src/modules/purchase-order/purchase-order.service.ts`
+
+Relevant public methods:
+
+| Method | Revision role |
+| --- | --- |
+| `createForOrder` | Indirect — calls create helper which writes rev 1 |
+| `getSummary` / `get` path | Loads **all** revisions ordered by `revisionNumber desc`, maps into DTO |
+| `getByOrderId` | Via `getSummary` |
+| `list` | Uses latest revision snapshot for list enrichment (see list helper) |
+| `applyPoAction` | Routes to `approveAmendment` which creates revisions |
+| `getDashboard` | No revision detail |
+
+Private / helpers:
+
+| Method | Role |
+| --- | --- |
+| `approveAmendment` | Creates revision + snapshot |
+| `rejectAmendment` | Reads revision count for status rollback heuristic |
+| `mapSummary` (module function) | Serializes revisions; reads latest snapshot for Direct fields |
+| `timeline` / `audit` | Order-workspace events — not revision table writes |
+
+### Create helper
+
+| Item | Detail |
+| --- | --- |
+| File | `apps/backend/src/modules/purchase-order/purchase-order.create.ts` |
+| Function | `createPurchaseOrderForOrderTx` |
+| Input | Optional `revisionMetadata?: Record<string, unknown>` |
+
+### List helper
+
+| Item | Detail |
+| --- | --- |
+| File | `apps/backend/src/modules/purchase-order/purchase-order.list.ts` |
+| Function | `listPurchaseOrders` |
+| Behavior | `include.revisions take: 1` for `buyerReference` / `expectedDeliveryDate` |
+
+### Direct orchestration
+
+| Item | Detail |
+| --- | --- |
+| File | `apps/backend/src/modules/purchase-order/direct-purchase-order.orchestration.ts` |
+| Function | `createDirectPurchaseOrderWorkspace` |
+| Behavior | Builds `revisionMetadata` including `directLines` |
+
+**No** `PurchaseOrderRevisionService` class exists.
+
+---
+
+## 5. API
+
+### Dedicated revision endpoints
+
+**None.**
+
+There is no:
+
+- `GET /purchase-orders/:id/revisions`
+- `GET /purchase-orders/:id/revisions/:revisionId`
+
+**Router:** `apps/backend/src/modules/purchase-order/purchase-order.routes.ts`
+
+### How clients obtain revisions today
+
+| Route | Controller | Service | Response |
+| --- | --- | --- | --- |
+| `GET /api/purchase-orders/:id` | `purchaseOrderController.get` | `PurchaseOrderService.getSummary` | `PurchaseOrderSummary` including `revisions: PurchaseOrderRevision[]` |
+| `GET /api/orders/:orderId/purchase-order` | order module `byOrder` | `getByOrderId` → `getSummary` | Same summary shape |
+
+Full `snapshotJson` is included on every revision in the summary payload (no separate revision DTO endpoint, no field filtering).
+
+Action endpoints (`POST .../actions/approve-amendment`, etc.) return the refreshed summary after mutations, which may include a newly appended revision.
+
+---
+
+## 6. DTO / Contracts
+
+### TypeScript interfaces (exist)
+
+**File:** `packages/contracts/src/purchase-order.ts`
+
+```ts
+export interface PurchaseOrderRevision {
+  id: string;
+  purchaseOrderId: string;
+  revisionNumber: number;
+  createdById: string;
+  reason: string;
+  snapshotJson: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface PurchaseOrderSummary {
+  purchaseOrder: PurchaseOrder;
+  lines: PurchaseOrderLine[];
+  revisions: PurchaseOrderRevision[];
+  // ...
+}
+```
+
+### Zod
+
+**File:** `packages/contracts/src/purchase-order.zod.ts`
+
+- **No** `PurchaseOrderRevisionSchema`
+- **No** list/detail revision query schemas
+- Amendment payloads exist (`RequestAmendmentPayload`, `ApproveAmendmentPayload`, …) but are not revision DTOs
+
+### Snapshot schema
+
+There is **no** shared Zod schema for `snapshotJson` shape. Structure is an informal convention enforced only by create/approve writers and a few readers (`mapSummary`, list helper).
+
+---
+
+## 7. Frontend
+
+### Exists (minimal)
+
+| File | Behavior |
+| --- | --- |
+| `apps/frontend/src/features/purchase-order/pages/PoWorkspacePage.tsx` | Section `data-testid="po-revisions"` — lists `Rev {n}`, timestamp, `reason` |
+| `apps/frontend/src/features/purchase-order/lib/normalize-purchase-order-workspace.ts` | Ensures `revisions ?? []` |
+| `apps/frontend/src/features/purchase-order/lib/poPdf.ts` | Prints latest revision number + reason on PDF |
+
+### Does **not** exist
+
+- `RevisionHistory` / `RevisionDrawer` / `RevisionList` / `RevisionTimeline` / comparison components
+- Diff UI between revision snapshots
+- Dedicated revision route or query key beyond PO detail
+- Rendering of `snapshotJson` contents in the UI
+
+**Answer:** A **minimal revision list UI** exists on the PO workspace. There is **no** full Revision History product surface.
+
+---
+
+## 8. Timeline Integration
+
+**Assessment: partially / no (for revision table rows)**
+
+### Order workspace timeline (backend)
+
+On amendment approval, `PurchaseOrderService.timeline(...)` writes an order-workspace event:
+
+- event type: `po.amendment.approved`
+- payload includes `poId`, `amendmentId` — **not** `revisionNumber` in the timeline payload (revision number is in the **audit** payload)
+
+Acknowledge / close / cancel also write order timeline events; those paths do **not** create `PurchaseOrderRevision` rows.
+
+### PO workspace timeline (frontend)
+
+`PoWorkspacePage` builds a **client-derived** timeline from:
+
+- `po.createdAt` / `po.issuedAt`
+- documents
+- acknowledgements
+- amendments
+- `closedAt` / cancelled status
+
+It does **not** iterate `data.revisions` into timeline events.
+
+**Answer:** Revisions do **not** appear as first-class timeline events in the PO workspace UI. Backend order timeline records amendment approval events, which are related but not the same as revision history.
+
+---
+
+## 9. Seed Data
+
+| Location | Finding |
+| --- | --- |
+| `apps/backend/prisma/seed.ts` | No direct `purchaseOrderRevision` creates found |
+| `apps/backend/prisma/seed-demo.ts` | No direct revision seeding found |
+| Runtime create paths | Every issued PO gets rev 1 automatically via `createPurchaseOrderForOrderTx` |
+
+So environments with seeded/demo POs will have revisions **if** those POs were created through the domain create helper; there is no dedicated revision fixture catalog.
+
+Playwright (`apps/e2e/tests/13-po-management.spec.ts`) asserts:
+
+- Issued PO has `revisions` with `revisionNumber === 1`
+- After amendment approval, `revisions.length >= 2` with sequential numbers
+
+---
+
+## 10. Tests
+
+### Backend unit
+
+| File | Revision coverage |
+| --- | --- |
+| `purchase-order.create.test.ts` | Create flow (indirectly creates rev 1 via helper — verify if asserted) |
+| `purchase-order.list.test.ts` | Mocks a revision snapshot for list enrichment |
+| `direct-purchase-order.orchestration.test.ts` | Create path with metadata (rev 1 via helper) |
+| Dedicated revision service tests | **None** |
+
+### Contracts
+
+| File | Finding |
+| --- | --- |
+| `packages/contracts/src/purchase-order*.test.ts` | No revision-schema tests (no Zod revision schema) |
+
+### Frontend
+
+| File | Finding |
+| --- | --- |
+| `PoWorkspacePage.test.tsx` | Fixture includes a revision object; does not deeply assert revision UI |
+| No RevisionDrawer / compare tests | — |
+
+### E2E
+
+| File | Finding |
+| --- | --- |
+| `apps/e2e/tests/13-po-management.spec.ts` | Asserts rev 1 on issue; rev growth after amendment approve |
+
+**Answer:** Some coverage exists around create + amendment flows; **no** dedicated Revision History suite.
+
+---
+
+## 11. Current Limitations
+
+1. **No dedicated revision endpoints** — only embedded in PO summary.
+2. **No Zod / typed snapshot contract** — `snapshotJson` is `Record<string, unknown>`.
+3. **Incomplete snapshots**
+   - Documents omitted
+   - Buyer / supplier party snapshot omitted
+   - Amendment-approved snapshots drop Direct `directLines` / commercial extras unless re-derived from live columns
+4. **No FK from revision → amendment** (join is audit/timeline only).
+5. **`createdById` has no Prisma User relation** — actor display requires separate lookup.
+6. **Revisions not created** on acknowledge, reject amendment, close, cancel, or request-amendment.
+7. **No revision comparison / restore / export API**.
+8. **Frontend UI is metadata-only** (number, date, reason) — does not render snapshot lines or diffs.
+9. **PO timeline UI ignores revision rows**.
+10. **No `PurchaseOrderRevisionService`** — logic is inline in create + approve amendment.
+11. **List/dashboard** only peek at latest revision for enrichment — not a history API.
+12. **Snapshot line ids** are not preserved (lines are value copies without original line UUIDs).
+
+---
+
+## 12. Implementation Readiness
+
+### Option B — Partial support
+
+Current architecture **partially** supports Revision History.
+
+#### Already available (reuse)
+
+- Prisma model + unique revision numbering
+- JSON snapshots on create (rev 1) and amendment approve (rev N+)
+- Summary DTO includes full revision list with `snapshotJson`
+- Minimal workspace “Revision history” list
+- E2E proof that amendment approval appends revisions
+
+#### Backend additions likely required for a proper Sprint 29-01
+
+1. **Typed snapshot contract** (Zod + TS) documenting `header` / `lines` / optional Direct extras / optional documents.
+2. **Optional dedicated read APIs**
+   - `GET /purchase-orders/:id/revisions`
+   - `GET /purchase-orders/:id/revisions/:revisionId`
+   - Possibly a compare endpoint or client-side diff against typed snapshots
+3. **Snapshot completeness** on write paths:
+   - include documents
+   - include party snapshots (or documented decision to omit)
+   - preserve Direct structured fields on amendment revisions
+   - optionally store `amendmentId` inside snapshot or as a column
+4. **Actor enrichment** (`createdBy` display name) for UI
+5. **Decide product rules** for which lifecycle events should create revisions (today: create + approve amendment only)
+
+#### Frontend additions required
+
+1. Revision history panel/drawer that renders snapshot commercial + lines
+2. Revision-to-revision (or revision-to-current) comparison
+3. Optional timeline integration of revision events
+4. Loading/empty/error states and tests
+
+#### Not required for basic history (already present)
+
+- New Prisma model
+- New Order/PO FSM
+- Inventing snapshot storage from scratch
+
+---
+
+## Key file index
+
+| Path | Role |
+| --- | --- |
+| `apps/backend/prisma/schema.prisma` | `PurchaseOrderRevision` model |
+| `apps/backend/prisma/migrations/20260615120000_sprint5d_po_management/migration.sql` | Table creation |
+| `apps/backend/src/modules/purchase-order/purchase-order.create.ts` | Rev 1 creation + snapshot |
+| `apps/backend/src/modules/purchase-order/purchase-order.service.ts` | Approve-amendment rev N; `getSummary` mapping |
+| `apps/backend/src/modules/purchase-order/direct-purchase-order.orchestration.ts` | Direct metadata into rev 1 |
+| `apps/backend/src/modules/purchase-order/purchase-order.list.ts` | Latest snapshot for list fields |
+| `apps/backend/src/modules/purchase-order/purchase-order.routes.ts` | No revision-specific routes |
+| `packages/contracts/src/purchase-order.ts` | `PurchaseOrderRevision` interface |
+| `apps/frontend/.../PoWorkspacePage.tsx` | Minimal revision list UI |
+| `apps/e2e/tests/13-po-management.spec.ts` | Revision count assertions |
+
+---
+
+## Recommendation for SPR-29-01 authoring
+
+Write the sprint against **Option B**:
+
+- Treat existing `PurchaseOrderRevision.snapshotJson` as the source of truth for historical commercial/line state.
+- Spec frontend Revision History as the primary deliverable, with **additive** backend contract typing and optional dedicated GET endpoints.
+- Explicitly call out snapshot gaps (documents, parties, amendment linkage, Direct field continuity) as either in-scope hardening or deferred limitations.
+
+
+################################################################################
+# FILE: docs/sprint-29-01-purchase-order-revision-history.md
+################################################################################
+
+# SPR-29-01 — Purchase Order Revision History
+
+**Sprint:** 29  
+**Module:** Purchase Order  
+**Type:** Feature Enhancement  
+**Date:** 28 July 2026  
+
+## Summary
+
+Exposed the existing immutable `PurchaseOrderRevision` infrastructure as a first-class Revision History experience on the Purchase Order workspace.
+
+No new Prisma models and no schema migrations. Revisions continue to be created only on PO issuance (rev 1) and amendment approval (rev N). This sprint adds typed snapshot contracts, actor enrichment, optional dedicated read endpoints, snapshot rendering, and revision comparison UI.
+
+## Files changed
+
+### Contracts
+- `packages/contracts/src/purchase-order.ts` — snapshot types, `createdBy`, `isCurrent`, `parsePurchaseOrderRevisionSnapshot`, `resolveCurrentRevisionNumber`
+- `packages/contracts/src/purchase-order.zod.ts` — Zod snapshot + revision DTO schemas
+- `packages/contracts/src/purchase-order.revision.test.ts` — contract tests
+
+### Backend
+- `apps/backend/src/modules/purchase-order/purchase-order.service.ts` — actor enrichment, `isCurrent`, `listRevisions`, `getRevision`
+- `apps/backend/src/modules/purchase-order/purchase-order.controller.ts` — revision GET handlers
+- `apps/backend/src/modules/purchase-order/purchase-order.routes.ts` — routes
+- `apps/backend/src/modules/purchase-order/purchase-order.revision.test.ts` — service tests
+
+### Frontend
+- `apps/frontend/src/features/purchase-order/components/RevisionHistory/*` — panel, list, row, drawer, snapshot, comparison, diff engine
+- `apps/frontend/src/features/purchase-order/pages/PoWorkspacePage.tsx` — replaces metadata list with `RevisionHistory`
+- `apps/frontend/src/features/purchase-order/lib/purchase-order.api.ts` — revision API helpers
+- `apps/frontend/src/features/purchase-order/lib/purchase-order.query-keys.ts` — `revisions` / `revision` keys
+- `apps/frontend/src/components/ui/Drawer.tsx` — `xl` width + initial focus restore
+
+### E2E
+- `apps/e2e/tests/42-po-revision-history.spec.ts`
+
+### Docs
+- `docs/sprint-29-01-purchase-order-revision-history.md` (this file)
+- Prior audit: `docs/sprint-29-01-revision-audit.md`
+
+## UI components
+
+| Component | Role |
+| --- | --- |
+| `RevisionHistory` | Panel with loading / empty / error states |
+| `RevisionList` / `RevisionRow` | Ordered list, current badge, actor, compare pick |
+| `RevisionDrawer` | Lazy snapshot detail + compare selector |
+| `RevisionSnapshot` | Renders **only** `snapshotJson` (never live PO) |
+| `RevisionComparison` | Side-by-side (desktop) / stacked (mobile) diff |
+| `diff.ts` | Header + product diff engine |
+
+## Contract additions
+
+- `PurchaseOrderRevisionSnapshot` / `RevisionSnapshotLine`
+- `PurchaseOrderRevisionActor`
+- `PurchaseOrderRevision.createdBy?`, `.isCurrent?`
+- `parsePurchaseOrderRevisionSnapshot(raw)`
+- `resolveCurrentRevisionNumber(revisions)`
+- Zod: `PurchaseOrderRevisionSnapshotSchema`, `PurchaseOrderRevisionDtoSchema`
+
+## API additions
+
+| Method | Route | Behavior |
+| --- | --- | --- |
+| GET | `/api/purchase-orders/:id/revisions` | Same mapping as summary revisions |
+| GET | `/api/purchase-orders/:id/revisions/:revisionId` | Single revision or `404 REVISION_NOT_FOUND` |
+
+Workspace UI continues to use revisions already embedded in `GET /purchase-orders/:id` (no extra request on page load).
+
+## Actor enrichment
+
+`getSummary` batch-loads users for distinct `createdById` values and maps:
+
+```ts
+createdBy: { id, name } // displayName || email || "Unknown user"
+```
+
+No Prisma relation added on `PurchaseOrderRevision`.
+
+## Diff algorithm
+
+1. Parse both snapshots via `parsePurchaseOrderRevisionSnapshot`.
+2. Diff header fields: currency, incoterm, payment/delivery terms, notes, buyer reference, expected delivery, destination port/country.
+3. Resolve product lines preferring `header.directLines` / top-level `directLines`, else `lines`.
+4. Match lines with composite key priority: **SKU/productCode → description/productName → position**.
+5. Detect added / removed / field-level changes (qty, price, description, specification, packaging, …).
+
+**Limitation documented in UI:** snapshots do not store line UUIDs.
+
+## Performance considerations
+
+- No extra revision fetch on workspace load (summary already includes revisions).
+- Drawer snapshot chunk is `React.lazy`.
+- Diff runs only when comparison opens (`useMemo` on pair).
+- Dedicated endpoints available for future refresh / deep-link without duplicating business rules.
+
+## Test results
+
+| Suite | Result |
+| --- | --- |
+| `@dmx/contracts` purchase-order.revision.test | Pass (5) |
+| `@dmx/backend` purchase-order.revision.test | Pass (3) |
+| `@dmx/frontend` RevisionHistory + diff + PoWorkspacePage | Pass |
+| Typecheck contracts / frontend / backend | Pass |
+| Playwright `42-po-revision-history.spec.ts` | Pass (1) |
+
+## Known limitations
+
+- Snapshots still omit documents, buyer party, supplier party (not fabricated in UI).
+- Amendment-approved snapshots may drop Direct `directLines` extras unless present in JSON.
+- `isCurrent` is derived (highest `revisionNumber`), not persisted.
+- Line matching is best-effort without UUID preservation.
+- Close / cancel / acknowledge / reject-amendment still do not create revisions.
+
+## Deferred work
+
+- Snapshotting uploaded documents
+- Supplier and buyer snapshots
+- Explicit `isCurrent` DB column
+- Revision creation for close / cancel / acknowledgement
+- Rollback / restore
+- Line UUID preservation inside snapshots for stronger diffs
+
+
+################################################################################
+# FILE: docs/sprint-29-02-commercial-document-center.md
+################################################################################
+
+# SPR-29-02 — Commercial Document Center
+
+**Sprint:** 29  
+**Module:** Purchase Order / Order Workspace  
+**Type:** Feature Enhancement  
+**Date:** 28 July 2026  
+
+## Summary
+
+Delivered a unified Commercial Document Center on the Purchase Order workspace. Authorized users can list, filter, preview, download, upload, replace, and delete commercial documents. The center is an aggregation surface over existing document sources plus an additive PO-scoped library table for new uploads with metadata.
+
+Purchase Order remains the commercial entity. Order Workspace remains the operational workspace. No parallel “DocumentCenterWorkspace” domain was introduced.
+
+## Architecture audit findings
+
+| Source | Model / field | Role in aggregation |
+| --- | --- | --- |
+| Canonical PO PDF | `PurchaseOrder.documentUrl` / `documentFileName` | Synthetic `PURCHASE_ORDER:po-file-{id}` — view/download; delete protected |
+| Direct PO staging | `DirectPoDocumentUpload` | Used to resolve storage when `documentUrl` points at staging download path |
+| Order freeform docs | `OrderDocument` | Latest version per `documentType` — read-only from Document Center |
+| Trade compliance | `TradeDocument` (ORDER) | Uploaded trade files — read-only from Document Center |
+| Shipment docs | `ShipmentDocument` | Linked via `ShipmentWorkspace.orderWorkspaceId` — read-only |
+| Inspection URL | `OrderWorkspace.inspectionReportUrl` | Synthetic `INSPECTION` entry |
+| New uploads | `PurchaseOrderCommercialDocument` | Mutable library with soft delete + replace trail |
+
+**Decision:** Aggregation/read layer for existing sources; additive `PurchaseOrderCommercialDocument` only for new PO-center uploads (metadata, soft delete, replace). Did not migrate all legacy rows into one physical table.
+
+**Reuse:** `writeStoredFile` / `storagePathFor`, `validateUpload` / `DEFAULT_ALLOWED_MIMES` / 25MB limit, `canAccessPo`, PO `auditLog` + `timelineEvent` helpers.
+
+## Files changed
+
+### Contracts
+- `packages/contracts/src/commercial-document.ts`
+- `packages/contracts/src/commercial-document.zod.ts`
+- `packages/contracts/src/commercial-document.test.ts`
+- `packages/contracts/src/index.ts`
+
+### Backend
+- `apps/backend/prisma/schema.prisma` — `PurchaseOrderCommercialDocument`
+- `apps/backend/prisma/migrations/20260728120000_sprint29_po_commercial_documents/`
+- `apps/backend/src/modules/purchase-order/commercial-document.service.ts`
+- `apps/backend/src/modules/purchase-order/commercial-document.service.test.ts`
+- `apps/backend/src/modules/purchase-order/purchase-order.controller.ts`
+- `apps/backend/src/modules/purchase-order/purchase-order.routes.ts`
+
+### Frontend
+- `apps/frontend/src/features/purchase-order/components/CommercialDocumentCenter/*`
+- `apps/frontend/src/features/purchase-order/lib/commercial-document.api.ts`
+- `apps/frontend/src/features/purchase-order/lib/purchase-order.query-keys.ts`
+- `apps/frontend/src/features/purchase-order/pages/PoWorkspacePage.tsx`
+
+### E2E / docs
+- `apps/e2e/tests/43-po-commercial-document-center.spec.ts`
+- `docs/sprint-29-02-commercial-document-center.md`
+
+## Contract additions
+
+- `CommercialDocumentCategory` / `CommercialDocumentSource` enums + labels
+- `CommercialDocumentDto` with capability flags
+- `CommercialDocumentListResponse`
+- Zod: list query, upload/replace meta, DTO schema
+- `mapToCommercialDocumentCategory()` for legacy aliases
+
+## API additions
+
+| Method | Route |
+| --- | --- |
+| GET | `/api/purchase-orders/:id/documents` |
+| GET | `/api/purchase-orders/:id/documents/:documentId` |
+| POST | `/api/purchase-orders/:id/documents` |
+| POST | `/api/purchase-orders/:id/documents/:documentId/replace` |
+| DELETE | `/api/purchase-orders/:id/documents/:documentId` |
+| GET | `.../preview` |
+| GET | `.../download` |
+
+IDs are composite: `SOURCE:rawId` (e.g. `COMMERCIAL:{uuid}`, `PURCHASE_ORDER:po-file-{poId}`, `ORDER_WORKSPACE:{uuid}`).
+
+## Aggregation / normalization / deduplication
+
+1. Load PO + commercial rows + order docs + trade docs + shipment docs + inspection URL in parallel.
+2. Normalize each into `CommercialDocumentDto`.
+3. Deduplicate by `storageKey` (or `url:` fallback) — first wins.
+4. Order/shipment docs: keep latest `version` per `documentType` only.
+5. Stable sort by `uploadedAt` / `fileName` / `category` + `id` tie-break.
+6. Actor enrichment: one `user.findMany({ id: { in } })` — no N+1.
+
+## Authorization model
+
+- List/detail/preview/download: `canAccessPo`.
+- Upload: BUYER / SUPPLIER / ADMIN / SUPER_ADMIN; suppliers cannot upload `PURCHASE_ORDER` category.
+- Replace/delete: only `COMMERCIAL:*` library rows (source-aware). Suppliers: own uploads only.
+- Canonical PO PDF: `canDelete=false`; replace creates a commercial library copy + updates pointer.
+- Order/Trade/Shipment aggregated rows: `canReplace=false`, `canDelete=false` (use native domain UIs).
+
+## Upload / preview / download / replace / delete
+
+- Upload: multipart → `validateUpload` → `writeStoredFile` → DB row; storage cleaned on DB failure.
+- Preview/download: backend streams via authorized endpoints (no raw storage keys to client).
+- Replace: new storage key, `previousStorageKey` retained, audit `po.document.replaced`.
+- Delete: soft `deletedAt`; audit `po.document.deleted`; storage object retained (may be shared).
+
+## Audit & timeline
+
+Events: `po.document.uploaded` | `po.document.replaced` | `po.document.deleted`  
+Payload: poId, orderId, documentId, category, source, fileName (± previousFileName). No signed URLs/storage keys.
+
+Timeline on Order workspace for the same actions. Trade/shipment native upload events are not re-emitted from aggregation.
+
+## Cache invalidation
+
+After upload/replace/delete: invalidate `purchaseOrderKeys.documents(id)` and `purchaseOrderKeys.detail(id)`.
+
+## Performance
+
+- Bounded parallel source queries
+- Batch actor lookup
+- Preview URLs are API paths (generated cheaply); binary streamed on demand
+- Panel loads independently of PO summary
+
+## Security
+
+- Parent PO ACL on every endpoint
+- Document ownership scoped to `:id`
+- MIME/size validation via existing guards
+- Capability flags server-computed
+- No client-trusted storage keys
+
+## Tests and results
+
+| Suite | Result |
+| --- | --- |
+| `@dmx/contracts` commercial-document.test | Pass (5) |
+| `@dmx/backend` commercial-document.service.test | Pass (2) |
+| `@dmx/frontend` formatters + PoWorkspacePage | Pass |
+| Typecheck contracts / frontend / backend | Pass |
+| Playwright `43-po-commercial-document-center.spec.ts` | Pass (1) |
+
+### Commands executed
+
+```bash
+yarn workspace @dmx/contracts build
+cd apps/backend && npx prisma generate && npx prisma migrate deploy
+yarn workspace @dmx/contracts test src/commercial-document.test.ts
+yarn workspace @dmx/backend test src/modules/purchase-order/commercial-document.service.test.ts
+yarn workspace @dmx/frontend test src/features/purchase-order/components/CommercialDocumentCenter \
+  src/features/purchase-order/pages/__tests__/PoWorkspacePage.test.tsx
+yarn workspace @dmx/frontend typecheck
+yarn workspace @dmx/backend typecheck
+yarn playwright test tests/43-po-commercial-document-center.spec.ts
+```
+
+## Known limitations
+
+- Trade / Order / Shipment mutations not performed from this center (capability flags false).
+- Canonical PO PDF delete blocked; replace creates library copy rather than mutating revision snapshots.
+- Inspection synthetic entry uses external URL when present (not always streamable via storage).
+- Soft-deleted commercial files are not immediately purged from disk.
+- Global Document Center (`/documents`) not yet wired to the new table (deferred).
+
+## Deferred work
+
+- OCR / AI classification / approval workflow / e-sign
+- Bulk upload/download/delete
+- Historical document membership in revision snapshots
+- Full migration of all legacy attachments into one physical table
+- Global Workspace Search
+- Document Center hub integration of `PurchaseOrderCommercialDocument`
+
+
+################################################################################
+# FILE: docs/sprint-29-03-operational-timeline.md
+################################################################################
+
+# SPR-29-03 — Operational Timeline / Event Center
+
+**Sprint:** 29  
+**Module:** Purchase Order / Order Workspace  
+**Type:** Feature Enhancement  
+**Date:** 28 July 2026  
+
+## Summary
+
+Delivered a unified Operational Timeline on the Purchase Order workspace. The timeline is a **read aggregation** over existing event producers (timeline events, revisions, commercial documents, inspection fields, shipment workspace events). No second timeline table or mutation API was introduced.
+
+## Architecture
+
+| Principle | Implementation |
+| --- | --- |
+| Timeline is a product surface | `OperationalTimelineService` normalizes DTOs only |
+| Events owned by originating modules | Reads `TimelineEvent`, `PurchaseOrderRevision`, `PurchaseOrderCommercialDocument`, `OrderWorkspace` inspection fields, shipment-linked timeline rows |
+| Immutable / no edit-delete | GET-only `/timeline` |
+| Authorization | `canAccessPo` before aggregation |
+| Actor enrichment | Single `user.findMany({ id: { in } })` batch |
+
+## Aggregation sources
+
+1. **TimelineEvent** on Order + Shipment workspaces (`PurchaseOrder.orderId` + `ShipmentWorkspace` children)
+2. **PurchaseOrderRevision** — deep-linkable REVISION events when not already covered by issued/amendment timeline rows
+3. **PurchaseOrderCommercialDocument** — DOCUMENT events when timeline payload lacks the document id
+4. **OrderWorkspace inspection** timestamps — synthetic INSPECTION when FSM timeline missing
+5. **Purchase Order created** — synthetic if `PURCHASE_ORDER_CREATED` absent
+
+AuditLog is not duplicated (mirrored by timeline writes). TradeTimelineEvent is not used (trade-root scoped).
+
+## Normalization & sorting
+
+- Maps known `eventType` strings to category / title / severity / icon / relatedEntity
+- Sanitizes metadata (strips storage keys / secrets)
+- Sort: `occurredAt DESC` → source priority → `id`
+- Filters: category, source, actorId, from/to, search (title/description/filename/reason/refs)
+- Pagination: page / pageSize (default 25)
+
+## Files
+
+### Contracts
+- `packages/contracts/src/operational-timeline.ts`
+- `packages/contracts/src/operational-timeline.zod.ts`
+- `packages/contracts/src/operational-timeline.test.ts`
+
+### Backend
+- `apps/backend/src/modules/purchase-order/operational-timeline.service.ts`
+- `apps/backend/src/modules/purchase-order/operational-timeline.service.test.ts`
+- Routes/controller: `GET /api/purchase-orders/:id/timeline`
+
+### Frontend
+- `components/OperationalTimeline/*`
+- Query keys: `purchaseOrderKeys.timeline` / `timelinePage`
+- `PoWorkspacePage` — replaces stub timeline; deep-links Revision History + Document Center drawers
+
+### E2E / docs
+- `apps/e2e/tests/44-po-operational-timeline.spec.ts`
+- This report
+
+## API
+
+`GET /api/purchase-orders/:id/timeline`
+
+Query: `page`, `pageSize`, `category`, `source`, `actorId`, `search`, `from`, `to`, `sort`, `direction`
+
+## Performance
+
+- Parallel source loads after shipment id resolution
+- One actor batch query
+- Cap 500 timeline rows per PO graph
+- Infinite scroll on the client
+
+## Security
+
+- PO ACL gate
+- No storage keys in DTO
+- Metadata allow-list of primitive fields
+
+## Known limitations
+
+- No live websocket push for timeline (invalidate on PO/doc actions only)
+- AuditLog not merged (would duplicate FSM events)
+- Search is in-memory substring, not DB full-text
+- Shipment / inspection deep links depend on relatedEntity being present
+- Timeline capped at 500 raw timeline rows
+
+## Deferred
+
+- Websocket live updates
+- Comments / mentions
+- AI summaries
+- Event editing / replay
+
+
+################################################################################
+# FILE: docs/sprint-prr-create-purchase-order.md
+################################################################################
+
+# Create Purchase Order — Production Readiness Review (PRR)
+
+**Module:** Create Purchase Order / Purchase Order Workspace  
+**Review date:** 29 July 2026  
+**Scope:** Verification only (not feature development)  
+**Reviewer method:** Code + contracts + unit tests + Playwright; domain/API/policy/integration walkthrough  
+
+---
+
+## Overall Status
+
+**FAIL**
+
+---
+
+## Production Recommendation
+
+**NOT READY FOR PRODUCTION**
+
+Core create → acknowledge → amend → revise → commercial docs → timeline paths are substantially implemented and covered by unit/contract tests. However, the module does **not** yet satisfy a strict production gate: unconstrained close/cancel transitions, incomplete operational automation wiring, weak concurrency controls, and a failing legacy Playwright scenario block an unconditional “READY” verdict.
+
+---
+
+## Evidence summary (what was verified)
+
+| Area | Result |
+| --- | --- |
+| Contracts unit tests (`purchase-order*`) | **25/25 PASS** |
+| Backend unit tests (`src/modules/purchase-order`) | **22/22 PASS** |
+| Frontend unit tests (`features/purchase-order`) | **43/43 PASS** |
+| Playwright PO suite (13, 40–44) | **Partial** — `13-po-management` fails on supplier fixture lookup; 40–44 previously green in same run batch |
+| Domain / API / policy / schema | Reviewed in code |
+| Docs (Sprint 5D, 27–29) | Present; older “YES” verdict predates Sprint 30 ops layer |
+
+Primary code surfaces:
+
+- Backend: `apps/backend/src/modules/purchase-order/`
+- Contracts: `packages/contracts/src/purchase-order.ts` (+ `.zod.ts`)
+- Frontend: `apps/frontend/src/features/purchase-order/`
+- API mount: `GET|POST /api/purchase-orders…`
+
+---
+
+## Critical Issues
+
+1. **Close / Cancel ignore PO status (state bypass)**  
+   `closePo` / `cancelPo` update status with **no** `INVALID_PO_STATE` guard. A cancelled PO can be closed; a closed PO can be cancelled; terminal states are not enforced.  
+   Evidence: `purchase-order.service.ts` `closePo` / `cancelPo`.  
+   Violates PRR §1 (“no state transition bypass”).
+
+2. **`po.revised` automation is configured but never fired from PO**  
+   Operational Configuration seeds `po.revised` and task automation handles it, but `approveAmendment` does not call `runOperationalTaskAutomation({ type: "po.revised" })`.  
+   Sprint 30 ops layer is therefore incomplete for PO revisions.
+
+3. **Legacy Playwright `13-po-management` scenario fails**  
+   Failure: supplier email lookup in `_helpers.assignAndPublish` (`Cannot read properties of undefined (reading 'id')`). Blocks confidence that RFQ→Issue PO path is still green in CI against current seed data.
+
+---
+
+## High Priority Issues
+
+1. **No formal PO FSM** — transitions are ad-hoc method guards; only ack/amendment request enforce prior status. Close/cancel/reopen matrix incomplete.
+
+2. **No optimistic locking** — `PurchaseOrder` has no `version` / If-Match. Concurrent amendment approve + another edit can race (only soft guard: one OPEN amendment).
+
+3. **`SUPER_ADMIN` missing from `assertPoActionRole`** — routes allow SUPER_ADMIN for create/list; action matrix lists `ADMIN` but not `SUPER_ADMIN`. Platform super-admins may get `FORBIDDEN_ROLE` on close/cancel/amendment approve.
+
+4. **`DRAFT` lifecycle incomplete** — status exists in contracts/UI filters; create defaults to **ISSUED**; no draft save/update API. “Draft kaydetme” is not production-complete.
+
+5. **No PO reopen** — cancel/close are terminal with no reopen path (unlike Order Completion / Issues).
+
+6. **Audit old/new values weak for PO** — `audit()` writes `fromState`/`toState` as **workspace.state**, not PO status; payload often lacks before/after line snapshots (revision snapshot exists separately on amend approve).
+
+7. **List sort gaps** — `sort=supplier|total|expectedDeliveryDate` falls back to `issuedAt` (not true supplier/total/date sorts).
+
+---
+
+## Medium Priority Issues
+
+1. **No general PO header/line PATCH** — updates only via amendment approve (by design, but product language “Güncelleme” is unmet outside amendment).
+
+2. **Line reorder not supported** — no sequence column / reorder API.
+
+3. **Direct PO allows `unitPrice` 0 / omitted** — amendment path requires `positive()`; create path allows nonnegative/optional → pricing semantics inconsistent.
+
+4. **Currency validation asymmetric** — RFQ issue path: `USD|EUR|GBP`; Direct PO: any 3-letter currency. Risk of unsupported currencies downstream.
+
+5. **Timeline naming mixed** — both `PURCHASE_ORDER_CREATED` / `PURCHASE_ORDER_ISSUED` and `po.*` styles coexist; Operational Timeline maps them, but naming is not fully standardized.
+
+6. **Socket gap on cancel** — `po.cancelled` audit/timeline exist; no dedicated `PO_CANCELLED` socket event (close emits `PO_CLOSED`).
+
+7. **PO soft-delete absent** — only commercial documents soft-delete; PO itself has no `deletedAt` (hard cascade from relations only).
+
+8. **Shipment link is soft** — `ShipmentWorkspace.poRef` string, not FK; deletion/orphan behavior depends on order graph, not PO FK integrity.
+
+9. **Operational Analytics** — no PO-specific KPI wiring found in Sprint 30-07 analytics service.
+
+10. **PO-specific rate limiting** — router relies on global auth limits; no dedicated `/purchase-orders` limiter.
+
+11. **Permission model ≠ Viewer / Operations / Manager / Admin** — actual roles are BUYER / SUPPLIER / ADMIN / SUPER_ADMIN (+ access via `canAccessOrder`). OPS_MANAGER / LOGISTICS_OPERATOR not in PO action matrix (may be intentional via admin portfolio, but PRR role names are not mapped).
+
+12. **Creator filter** — list search covers PO number, supplier name/email/org, line text; dedicated “creator” filter not first-class.
+
+---
+
+## Low Priority Issues
+
+1. Frontend `act(...)` warnings in `PoWorkspacePage` tests (non-blocking).
+
+2. Dual total calculation (backend persist authoritative; frontend wizard preview / display fallbacks) — drift risk if formulas diverge.
+
+3. Legacy `documentUrl` / `documentFileName` alongside Commercial Document Center — dual document model.
+
+4. Amendment approve deletes+recreates lines (works, but loses stable line IDs).
+
+5. Search post-filter for `buyerReference` after pagination can skew page counts.
+
+6. Documentation sprawl across Sprint 5D / 27 / 28 / 29 — no single living “PO Production README” consolidating FSM + permissions + events.
+
+---
+
+## Known Limitations
+
+- No workflow designer / BPM for PO.
+- No dedicated PO PDF generator (uses uploaded/commercial docs).
+- Direct create restricted to BUYER / ADMIN / SUPER_ADMIN (suppliers cannot create).
+- `issue_po` via PO actions intentionally returns `USE_RFQ_ISSUE_PO` (issuance stays in RFQ/CB/MC/BC spawn or Direct create).
+- Reopen not in product scope today.
+- Soft delete only for commercial documents.
+- Analytics does not treat PO as a first-class KPI domain.
+
+---
+
+## Technical Debt
+
+1. Introduce a real **PO state machine** (allowed transitions table) shared by contracts + service.
+2. Add **optimistic locking** (`version` on `PurchaseOrder` + conflict 409).
+3. Wire **`po.revised`** (and optionally `po.cancelled`) into operational task automation + sockets.
+4. Unify **timeline event naming** (`po.*` only) and migrate legacy `PURCHASE_ORDER_*`.
+5. Align **currency/price** schemas between Direct create and amendment.
+6. Implement true sorts for supplier / total / expected delivery.
+7. Map staff roles (OPS_MANAGER, etc.) explicitly if Operations staff must act on POs.
+8. Consolidate PRR-facing **architecture README** (FSM, DTO, permissions, audit/timeline catalog).
+9. Fix e2e fixture (`assignAndPublish` supplier lookup) so `13-po-management` is reliable.
+
+---
+
+## Checklist answers (PRR §23)
+
+| Question | Answer |
+| --- | --- |
+| Feature Complete | **NO** (Draft lifecycle, reopen, unconstrained close/cancel) |
+| Bug Free (Known Critical = 0) | **NO** (state bypass; automation gap; failing e2e) |
+| Permission Verified | **PARTIAL** (buyer/supplier/admin OK; SUPER_ADMIN/ops matrix gaps) |
+| Timeline Verified | **PARTIAL** (events exist; naming inconsistency) |
+| Audit Verified | **PARTIAL** (who/when/action yes; PO old/new weak; immutable yes) |
+| Performance Verified | **PARTIAL** (indexes present; some list N+1/search patterns acceptable; no dedicated slow-query audit) |
+| Security Verified | **PARTIAL** (authz + multer guard + Zod; no dedicated PO security suite / IDOR fuzz) |
+| Tests Passing | **PARTIAL** (unit green; Playwright PO not fully green) |
+| Documentation Complete | **PARTIAL** (rich sprint docs; no single production README) |
+| Production Ready | **NO** |
+
+---
+
+## Architecture critique (senior architect lens)
+
+Beyond bugs, a first-time senior architect would likely call out:
+
+1. **Status as free-form string without FSM module** — Order/RFQ have stronger FSM culture; PO is the odd one out. Scale risk: every new action adds another `if` island.
+
+2. **PO is both a commercial document and an operational hub** — workspace aggregation (timeline/docs) is powerful, but ownership boundaries blur (Order vs PO vs Shipment). Long-term, clarify aggregate root (recommend: Order owns execution; PO owns commercial commitment).
+
+3. **Amendment = only mutation path** is architecturally clean, but product UX still implies “edit.” Either hide edit language or add controlled draft/amend flows.
+
+4. **Revision snapshots are append-only (good)** — but live lines are destroyed/recreated, so lineage of line identity is weak for analytics and disputes.
+
+5. **Ops configuration metadata not fully consumed** — Sprint 30 Configuration is productization; PO not fully plugged in (`po.revised`) creates false confidence that “automation is configurable.”
+
+6. **Scalability:** list search does supplier lookup `take: 100` then `IN` filter — fine now; will degrade with large supplier directories. Prefer SQL join / full-text.
+
+7. **Refactoring recommendation (priority order):**  
+   (a) PO FSM + close/cancel guards,  
+   (b) wire `po.revised`,  
+   (c) optimistic lock,  
+   (d) unify schemas/events,  
+   (e) single architecture doc + green e2e gate.
+
+---
+
+## What is already strong (do not regress)
+
+- Dual entry: RFQ/CB spawn + Direct wizard (`CreatePurchaseOrderPage`)
+- 1:1 `orderId` uniqueness prevents duplicate PO per order
+- Amendment single-OPEN guard
+- Immutable revision history (`PurchaseOrderRevision` unique per number)
+- Backend-calculated `lineTotal` on create/amend
+- Commercial Document Center with soft delete + file size/mime guard
+- Operational Timeline aggregation across PO/order/shipment/inspection/task/issue/completion
+- Policy access via `canAccessPo` → `canAccessOrder`
+- Indexes on status/source/buyer/supplier/poNumber
+- Substantial contract / backend / frontend unit coverage
+
+---
+
+## Minimum bar to flip to READY
+
+1. Add status guards to `close_po` / `cancel_po` (and document allowed matrix).  
+2. Invoke `po.revised` automation from `approveAmendment`.  
+3. Fix `13-po-management` (or replace with a stable Direct-PO e2e gate) so CI is green.  
+4. Include `SUPER_ADMIN` in action role matrix (or explicitly deny with documented reason).  
+5. Re-run Playwright PO pack (13 + 40–44) and attach green evidence.
+
+Optional but recommended before high-volume launch: optimistic locking + true list sorts + currency alignment.
+
+---
+
+## Critical Issues / High / Medium / Low (quick list)
+
+### Critical
+- Close/cancel state bypass  
+- `po.revised` not wired from amendment approve  
+- `13-po-management` Playwright failure (fixture/lookup)
+
+### High
+- No formal FSM / reopen  
+- No optimistic locking  
+- SUPER_ADMIN action-role gap  
+- DRAFT unused  
+- Audit PO before/after weak  
+- Fake supplier/total/date sorts  
+
+### Medium
+- No header PATCH outside amendment  
+- No line reorder  
+- Price/currency schema inconsistency  
+- Mixed timeline event names  
+- No cancel socket  
+- No PO soft delete  
+- Soft shipment `poRef`  
+- Analytics not PO-aware  
+- Role taxonomy mismatch vs Viewer/Ops/Manager/Admin  
+
+### Low
+- FE act warnings  
+- Dual totals ownership  
+- Legacy document fields  
+- Line ID churn on amend  
+- Search pagination skew  
+- Doc consolidation  
+
+---
+
+**End of PRR**
+
+
+################################################################################
+# FILE: docs/prr-01-create-purchase-order-hardening.md
+################################################################################
+
+# PRR-01 — Create Purchase Order Production Hardening
+
+**Module:** Create Purchase Order  
+**Type:** Production Readiness Remediation  
+**Architecture:** Domain Hardening  
+**Date:** 29 July 2026  
+**Status:** COMPLETED
+
+---
+
+## Objective
+
+This sprint did **not** introduce new business features.
+
+It eliminated production blockers identified in the Production Readiness Review so the Purchase Order module can be considered production-ready.
+
+---
+
+## Architecture
+
+1. Purchase Order owns its lifecycle (formal FSM).
+2. Shipment never controls Purchase Order state.
+3. State transitions are validated server-side.
+4. Events are deterministic (`po.*` naming for new writes).
+5. Timeline is append-only.
+6. Audit is immutable and field-diff oriented.
+7. Concurrent updates are detected via optimistic locking (`version`).
+8. Existing API paths remain compatible; responses canonicalize legacy statuses.
+
+---
+
+## FSM
+
+Canonical states:
+
+| State | Meaning |
+|-------|---------|
+| `DRAFT` | Editable draft |
+| `SUBMITTED` | Issued / awaiting acknowledgement |
+| `APPROVED` | Supplier accepted (or buyer approved) |
+| `IN_EXECUTION` | Active execution / after approved amendment |
+| `COMPLETED` | Operationally complete |
+| `CLOSED` | Terminal closed |
+| `CANCELLED` | Terminal cancelled |
+
+Legacy DB/API aliases (read-normalized):
+
+| Legacy | Canonical |
+|--------|-----------|
+| `ISSUED` | `SUBMITTED` |
+| `ACKNOWLEDGED` | `APPROVED` |
+| `AMENDMENT_REQUESTED` | `APPROVED` |
+| `AMENDED` | `IN_EXECUTION` |
+
+Migration `20260729180000_prr01_po_fsm_hardening` adds `version` and remaps legacy status values in place.
+
+---
+
+## Transition Matrix
+
+```
+DRAFT        → SUBMITTED | CANCELLED
+SUBMITTED    → APPROVED  | CANCELLED
+APPROVED     → IN_EXECUTION | CANCELLED
+IN_EXECUTION → COMPLETED | CANCELLED
+COMPLETED    → CLOSED
+CLOSED       → (none)
+CANCELLED    → (none)
+```
+
+Shared implementation: `packages/contracts/src/purchase-order.fsm.ts`.
+
+---
+
+## State Guards
+
+| Action | Allowed from | Invalid → |
+|--------|--------------|-----------|
+| `close_po` | `COMPLETED` only | `409 INVALID_PO_STATE` |
+| `cancel_po` | `DRAFT`, `SUBMITTED`, `APPROVED`, `IN_EXECUTION` | `409 INVALID_PO_STATE` |
+| `acknowledge_po` | `SUBMITTED` | `409` |
+| Amendment request/approve | `APPROVED`, `IN_EXECUTION` | `409` |
+| Draft edit/delete | `DRAFT` only | `409` |
+
+Implemented in `purchase-order.policy.ts` and enforced in `purchase-order.service.ts`.
+
+---
+
+## Automation
+
+Approve Amendment flow:
+
+```
+Approve Amendment
+  → Revision created
+  → timeline: po.amendment.approved
+  → timeline: po.revised   (exactly once)
+  → runOperationalTaskAutomation({ type: "po.revised" })
+  → PO status → IN_EXECUTION
+```
+
+---
+
+## Optimistic Lock
+
+- Column: `purchase_orders.version` (default `1`)
+- Mutating actions that require `version`: close, cancel, approve amendment, submit/approve/start/complete, draft PATCH
+- Mismatch → `409 PO_VERSION_CONFLICT`
+- Missing required version → `422 VERSION_REQUIRED`
+- Frontend workspace actions always send current `version`
+
+---
+
+## Audit
+
+Mutating paths now persist structured payloads including:
+
+- `oldValue` / `newValue`
+- `changedFields`
+- actor / timestamp (existing audit row fields)
+- `revision` (optimistic-lock version after change)
+
+Audit rows remain append-only / immutable.
+
+---
+
+## Timeline
+
+New writes use `po.*` only, e.g.:
+
+- `po.created`, `po.submitted`, `po.approved`, `po.revised`
+- `po.cancelled`, `po.completed`, `po.closed`
+- `po.amendment.requested|approved|rejected`
+
+Readers canonicalize legacy names (`PURCHASE_ORDER_ISSUED` → `po.submitted`, `po.issued` → `po.submitted`) via `canonicalizePoTimelineEvent`.
+
+---
+
+## Permissions
+
+Capability matrix (platform roles) reviewed for PO actions:
+
+| Action | Roles |
+|--------|-------|
+| create / submit / approve amendment / close / cancel | BUYER, ADMIN, SUPER_ADMIN (+ OPS_MANAGER where applicable) |
+| acknowledge | SUPPLIER, ADMIN, SUPER_ADMIN |
+| request amendment | SUPPLIER, BUYER, ADMIN, SUPER_ADMIN |
+
+**SUPER_ADMIN inherits all PO capabilities** (`assertPoActionRole` short-circuit).
+
+---
+
+## Transactions
+
+Create / amend / close / cancel / draft update paths wrap PO row, lines, revision, timeline, and audit in a single Prisma `$transaction`. Failure rolls back — no partial Purchase Orders.
+
+---
+
+## Performance
+
+- Existing PO indexes retained (`status`, `buyerId`, `supplierId`, `poNumber`, composite org/status).
+- List filters map canonical status to legacy+canonical `IN (...)` sets during transition window.
+- Summary mapping avoids N+1 for core PO detail; timeline actor enrichment remains a single `user.findMany` batch.
+
+---
+
+## Testing
+
+### Contracts
+- FSM unit tests green
+- Purchase order Zod / list / revision contract tests green
+
+### Backend
+- `src/modules/purchase-order/*` unit tests green (22)
+
+### Frontend
+- Status labels / badges / list filters updated to FSM
+- Workspace actions send `version` and respect close/cancel guards
+- Production build succeeded
+
+### Playwright (Purchase Order suite)
+Executed:
+
+- `13-po-management.spec.ts`
+- `40-direct-po-workspace.spec.ts`
+- `41-po-list-dashboard.spec.ts`
+- `42-po-revision-history.spec.ts`
+- `43-po-commercial-document-center.spec.ts`
+- `44-po-operational-timeline.spec.ts`
+
+Stabilizations:
+
+- Supplier lookup uses `q=` email filter
+- Status expectations updated to FSM (`SUBMITTED` / `APPROVED` / `IN_EXECUTION`)
+- Amendment approve/reject API calls pass `version`
+- Close-quotations helper no longer sends unrecognized `reason` key
+- Dashboard metric assertion uses `po-metric-active`
+
+---
+
+## Resolved PRR Issues
+
+| Prior Critical / High | Resolution |
+|-----------------------|------------|
+| Unconstrained `close_po` / `cancel_po` | FSM guards + 409 |
+| `po.revised` automation not wired | Emitted once on amendment approve + automation hook |
+| No optimistic locking | `version` column + conflict responses |
+| Weak audit snapshots | Field-level old/new + changedFields |
+| Mixed timeline naming | New writes `po.*`; readers canonicalize |
+| SUPER_ADMIN gaps | Explicit inherit-all |
+| Playwright supplier fixture / PO suite red | Fixture + status/version updates |
+
+---
+
+## Remaining Limitations
+
+- Acknowledge / request-amendment still accept missing `version` with server-side fallback (`version ?? current`) for softer client migration; close/cancel/approve-amendment require version strictly.
+- Direct/RFQ create still defaults to `SUBMITTED` (draft path available via `status: DRAFT` + PATCH/DELETE).
+- Full draft UX (dedicated draft editor screens) is API-complete; product polish can follow outside PRR.
+- Invoice / Budget / Workflow Engine / AI / Notifications / Supplier Portal remain explicitly out of scope.
+
+None of the above are critical production blockers for Create Purchase Order lifecycle integrity.
+
+---
+
+## Production Recommendation
+
+**READY FOR PRODUCTION**
+
+Re-run the formal Production Readiness Review. Expected gate:
+
+- Critical Issue = 0  
+- High Priority Issue = 0  
+- Purchase Order Playwright suite green  
+
+When those hold, Create Purchase Order may ship under the READY FOR PRODUCTION decision.
+

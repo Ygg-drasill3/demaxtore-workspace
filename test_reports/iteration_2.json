@@ -1,0 +1,35 @@
+{
+  "summary": "Phase C verification on the new Node/Express/Prisma/PostgreSQL backend (port 8002). Full suite of 29 pytest cases covering AUTH (login for 3 roles, invalid/unknown creds, /me, refresh+rotation, reuse revocation, logout, forgot-password anti-enumeration, Zod validation, brute-force lockout), RBAC (unauth 401, role field correctness, requireRole source presence), NOTIFICATIONS (list, pagination, mark-read idempotency, cross-user isolation 404, unreadOnly filter, read-all + unreadCount=0), SOCKET.IO (no-token reject, invalid-jwt reject, valid-token connect, SocketEvents contract presence) and HEALTH (db ping via SELECT 1). 29/29 passed.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/apps/backend/tests/test_phase_c.py",
+    "/app/test_reports/pytest/phase_c.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Phase C surface looks clean and matches the contract: dmx_refresh httpOnly cookie scoped to /api/auth, generic 'Invalid email or password' message on both unknown email and bad password (no enumeration), Zod 400 with details.issues[], brute-force returns 429 with code PRECONDITION_FAILED + 'Retry in ...' message, refresh rotation revokes the prior token on reuse (verified end-to-end), and Socket.io handshake rejects with 'UNAUTHENTICATED' for missing/invalid JWT.",
+    "Documented-as-deferred (per spec, NOT failures): role-restricted REST endpoints are not mounted yet (Phase D); notification:new socket fan-out is intentionally absent until Phase E; no active/disabled user flag in schema (out of scope for Phase C).",
+    "Environment note for the next agent: this container shipped without Postgres installed and without supervisord running. I had to: (1) apt-get install postgresql-15, (2) start pg via pg_ctl with /etc/postgresql/15/main/postgresql.conf, (3) CREATE USER dmx / CREATE DATABASE dmx, (4) prisma migrate deploy + db seed, (5) launch the backend via `nohup npx tsx watch src/server.ts`. The supervisord_postgres.conf exists at /etc/supervisor/conf.d/ but the postgres unix user/binary were missing on first boot. Worth adding to a bootstrap script."
+  ],
+  "updated_files": [
+    "/app/apps/backend/tests/test_phase_c.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (29/29 pytest)",
+    "frontend": "n/a (backend-only request)"
+  },
+  "test_credentials": "Seeded users — all password Passw0rd! — ADMIN: admin@demaxtore.local; BUYER: buyer1@acme.test, buyer2@beta.test (buyer2 used for lockout); SUPPLIER: supplier1@acme-mfg.test. Source: /app/memory/test_credentials.md.",
+  "seed_data_creation": "Ran the existing idempotent `npx prisma db seed` (7 users, 3 RFQ workspaces, 2 notifications for buyer1). No new seed data created by this agent.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend now runs as a foreground tsx-watch process (logs at /tmp/dmx-backend.log, PID was 2961). Postgres is up via direct pg_ctl. Brute-force is in-memory per (ip,email); buyer2@beta.test will remain locked for ~15 min after this run — pick a different user (or restart the backend to clear the in-memory limiter) for new lockout retests. Refresh cookie name is `dmx_refresh`, path /api/auth — remember to scope cookies when crafting custom requests. Phase D RFQ endpoints are not mounted; Phase E socket fan-out emit is not present.",
+  "rca of the issue": "n/a — no defects found in Phase C. The only blocker encountered was infrastructure (Postgres absent, supervisor not running), which was resolved before testing began."
+}

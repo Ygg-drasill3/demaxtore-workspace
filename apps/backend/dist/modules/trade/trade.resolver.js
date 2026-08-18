@@ -1,0 +1,147 @@
+const ROOT_TYPES = new Set([
+    "RFQ",
+    "COMMODITYBID",
+    "MIXED_CONTAINER",
+    "BULK_CONTAINER",
+]);
+export async function resolveTradeRoot(db, workspaceId) {
+    let current = await db.workspace.findUnique({ where: { id: workspaceId } });
+    if (!current)
+        return null;
+    if (ROOT_TYPES.has(current.type))
+        return current;
+    if (current.type === "ORDER") {
+        const ow = await db.orderWorkspace.findUnique({
+            where: { workspaceId: current.id },
+            select: { parentWorkspaceId: true },
+        });
+        if (ow?.parentWorkspaceId) {
+            return resolveTradeRoot(db, ow.parentWorkspaceId);
+        }
+        // DIRECT_PO orders have no parent RFQ/CB/MC/BC, so the order itself is the trade root.
+        if (ow && !current.spawnedFromId)
+            return current;
+    }
+    if (current.type === "SHIPMENT") {
+        const sw = await db.shipmentWorkspace.findUnique({
+            where: { workspaceId: current.id },
+            select: { orderWorkspaceId: true },
+        });
+        if (sw?.orderWorkspaceId) {
+            return resolveTradeRoot(db, sw.orderWorkspaceId);
+        }
+        if (current.spawnedFromId) {
+            return resolveTradeRoot(db, current.spawnedFromId);
+        }
+    }
+    let cursor = current;
+    while (cursor.spawnedFromId) {
+        const parent = await db.workspace.findUnique({ where: { id: cursor.spawnedFromId } });
+        if (!parent)
+            break;
+        if (ROOT_TYPES.has(parent.type))
+            return parent;
+        cursor = parent;
+    }
+    if (cursor.type === "ORDER") {
+        const ow = await db.orderWorkspace.findUnique({
+            where: { workspaceId: cursor.id },
+            select: { parentWorkspaceId: true },
+        });
+        if (ow?.parentWorkspaceId)
+            return resolveTradeRoot(db, ow.parentWorkspaceId);
+    }
+    return ROOT_TYPES.has(cursor.type) ? cursor : null;
+}
+/**
+ * DIRECT_PO orders are their own trade root, so root-type queries alone miss them.
+ */
+export function findDirectOrderRoots(db, take = 200) {
+    return db.workspace.findMany({
+        where: {
+            type: "ORDER",
+            spawnedFromId: null,
+            orderWorkspace: { parentWorkspaceId: null },
+        },
+        take,
+        orderBy: { updatedAt: "desc" },
+    });
+}
+export async function collectTradeGraph(db, root) {
+    const orderIdSet = new Set();
+    // A DIRECT_PO order is its own root, so it also counts as the trade's order.
+    if (root.type === "ORDER")
+        orderIdSet.add(root.id);
+    const spawnedOrders = await db.workspace.findMany({
+        where: { spawnedFromId: root.id, type: "ORDER" },
+        select: { id: true },
+    });
+    for (const o of spawnedOrders)
+        orderIdSet.add(o.id);
+    if (root.type === "MIXED_CONTAINER") {
+        const links = await db.mcOrderLink.findMany({
+            where: { smartContainerId: root.id },
+            select: { supplierOrderId: true },
+        });
+        for (const l of links)
+            orderIdSet.add(l.supplierOrderId);
+    }
+    if (root.type === "BULK_CONTAINER") {
+        const links = await db.bcOrderLink.findMany({
+            where: { workspaceId: root.id },
+            select: { supplierOrderId: true },
+        });
+        for (const l of links)
+            orderIdSet.add(l.supplierOrderId);
+    }
+    if (root.type === "RFQ") {
+        const details = await db.rfqDetails.findUnique({
+            where: { workspaceId: root.id },
+            select: { linkedCommoditybidId: true },
+        });
+        if (details?.linkedCommoditybidId) {
+            const cbOrders = await db.workspace.findMany({
+                where: { spawnedFromId: details.linkedCommoditybidId, type: "ORDER" },
+                select: { id: true },
+            });
+            for (const o of cbOrders)
+                orderIdSet.add(o.id);
+        }
+    }
+    const orderIds = [...orderIdSet];
+    const shipments = orderIds.length
+        ? await db.workspace.findMany({
+            where: { spawnedFromId: { in: orderIds }, type: "SHIPMENT" },
+            select: { id: true },
+        })
+        : [];
+    const shipmentIds = shipments.map((s) => s.id);
+    const allWorkspaceIds = [root.id, ...orderIds, ...shipmentIds];
+    if (root.type === "RFQ") {
+        const details = await db.rfqDetails.findUnique({
+            where: { workspaceId: root.id },
+            select: { linkedCommoditybidId: true },
+        });
+        if (details?.linkedCommoditybidId) {
+            allWorkspaceIds.push(details.linkedCommoditybidId);
+        }
+    }
+    return {
+        root,
+        rootId: root.id,
+        orderIds,
+        shipmentIds,
+        allWorkspaceIds: [...new Set(allWorkspaceIds)],
+    };
+}
+export function tradeRefFromRoot(root) {
+    const ref = root.externalRef;
+    if (ref.startsWith("RFQ-"))
+        return ref.replace(/^RFQ-/, "TRADE-");
+    if (ref.startsWith("ORD-"))
+        return ref.replace(/^ORD-/, "TRADE-");
+    if (ref.startsWith("TRADE-"))
+        return ref;
+    return `TRADE-${ref}`;
+}
+//# sourceMappingURL=trade.resolver.js.map

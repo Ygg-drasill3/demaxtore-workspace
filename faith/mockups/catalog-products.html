@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1440" />
+  <title>Product List — DeMaxtore</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=Fraunces:wght@600&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter Tight', sans-serif; background: #fafafa; color: #18181b; }
+    .layout { display: flex; min-height: 100vh; }
+    .sidebar { width: 244px; background: #0f172a; color: #e2e8f0; padding: 24px 16px; }
+    .sidebar .logo { font-family: Fraunces, serif; font-size: 20px; font-weight: 600; margin-bottom: 32px; }
+    .sidebar nav div { padding: 8px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-top: 16px; }
+    .sidebar nav a { display: block; padding: 10px 12px; border-radius: 8px; font-size: 14px; color: #cbd5e1; text-decoration: none; }
+    .sidebar nav a.active { background: #1e3a5f; color: #fff; }
+    .main { flex: 1; padding: 32px; max-width: 1196px; }
+    .eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #71717a; }
+    h1 { font-family: Fraunces, serif; font-size: 36px; font-weight: 600; margin: 4px 0 8px; }
+    .sub { font-size: 14px; color: #71717a; margin-bottom: 24px; }
+    .toolbar { display: flex; gap: 12px; margin-bottom: 20px; align-items: center; }
+    .search { flex: 1; height: 40px; border: 1px solid #e4e4e7; border-radius: 8px; padding: 0 12px; font-size: 14px; }
+    .grid-toggle { font-size: 13px; color: #71717a; }
+    .products { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .card { background: #fff; border: 1px solid #e4e4e7; border-radius: 12px; padding: 20px; }
+    .badge { display: inline-block; font-size: 10px; text-transform: uppercase; background: #eff6ff; color: #1e3a8a; padding: 3px 8px; border-radius: 4px; margin-bottom: 8px; }
+    .sample { float: right; font-size: 11px; color: #16a34a; font-weight: 500; }
+    .card h3 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+    .sku { font-size: 12px; color: #a1a1aa; margin-bottom: 12px; }
+    .meta { font-size: 13px; color: #52525b; line-height: 1.6; margin-bottom: 12px; }
+    .insight { font-size: 12px; color: #71717a; background: #f4f4f5; padding: 10px; border-radius: 8px; margin-bottom: 12px; line-height: 1.5; }
+    .price { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .price-note { font-size: 11px; color: #a1a1aa; margin-bottom: 16px; }
+    .actions { display: flex; gap: 8px; }
+    .btn { flex: 1; height: 36px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; }
+    .btn-secondary { background: #fff; border: 1px solid #e4e4e7; color: #18181b; }
+    .btn-primary { background: #1e3a8a; color: #fff; }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="logo">DeMaxtore</div>
+      <nav>
+        <div>Sourcing</div>
+        <a class="active" href="#">Mixed Container</a>
+      </nav>
+    </aside>
+    <main class="main">
+      <span class="eyebrow">Buyer · Catalog · Grains & Rice</span>
+      <h1>Product List</h1>
+      <p class="sub">48 products · Supplier identity hidden · Prices are indicative only</p>
+      <div class="toolbar">
+        <input class="search" placeholder="Search products…" value="" />
+        <span class="grid-toggle">Grid | List</span>
+      </div>
+      <div class="products">
+        <div class="card">
+          <span class="badge">Grains · Rice</span><span class="sample">Sample ✓</span>
+          <h3>Premium Basmati Rice 5kg</h3>
+          <div class="sku">MC-SKU-0042</div>
+          <div class="meta">50 units × 5kg / pallet<br/>MOQ: 2 pallets · 40 units/pallet · ~800 kg</div>
+          <div class="insight">EU retail demand up 12% in Q1. Supply stable.</div>
+          <div class="price">$1,180 – $1,340 / pallet</div>
+          <div class="price-note">Recent trades · May 2026 · Indicative price</div>
+          <div class="actions">
+            <button class="btn btn-secondary">Sample</button>
+            <button class="btn btn-primary">Add to Container →</button>
+          </div>
+        </div>
+        <div class="card">
+          <span class="badge">Grains · Rice</span><span class="sample">Sample ✓</span>
+          <h3>Jasmine Rice 1kg</h3>
+          <div class="sku">MC-SKU-0043</div>
+          <div class="meta">80 units × 1kg / pallet<br/>MOQ: 2 pallets · 80 units/pallet · ~640 kg</div>
+          <div class="insight">Southeast Asia origin. EU imports rising.</div>
+          <div class="price">$920 – $1,050 / pallet</div>
+          <div class="price-note">Recent trades · May 2026 · Indicative price</div>
+          <div class="actions">
+            <button class="btn btn-secondary">Sample</button>
+            <button class="btn btn-primary">Add to Container →</button>
+          </div>
+        </div>
+        <div class="card">
+          <span class="badge">Grains · Pasta</span><span class="sample">Sample ✓</span>
+          <h3>Penne Rigate 500g</h3>
+          <div class="sku">MC-SKU-0051</div>
+          <div class="meta">60 units × 500g / pallet<br/>MOQ: 1 pallet · 60 units/pallet · ~480 kg</div>
+          <div class="insight">Strong European distributor demand. Prices stable.</div>
+          <div class="price">$680 – $760 / pallet</div>
+          <div class="price-note">Recent trades · Apr 2026 · Indicative price</div>
+          <div class="actions">
+            <button class="btn btn-secondary">Sample</button>
+            <button class="btn btn-primary">Add to Container →</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

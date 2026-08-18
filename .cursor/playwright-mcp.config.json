@@ -1,0 +1,10 @@
+{
+  "browser": {
+    "browserName": "chromium",
+    "launchOptions": {
+      "chromiumSandbox": false,
+      "args": ["--no-sandbox", "--disable-setuid-sandbox"]
+    }
+  },
+  "outputDir": "qa-customer-acceptance/release-certification/playwright-mcp-output"
+}

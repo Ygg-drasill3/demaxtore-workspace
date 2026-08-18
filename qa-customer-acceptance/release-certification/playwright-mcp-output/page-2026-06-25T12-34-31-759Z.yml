@@ -1,0 +1,26 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - link "D DeMaxtore" [ref=e6] [cursor=pointer]:
+      - /url: /welcome
+      - generic [ref=e7]: D
+      - generic [ref=e8]: DeMaxtore
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - generic [ref=e11]: B2B Sourcing & Import Operating Platform
+        - heading "Run global sourcing like an operating system — not an inbox." [level=1] [ref=e12]
+        - paragraph [ref=e13]: RFQs, reverse auctions, mixed containers, purchase orders, freight, and shipment tracking — one workspace, one timeline, one state machine.
+      - list [ref=e14]:
+        - listitem [ref=e15]:
+          - text: Structured sourcing
+          - generic [ref=e16]: — RFQ, CommodityBid, SmartContainer, and BulkContainer programmes with supplier governance built in.
+        - listitem [ref=e17]:
+          - text: Award to execution
+          - generic [ref=e18]: — PO issuance, order workspaces, FreightIQ sailings, and shipment visibility without spreadsheet handoffs.
+        - listitem [ref=e19]:
+          - text: Operations control
+          - generic [ref=e20]: — Control Tower alerts for late acknowledgements, ETA drift, and document gaps — before customers escalate.
+    - generic [ref=e21]:
+      - text: © 2026 DeMaxtore ·
+      - link "Product overview" [ref=e22] [cursor=pointer]:
+        - /url: /welcome
+  - main [ref=e23]

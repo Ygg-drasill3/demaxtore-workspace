@@ -1,0 +1,443 @@
+{
+  "generatedAt": "2026-06-25T11:55:50.239Z",
+  "base": "https://workspace.demaxtore.com",
+  "findings": [
+    {
+      "id": "QA-001",
+      "severity": "Low",
+      "role": "buyer",
+      "module": "RFQ",
+      "url": "/buyer/rfq/new",
+      "what": "Create form CTA not obvious",
+      "actual": "no submit button found by role",
+      "expected": "Clear CTA",
+      "customerImpact": "Confusion"
+    },
+    {
+      "id": "QA-002",
+      "severity": "Medium",
+      "role": "buyer",
+      "module": "notifications",
+      "url": "/notifications",
+      "what": "Untranslated i18n key visible",
+      "actual": "order.production.completed",
+      "expected": "Human text",
+      "customerImpact": "Unpolished"
+    },
+    {
+      "id": "QA-003",
+      "severity": "High",
+      "role": "admin",
+      "module": "CommodityBid",
+      "url": "/admin/commoditybid",
+      "what": "No CommodityBid iframe",
+      "actual": "missing",
+      "expected": "embed iframe",
+      "customerImpact": "Auctions unavailable"
+    }
+  ],
+  "perf": [
+    {
+      "role": "buyer",
+      "route": "/buyer/dashboard",
+      "ms": 3137
+    },
+    {
+      "role": "buyer",
+      "route": "/buyer/rfq",
+      "ms": 3094
+    },
+    {
+      "role": "buyer",
+      "route": "/buyer/rfq/new",
+      "ms": 3032
+    },
+    {
+      "role": "buyer",
+      "route": "/buyer/commoditybid",
+      "ms": 3033
+    },
+    {
+      "role": "buyer",
+      "route": "/buyer/freightiq",
+      "ms": 3077
+    },
+    {
+      "role": "buyer",
+      "route": "/buyer/orders",
+      "ms": 3088
+    },
+    {
+      "role": "buyer",
+      "route": "/buyer/shipments",
+      "ms": 3094
+    },
+    {
+      "role": "buyer",
+      "route": "/buyer/purchase-orders",
+      "ms": 3037
+    },
+    {
+      "role": "buyer",
+      "route": "/buyer/trade-documents",
+      "ms": 3031
+    },
+    {
+      "role": "buyer",
+      "route": "/buyer/messages",
+      "ms": 3036
+    },
+    {
+      "role": "buyer",
+      "route": "/notifications",
+      "ms": 3033
+    },
+    {
+      "role": "buyer",
+      "route": "/documents",
+      "ms": 3076
+    },
+    {
+      "role": "buyer",
+      "route": "/buyer/control-tower",
+      "ms": 3033
+    },
+    {
+      "role": "buyer",
+      "route": "/buyer/freightiq/messages",
+      "ms": 3061
+    },
+    {
+      "role": "supplier",
+      "route": "/supplier/dashboard",
+      "ms": 3081
+    },
+    {
+      "role": "supplier",
+      "route": "/supplier/rfq",
+      "ms": 3058
+    },
+    {
+      "role": "supplier",
+      "route": "/supplier/orders",
+      "ms": 3043
+    },
+    {
+      "role": "supplier",
+      "route": "/supplier/shipments",
+      "ms": 3067
+    },
+    {
+      "role": "supplier",
+      "route": "/supplier/purchase-orders",
+      "ms": 3041
+    },
+    {
+      "role": "supplier",
+      "route": "/supplier/messages",
+      "ms": 3094
+    },
+    {
+      "role": "supplier",
+      "route": "/supplier/trade-documents",
+      "ms": 3035
+    },
+    {
+      "role": "supplier",
+      "route": "/supplier/freightiq",
+      "ms": 3046
+    },
+    {
+      "role": "supplier",
+      "route": "/supplier/commoditybid/panel",
+      "ms": 3086
+    },
+    {
+      "role": "admin",
+      "route": "/admin/dashboard",
+      "ms": 3098
+    },
+    {
+      "role": "admin",
+      "route": "/admin/rfq",
+      "ms": 3033
+    },
+    {
+      "role": "admin",
+      "route": "/admin/orders",
+      "ms": 3096
+    },
+    {
+      "role": "admin",
+      "route": "/admin/shipments",
+      "ms": 3044
+    },
+    {
+      "role": "admin",
+      "route": "/admin/freightiq",
+      "ms": 3033
+    },
+    {
+      "role": "admin",
+      "route": "/admin/commoditybid",
+      "ms": 3097
+    },
+    {
+      "role": "admin",
+      "route": "/operations",
+      "ms": 3066
+    },
+    {
+      "role": "admin",
+      "route": "/admin/conversations",
+      "ms": 3056
+    },
+    {
+      "role": "admin",
+      "route": "/operations/freight-intake",
+      "ms": 3093
+    },
+    {
+      "role": "admin",
+      "route": "/notifications",
+      "ms": 3035
+    }
+  ],
+  "allConsole": [
+    {
+      "role": "buyer",
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "url": "https://workspace.demaxtore.com/login"
+    },
+    {
+      "role": "supplier",
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "url": "https://workspace.demaxtore.com/login"
+    },
+    {
+      "role": "admin",
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "url": "https://workspace.demaxtore.com/login"
+    },
+    {
+      "role": "admin",
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+      "url": "https://workspace.demaxtore.com/admin/freightiq"
+    },
+    {
+      "role": "admin",
+      "type": "warning",
+      "text": "The width(-1) and height(-1) of chart should be greater than 0,\n       please check the style of container, or the props width(100%) and height(100%),\n       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the\n       height and width.",
+      "url": "https://workspace.demaxtore.com/admin/freightiq"
+    },
+    {
+      "role": "admin",
+      "type": "warning",
+      "text": "The width(-1) and height(-1) of chart should be greater than 0,\n       please check the style of container, or the props width(100%) and height(100%),\n       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the\n       height and width.",
+      "url": "https://workspace.demaxtore.com/admin/freightiq"
+    },
+    {
+      "role": "admin",
+      "type": "warning",
+      "text": "The width(-1) and height(-1) of chart should be greater than 0,\n       please check the style of container, or the props width(100%) and height(100%),\n       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the\n       height and width.",
+      "url": "https://workspace.demaxtore.com/admin/freightiq"
+    },
+    {
+      "role": "admin",
+      "type": "warning",
+      "text": "The width(-1) and height(-1) of chart should be greater than 0,\n       please check the style of container, or the props width(100%) and height(100%),\n       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the\n       height and width.",
+      "url": "https://workspace.demaxtore.com/admin/freightiq"
+    },
+    {
+      "role": "admin",
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 ()",
+      "url": "https://workspace.demaxtore.com/admin/freightiq"
+    },
+    {
+      "role": "admin",
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 ()",
+      "url": "https://workspace.demaxtore.com/admin/freightiq"
+    }
+  ],
+  "allNetwork": [
+    {
+      "role": "buyer",
+      "status": 401,
+      "url": "https://workspace.demaxtore.com/api/auth/refresh",
+      "method": "POST"
+    },
+    {
+      "role": "supplier",
+      "status": 401,
+      "url": "https://workspace.demaxtore.com/api/auth/refresh",
+      "method": "POST"
+    },
+    {
+      "role": "admin",
+      "status": 401,
+      "url": "https://workspace.demaxtore.com/api/auth/refresh",
+      "method": "POST"
+    },
+    {
+      "role": "admin",
+      "status": 500,
+      "url": "https://freightiq.demaxtore.com/api/rfqs",
+      "method": "GET"
+    }
+  ],
+  "screenshots": [
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/buyer/01-after-login.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/buyer/dashboard.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/buyer/rfq-list.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/buyer/rfq-create.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/buyer/commoditybid.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/buyer/freightiq.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/buyer/orders.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/buyer/shipments.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/buyer/purchase-orders.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/buyer/trade-documents.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/buyer/messages.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/buyer/notifications.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/buyer/document-center.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/buyer/control-tower.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/buyer/freightiq-messages.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/buyer/auth-buyer-tries-admin.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/buyer/auth-refresh-test.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/buyer/auth-new-tab.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/buyer/mobile-dashboard.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/supplier/01-after-login.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/supplier/dashboard.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/supplier/rfq-list.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/supplier/orders.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/supplier/shipments.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/supplier/purchase-orders.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/supplier/messages.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/supplier/trade-documents.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/supplier/freightiq.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/supplier/commoditybid.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/supplier/auth-supplier-tries-buyer.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/supplier/mobile-dashboard.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/admin/01-after-login.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/admin/dashboard.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/admin/rfq-list.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/admin/orders.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/admin/shipments.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/admin/freightiq.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/admin/commoditybid.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/admin/operations.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/admin/conversations.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/admin/freight-ops.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/admin/notifications.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/admin/mobile-dashboard.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/qa-customer-acceptance/screenshots/buyer/auth-wrong-password.png"
+  ],
+  "apiChecks": [
+    {
+      "url": "/api/auth/me",
+      "status": 401,
+      "expected": 401
+    },
+    {
+      "url": "/api/healthz",
+      "status": 200,
+      "expected": 200
+    }
+  ],
+  "journey": [
+    {
+      "test": "RFQ detail",
+      "url": "https://workspace.demaxtore.com/workspace/rfq/d0ce94c1-5d75-4d28-8d36-2e9de9b3d926",
+      "ok": true
+    },
+    {
+      "test": "Order workspace",
+      "url": "https://workspace.demaxtore.com/workspace/order/dcf1476e-b81e-4af2-9875-5213e2e064b4",
+      "freightSection": true,
+      "paymentMentions": false
+    },
+    {
+      "test": "Security localStorage",
+      "storage": {
+        "hasAuth": true,
+        "authLen": 515,
+        "hasTokenInUrl": false
+      }
+    },
+    {
+      "test": "Logout",
+      "url": "https://workspace.demaxtore.com/buyer/dashboard",
+      "loggedOut": false
+    },
+    {
+      "test": "Admin FreightIQ SSO",
+      "sso": {
+        "status": 200,
+        "hasEmbed": true
+      }
+    }
+  ],
+  "journeyNetwork": [
+    {
+      "s": 401,
+      "u": "https://workspace.demaxtore.com/api/auth/refresh"
+    }
+  ],
+  "journeyConsole": [
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+  ],
+  "deepTests": [
+    {
+      "test": "Empty login fields",
+      "errors": true,
+      "url": "https://workspace.demaxtore.com/login"
+    },
+    {
+      "test": "Wrong password",
+      "hasError": true,
+      "onLogin": true
+    },
+    {
+      "test": "Responsive tablet-768",
+      "horizontalOverflow": false
+    },
+    {
+      "test": "Responsive laptop-1280",
+      "horizontalOverflow": false
+    },
+    {
+      "test": "Responsive desktop-1440",
+      "horizontalOverflow": false
+    },
+    {
+      "test": "Responsive mobile-390",
+      "horizontalOverflow": false
+    },
+    {
+      "test": "Documents upload UI",
+      "uploadControls": 0
+    },
+    {
+      "test": "Security storage",
+      "hasAccessToken": true,
+      "hasRefresh": false,
+      "keys": [
+        "dmx.auth"
+      ]
+    },
+    {
+      "test": "Supplier tries buyer",
+      "url": "https://workspace.demaxtore.com/supplier/dashboard",
+      "blocked": true
+    },
+    {
+      "test": "Admin CB panel embed",
+      "iframeCount": 1
+    }
+  ]
+}

@@ -1,0 +1,333 @@
+{
+  "sprint": "16",
+  "generatedAt": "2026-06-15T11:36:32.139Z",
+  "phases": {
+    "phase6_acl_security": {
+      "phase": "phase6_acl_security",
+      "verdict": "PASS",
+      "checks": [
+        {
+          "label": "buyer2 cannot access buyer1 trade workspace",
+          "path": "/api/trades/da0c85b2-26a4-4dc1-af46-19dc259add44/workspace",
+          "status": 403,
+          "blocked": true,
+          "pass": true
+        },
+        {
+          "label": "buyer1 cannot access buyer2 trade workspace",
+          "path": "/api/trades/e3b4468c-3c02-4efc-bb25-3da0bae76aca/workspace",
+          "status": 403,
+          "blocked": true,
+          "pass": true
+        },
+        {
+          "label": "buyer1 can access own trade workspace",
+          "path": "/api/trades/da0c85b2-26a4-4dc1-af46-19dc259add44/workspace",
+          "status": 200,
+          "blocked": false,
+          "pass": true
+        },
+        {
+          "label": "buyer2 cannot access buyer1 documents",
+          "path": "/api/trades/da0c85b2-26a4-4dc1-af46-19dc259add44/documents",
+          "status": 403,
+          "blocked": true,
+          "pass": true
+        },
+        {
+          "label": "buyer2 cannot access buyer1 exceptions",
+          "path": "/api/trades/da0c85b2-26a4-4dc1-af46-19dc259add44/exceptions",
+          "status": 403,
+          "blocked": true,
+          "pass": true
+        },
+        {
+          "label": "unauthenticated blocked from exceptions",
+          "path": "/api/exceptions",
+          "status": 401,
+          "blocked": true,
+          "pass": true
+        },
+        {
+          "label": "supplier cannot access admin system health",
+          "path": "/api/system/health",
+          "status": 403,
+          "blocked": true,
+          "pass": true
+        },
+        {
+          "label": "admin can access system health",
+          "path": "/api/system/health",
+          "status": 200,
+          "blocked": false,
+          "pass": true
+        },
+        {
+          "label": "supplier document center scoped (200 or empty)",
+          "path": "/api/documents",
+          "status": 200,
+          "blocked": false,
+          "pass": true
+        }
+      ],
+      "failed": [],
+      "buyer1Trade": "da0c85b2-26a4-4dc1-af46-19dc259add44",
+      "buyer2Trade": "e3b4468c-3c02-4efc-bb25-3da0bae76aca"
+    },
+    "phase7_data_integrity": {
+      "phase": "phase7_data_integrity",
+      "verdict": "PASS",
+      "issues": [],
+      "counts": {
+        "workspaces": 144,
+        "rfqs": 68,
+        "orders": 23,
+        "shipments": 13,
+        "tradeDocuments": 8,
+        "tradeExceptions": 94,
+        "openExceptions": 94,
+        "timelineEvents": 1872,
+        "controlTowerAlerts": 39
+      },
+      "staleRunningJobs": 0,
+      "openAlertsNoWorkspace": 0
+    },
+    "phase8_performance": {
+      "phase": "phase8_performance",
+      "verdict": "PASS",
+      "tradeCountProxy": 1,
+      "samplesPerEndpoint": 8,
+      "target": "p95 <= 1000ms",
+      "results": [
+        {
+          "path": "/api/exceptions?limit=25",
+          "samples": 8,
+          "p50": 218,
+          "p95": 241,
+          "max": 241,
+          "ok": true,
+          "status": 200,
+          "under1s": 1
+        },
+        {
+          "path": "/api/documents?limit=25",
+          "samples": 8,
+          "p50": 13,
+          "p95": 15,
+          "max": 15,
+          "ok": true,
+          "status": 200,
+          "under1s": 1
+        },
+        {
+          "path": "/api/shipments/portfolio?limit=25",
+          "samples": 8,
+          "p50": 12,
+          "p95": 16,
+          "max": 16,
+          "ok": true,
+          "status": 200,
+          "under1s": 1
+        },
+        {
+          "path": "/api/trades/da0c85b2-26a4-4dc1-af46-19dc259add44/workspace",
+          "samples": 8,
+          "p50": 13,
+          "p95": 18,
+          "max": 18,
+          "ok": true,
+          "status": 200,
+          "under1s": 1
+        },
+        {
+          "path": "/api/trades/da0c85b2-26a4-4dc1-af46-19dc259add44/documents",
+          "samples": 8,
+          "p50": 18,
+          "p95": 22,
+          "max": 22,
+          "ok": true,
+          "status": 200,
+          "under1s": 1
+        },
+        {
+          "path": "/api/trades/da0c85b2-26a4-4dc1-af46-19dc259add44/exceptions",
+          "samples": 8,
+          "p50": 241,
+          "p95": 551,
+          "max": 551,
+          "ok": true,
+          "status": 200,
+          "under1s": 1
+        },
+        {
+          "path": "/api/exceptions?limit=25&search=TRADE",
+          "samples": 8,
+          "p50": 227,
+          "p95": 310,
+          "max": 310,
+          "ok": true,
+          "status": 200,
+          "under1s": 1
+        },
+        {
+          "path": "/api/documents?limit=25&status=Missing",
+          "samples": 8,
+          "p50": 11,
+          "p95": 13,
+          "max": 13,
+          "ok": true,
+          "status": 200,
+          "under1s": 1
+        },
+        {
+          "path": "/api/shipments/portfolio?limit=25&status=At%20Risk",
+          "samples": 8,
+          "p50": 10,
+          "p95": 24,
+          "max": 24,
+          "ok": true,
+          "status": 200,
+          "under1s": 1
+        }
+      ],
+      "p95Under1sRate": 1,
+      "slowEndpoints": []
+    },
+    "phase10_observability": {
+      "phase": "phase10_observability",
+      "verdict": "PASS",
+      "checks": {
+        "healthz": {
+          "ok": true,
+          "ms": 2,
+          "status": 200
+        },
+        "systemHealth": {
+          "ok": true,
+          "ms": 17,
+          "status": 200
+        },
+        "systemInsights": {
+          "ok": true,
+          "ms": 44,
+          "status": 200
+        },
+        "systemJobs": {
+          "ok": true,
+          "ms": 13,
+          "status": 200
+        },
+        "failedJobs": {
+          "ok": true,
+          "ms": 3,
+          "status": 200
+        },
+        "controlTowerMetrics": {
+          "ok": true,
+          "ms": 10,
+          "status": 200
+        }
+      },
+      "healthOverall": "degraded",
+      "componentCount": 8,
+      "degradedComponents": [
+        "scheduler",
+        "jobs"
+      ],
+      "recentFailedJobs": [
+        {
+          "jobName": "control_tower_alert_scan",
+          "failures": 7,
+          "lastError": "Marked FAILED by stale RUNNING reconciler (worker crash, hot reload, or lock timeout)",
+          "lastFailedAt": "2026-06-10T10:14:11.186Z",
+          "longRunning": true
+        },
+        {
+          "jobName": "test_reconcile_job",
+          "failures": 1,
+          "lastError": "Marked FAILED by stale RUNNING reconciler (worker crash, hot reload, or lock timeout)",
+          "lastFailedAt": "2026-06-10T13:44:15.132Z",
+          "longRunning": true
+        }
+      ],
+      "dashboardRoute": "/operations/system"
+    },
+    "test_coverage_inventory": {
+      "phase": "test_coverage_inventory",
+      "e2eSpecCount": 41,
+      "unitBackendHardening": 3,
+      "unitContracts": 14,
+      "modules": {
+        "auth": [
+          "01-auth.spec.ts"
+        ],
+        "rfq": [
+          "02-rfq-flow.spec.ts",
+          "29-procurement-strategy.spec.ts",
+          "31-mixed-container-procurement-offer.spec.ts",
+          "36-bulk-procurement-offer.spec.ts"
+        ],
+        "commoditybid": [
+          "04-commoditybid-flow.spec.ts",
+          "24-commoditybid-auction-engine.spec.ts"
+        ],
+        "smartContainer": [
+          "30-mixed-container-builder.spec.ts",
+          "31-mixed-container-procurement-offer.spec.ts",
+          "32-mixed-container-allocation-payment.spec.ts",
+          "33-smartcontainer-execution-bridge.spec.ts"
+        ],
+        "bulkContainer": [
+          "34-bulk-container-builder.spec.ts",
+          "36-bulk-procurement-offer.spec.ts",
+          "37-bulk-allocation-payment.spec.ts",
+          "38-bulkcontainer-execution-bridge.spec.ts"
+        ],
+        "tradeWorkspace": [
+          "26-trade-workspace.spec.ts"
+        ],
+        "shipmentPortfolio": [
+          "06-shipment-flow.spec.ts",
+          "27-shipment-portfolio.spec.ts"
+        ],
+        "documentCenter": [
+          "12-trade-documents.spec.ts",
+          "28-document-center.spec.ts"
+        ],
+        "exceptionHub": [
+          "29-exception-hub.spec.ts"
+        ],
+        "controlTower": [
+          "08-control-tower.spec.ts"
+        ],
+        "hardening": [
+          "03-realtime-and-isolation.spec.ts",
+          "07-hardening.spec.ts"
+        ],
+        "onboarding": [
+          "15-pilot-readiness.spec.ts",
+          "22-guided-onboarding.spec.ts"
+        ]
+      }
+    }
+  },
+  "sprint9bBaseline": {
+    "pass": 7,
+    "passWithRisk": 2,
+    "fail": 0
+  },
+  "scores": {
+    "security": 100,
+    "performance": 100,
+    "reliability": 100,
+    "observability": 100,
+    "platform": 99,
+    "productionReadiness": 100
+  },
+  "summary": {
+    "pass": 4,
+    "passWithRisk": 0,
+    "fail": 0,
+    "goNoGo": "GO"
+  }
+}

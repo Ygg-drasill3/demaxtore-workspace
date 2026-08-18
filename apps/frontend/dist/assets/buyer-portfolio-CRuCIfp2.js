@@ -1,0 +1,1 @@
+import"./index-k99X1SuW.js";import{p as a}from"./supplier-portfolio-CVc-KmCZ.js";async function i(e={}){const t=await a.shipments(e);return{items:t.items,total:t.total}}async function r(e={}){const t=await a.tradeDocuments(e);return{items:t.items,total:t.total}}export{r as a,i as f};

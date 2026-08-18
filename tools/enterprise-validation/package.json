@@ -1,0 +1,13 @@
+{
+  "name": "@dmx/enterprise-validation",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Sprint 9 — Enterprise validation & scale verification (no app feature changes)",
+  "scripts": {
+    "validate": "node run.mjs",
+    "validate:quick": "EV_QUICK=1 node run.mjs",
+    "reports": "node generate-reports.mjs",
+    "seed:scale": "node scripts/seed-scale-fixtures.mjs"
+  }
+}

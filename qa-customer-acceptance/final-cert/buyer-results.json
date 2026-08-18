@@ -1,0 +1,191 @@
+{
+  "role": "BUYER",
+  "tests": [
+    {
+      "name": "auth-wrong-password",
+      "pass": true
+    },
+    {
+      "name": "auth-login",
+      "pass": true,
+      "url": "https://workspace.demaxtore.com/buyer/control-tower"
+    },
+    {
+      "name": "auth-hard-refresh",
+      "pass": true
+    },
+    {
+      "name": "mod-dashboard",
+      "path": "/buyer/dashboard",
+      "pass": true,
+      "loadMs": 2792,
+      "status": 200
+    },
+    {
+      "name": "mod-rfq-list",
+      "path": "/buyer/rfq",
+      "pass": true,
+      "loadMs": 2392,
+      "status": 200
+    },
+    {
+      "name": "mod-orders-list",
+      "path": "/buyer/orders",
+      "pass": true,
+      "loadMs": 2293,
+      "status": 200
+    },
+    {
+      "name": "mod-shipments",
+      "path": "/buyer/shipments",
+      "pass": true,
+      "loadMs": 2355,
+      "status": 200
+    },
+    {
+      "name": "mod-messages",
+      "path": "/buyer/messages",
+      "pass": true,
+      "loadMs": 2166,
+      "status": 200
+    },
+    {
+      "name": "mod-notifications",
+      "path": "/buyer/notifications",
+      "pass": true,
+      "loadMs": 2477,
+      "status": 200
+    },
+    {
+      "name": "mod-settings",
+      "path": "/buyer/settings",
+      "pass": true,
+      "loadMs": 2208,
+      "status": 200
+    },
+    {
+      "name": "mod-commoditybid",
+      "path": "/buyer/commoditybid",
+      "pass": true,
+      "loadMs": 2248,
+      "status": 200
+    },
+    {
+      "name": "mod-freightiq-embed",
+      "path": "/buyer/freightiq",
+      "pass": true,
+      "loadMs": 2470,
+      "status": 200
+    },
+    {
+      "name": "mod-payments",
+      "path": "/buyer/payments",
+      "pass": true,
+      "loadMs": 2285,
+      "status": 200
+    },
+    {
+      "name": "mod-documents",
+      "path": "/buyer/documents",
+      "pass": true,
+      "loadMs": 2262,
+      "status": 200
+    },
+    {
+      "name": "rbac-admin-users",
+      "path": "/admin/users",
+      "pass": true,
+      "loadMs": 2174,
+      "status": 200
+    },
+    {
+      "name": "idor-random-order",
+      "path": "/workspace/order/00000000-0000-0000-0000-000000000099",
+      "pass": true,
+      "loadMs": 2120,
+      "status": 200
+    },
+    {
+      "name": "responsive-390-dashboard",
+      "path": "/buyer/dashboard",
+      "pass": true,
+      "loadMs": 2242,
+      "status": 200
+    }
+  ],
+  "bugs": [],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)"
+  ],
+  "failedRequests": [
+    {
+      "url": "https://workspace.demaxtore.com/api/auth/refresh",
+      "status": 401
+    },
+    {
+      "url": "https://workspace.demaxtore.com/api/auth/login",
+      "status": 401
+    },
+    {
+      "url": "https://workspace.demaxtore.com/api/auth/refresh",
+      "status": 401
+    },
+    {
+      "url": "https://workspace.demaxtore.com/api/orders/00000000-0000-0000-0000-000000000099",
+      "status": 404
+    },
+    {
+      "url": "https://workspace.demaxtore.com/api/orders/00000000-0000-0000-0000-000000000099/timeline",
+      "status": 404
+    },
+    {
+      "url": "https://workspace.demaxtore.com/api/orders/00000000-0000-0000-0000-000000000099/status-updates",
+      "status": 404
+    },
+    {
+      "url": "https://workspace.demaxtore.com/api/orders/00000000-0000-0000-0000-000000000099/spawned-shipments",
+      "status": 404
+    },
+    {
+      "url": "https://workspace.demaxtore.com/api/freightiq/orders/00000000-0000-0000-0000-000000000099",
+      "status": 403
+    },
+    {
+      "url": "https://workspace.demaxtore.com/api/orders/00000000-0000-0000-0000-000000000099/timeline",
+      "status": 404
+    },
+    {
+      "url": "https://workspace.demaxtore.com/api/orders/00000000-0000-0000-0000-000000000099/status-updates",
+      "status": 404
+    },
+    {
+      "url": "https://workspace.demaxtore.com/api/orders/00000000-0000-0000-0000-000000000099/spawned-shipments",
+      "status": 404
+    }
+  ],
+  "perf": {},
+  "security": {
+    "lsKeys": [
+      "dmx.auth"
+    ],
+    "ssKeys": [],
+    "jwtInLs": 1
+  },
+  "summary": {
+    "total": 17,
+    "passed": 17,
+    "failed": 0,
+    "consoleErrorCount": 11,
+    "failedApiCount": 11
+  }
+}

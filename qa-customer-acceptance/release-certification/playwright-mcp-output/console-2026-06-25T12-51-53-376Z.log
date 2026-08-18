@@ -1,0 +1,48 @@
+[  300057ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ https://workspace.demaxtore.com/api/auth/refresh:0
+[  303270ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ https://workspace.demaxtore.com/api/portfolio/trade-documents?limit=25&offset=0:0
+[  326971ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ https://workspace.demaxtore.com/api/auth/refresh:0
+[  330771ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ https://workspace.demaxtore.com/api/auth/refresh:0
+[  345652ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ https://workspace.demaxtore.com/api/auth/refresh:0
+[  854270ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ https://workspace.demaxtore.com/api/auth/refresh:0
+[  863917ms] [WARNING] The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width. @ https://freightiq.demaxtore.com/static/js/main.bfc8d845.js:1
+[  863919ms] [WARNING] The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width. @ https://freightiq.demaxtore.com/static/js/main.bfc8d845.js:1
+[  863920ms] [WARNING] The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width. @ https://freightiq.demaxtore.com/static/js/main.bfc8d845.js:1
+[  863920ms] [WARNING] The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width. @ https://freightiq.demaxtore.com/static/js/main.bfc8d845.js:1
+[  864096ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://images.pexels.com/photos/2634722/pexels-photo-2634722.jpeg?auto=compress&cs=tinysrgb&w=640&h=480&fit=crop:0
+[  864097ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://images.pexels.com/photos/313016/pexels-photo-313016.jpeg?auto=compress&cs=tinysrgb&w=640&h=480&fit=crop:0
+[  889308ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ https://workspace.demaxtore.com/api/auth/refresh:0
+[  889558ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ https://workspace.demaxtore.com/api/auth/refresh:0
+[  909408ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ https://workspace.demaxtore.com/api/auth/refresh:0
+[ 1283086ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ https://workspace.demaxtore.com/api/auth/refresh:0
+[ 1340739ms] [ERROR] Failed to load resource: net::ERR_INCOMPLETE_CHUNKED_ENCODING @ https://freightiq.demaxtore.com/api/realtime/stream:0
+[ 1342747ms] [ERROR] Failed to load resource: the server responded with a status of 502 (Bad Gateway) @ https://freightiq.demaxtore.com/api/realtime/stream:0
+[ 1359728ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ https://workspace.demaxtore.com/api/auth/refresh:0
+[ 1789338ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ https://workspace.demaxtore.com/api/auth/refresh:0
+[ 1795457ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ https://workspace.demaxtore.com/api/auth/refresh:0
+[ 1801512ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ https://workspace.demaxtore.com/api/auth/refresh:0
+[ 1908049ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ https://workspace.demaxtore.com/api/auth/refresh:0
+[ 4018807ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ https://workspace.demaxtore.com/api/control-tower/alerts?resolved=false&limit=50:0
+[ 4018813ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ https://workspace.demaxtore.com/api/control-tower/shipment-tracking:0
+[ 4018819ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ https://workspace.demaxtore.com/api/scale/workload:0
+[ 4018823ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ https://workspace.demaxtore.com/api/control-tower/ops-dashboard:0
+[ 4018823ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ https://workspace.demaxtore.com/api/scale/pipeline/health:0
+[ 4018830ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ https://workspace.demaxtore.com/api/freightiq/operations/overview:0
+[ 4018833ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ https://workspace.demaxtore.com/api/freightiq/commercial/analytics/insight:0
+[ 4018838ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ https://workspace.demaxtore.com/api/orders?bucket=active&limit=20:0
+[ 4018841ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ https://workspace.demaxtore.com/api/rfq?limit=20:0
+[ 4018847ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ https://workspace.demaxtore.com/api/commoditybid?limit=20:0
+[ 4919202ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ https://workspace.demaxtore.com/api/onboarding/progress:0
+[ 5818773ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ https://workspace.demaxtore.com/api/onboarding/progress:0
+[ 6718947ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ https://workspace.demaxtore.com/api/onboarding/progress:0

@@ -1,0 +1,1 @@
+import{u as i}from"./query-CXNMX7BQ.js";import{p as r}from"./phone-verification.api-c7GF_rF1.js";function o(){return i({queryKey:["phone-verification","me"],queryFn:()=>r.me(),staleTime:3e4})}function t(e="PENDING"){return i({queryKey:["phone-verification","queue",e],queryFn:()=>r.queue({status:e})})}export{o as a,t as u};
