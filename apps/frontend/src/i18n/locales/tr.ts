@@ -3,6 +3,8 @@ import dashboardTr from "./dashboard-tr";
 import launchTr from "./launch-tr";
 import pagesTr from "./pages-tr";
 import workspaceTr from "./workspace-tr";
+import navTr from "./nav-tr";
+import importOpsTr from "./import-ops-tr";
 
 const coreTr: TranslationDict = {
   "common.loading": "Yükleniyor…",
@@ -77,6 +79,18 @@ const coreTr: TranslationDict = {
   "role.SUPPLIER": "Tedarikçi",
   "role.ADMIN": "Admin",
   "role.SALES_CONTROL": "Sales Control",
+  "role.TRUCKER": "Nakliyeci",
+  "role.CUSTOMS_BROKER": "Gümrük müşaviri",
+  "role.ORIGIN_AGENT": "Çıkış acentesi",
+  "role.FORWARDER": "Forwarder",
+  "role.OPS_MANAGER": "Operasyon yöneticisi",
+  "role.LOGISTICS_OPERATOR": "Lojistik operatörü",
+  "role.DOCUMENT_CONTROLLER": "Belge kontrolörü",
+  "ROLE.TRUCKER": "Nakliyeci",
+  "ROLE.CUSTOMS_BROKER": "Gümrük müşaviri",
+  "ROLE.BUYER": "Alıcı",
+  "ROLE.SUPPLIER": "Tedarikçi",
+  "ROLE.ADMIN": "Admin",
 
   "salesControl.eyebrow": "Sales Control Center",
   "salesControl.title": "Kullanıcı hesapları",
@@ -128,6 +142,8 @@ const tr: TranslationDict = {
   ...launchTr,
   ...pagesTr,
   ...workspaceTr,
+  ...navTr,
+  ...importOpsTr,
   ...coreTr,
 };
 

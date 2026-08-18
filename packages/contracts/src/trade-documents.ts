@@ -11,6 +11,7 @@ export const TradeDocumentType = [
   "INSPECTION_REPORT",
   "INSURANCE_CERTIFICATE",
   "EXPORT_DECLARATION",
+  "PROOF_OF_DELIVERY",
   "OTHER",
 ] as const;
 export type TradeDocumentType = (typeof TradeDocumentType)[number];

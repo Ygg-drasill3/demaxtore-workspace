@@ -22,7 +22,15 @@ function initials(name: string): string {
 export function RfqParticipants({ workspaceId }: { workspaceId: string }) {
   const { t } = useT();
   const { data: rfq } = useRfqWorkspace(workspaceId);
-  const participants = ((rfq as { participants?: RfqParticipantDTO[] } | undefined)?.participants) ?? [];
+  const allParticipants = ((rfq as { participants?: RfqParticipantDTO[] } | undefined)?.participants) ?? [];
+  const selectedSupplierUserId =
+    (rfq as { selectedSupplierUserId?: string | null } | undefined)?.selectedSupplierUserId ?? null;
+  // After supplier selection, only show buyer (OWNER) + the awarded supplier.
+  const participants = selectedSupplierUserId
+    ? allParticipants.filter(
+        (p) => p.participantRole === "OWNER" || p.userId === selectedSupplierUserId,
+      )
+    : allParticipants;
   const state = (rfq as { state?: string } | undefined)?.state ?? "";
   const identitiesRevealed = areRfqParticipantIdentitiesRevealed(state);
   const hasMaskedCounterparty = participants.some(

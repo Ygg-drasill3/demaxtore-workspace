@@ -2,15 +2,49 @@ import { Router } from "express";
 import { requireAuth } from "../../middleware/auth.js";
 import { asyncHandler } from "../../middleware/asyncHandler.js";
 import { shipmentController } from "./shipment.controller.js";
+import { tradeLineageController } from "../trade-lineage/trade-lineage.controller.js";
 
 export const shipmentRouter = Router();
 
 shipmentRouter.get("/portfolio", requireAuth, asyncHandler(shipmentController.portfolio));
+shipmentRouter.get("/delayed", requireAuth, asyncHandler(shipmentController.delayedShipments));
+shipmentRouter.get("/upcoming", requireAuth, asyncHandler(shipmentController.upcomingMilestones));
+shipmentRouter.get("/milestones/summary", requireAuth, asyncHandler(shipmentController.milestoneDashboardSummary));
 shipmentRouter.get("/:id/exceptions", requireAuth, shipmentController.shipmentExceptions);
 shipmentRouter.get("/:id/documents", requireAuth, shipmentController.shipmentDocuments);
 shipmentRouter.get("/tracking/config", requireAuth, asyncHandler(shipmentController.trackingConfig));
 
+/** Sprint 31 — lineage write APIs (static paths before /:id) */
+shipmentRouter.post("/line-allocations", requireAuth, asyncHandler(tradeLineageController.upsertAllocation));
+shipmentRouter.post("/trade-links", requireAuth, asyncHandler(tradeLineageController.linkShipment));
+
 shipmentRouter.get("/:id", requireAuth, asyncHandler(shipmentController.get));
+/** Sprint 31 — Shipment → POs / lines / booking / containers */
+shipmentRouter.get("/:id/related-entities", requireAuth, asyncHandler(tradeLineageController.shipmentRelated));
+shipmentRouter.post("/:id/backfill-line-allocations", requireAuth, asyncHandler(tradeLineageController.backfillAllocations));
+shipmentRouter.patch("/:id", requireAuth, asyncHandler(shipmentController.patch));
+shipmentRouter.patch("/:id/status", requireAuth, asyncHandler(shipmentController.patchStatus));
+shipmentRouter.post("/:id/booking", requireAuth, asyncHandler(shipmentController.upsertBooking));
+shipmentRouter.patch("/:id/booking", requireAuth, asyncHandler(shipmentController.upsertBooking));
+shipmentRouter.post("/:id/booking/cancel", requireAuth, asyncHandler(shipmentController.cancelBooking));
+shipmentRouter.post("/:id/booking/transition", requireAuth, asyncHandler(shipmentController.transitionBooking));
+shipmentRouter.get("/:id/containers", requireAuth, asyncHandler(shipmentController.listContainers));
+shipmentRouter.post("/:id/containers", requireAuth, asyncHandler(shipmentController.addContainer));
+shipmentRouter.patch("/:id/containers/:containerId", requireAuth, asyncHandler(shipmentController.patchContainer));
+shipmentRouter.delete("/:id/containers/:containerId", requireAuth, asyncHandler(shipmentController.removeContainer));
+shipmentRouter.get(
+  "/:id/containers/:containerId/related-entities",
+  requireAuth,
+  asyncHandler(tradeLineageController.containerRelated),
+);
+shipmentRouter.get("/:id/milestones", requireAuth, asyncHandler(shipmentController.listMilestones));
+shipmentRouter.post("/:id/milestones", requireAuth, asyncHandler(shipmentController.createMilestone));
+shipmentRouter.patch("/:id/milestones/:milestoneId", requireAuth, asyncHandler(shipmentController.patchMilestone));
+shipmentRouter.post(
+  "/:id/milestones/:milestoneId/complete",
+  requireAuth,
+  asyncHandler(shipmentController.completeMilestone),
+);
 shipmentRouter.get("/:id/timeline", requireAuth, asyncHandler(shipmentController.timeline));
 shipmentRouter.get("/:id/exceptions", requireAuth, asyncHandler(shipmentController.exceptions));
 shipmentRouter.get("/:id/next-actions", requireAuth, asyncHandler(shipmentController.nextActions));

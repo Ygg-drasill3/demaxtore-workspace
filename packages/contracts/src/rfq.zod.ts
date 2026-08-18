@@ -3,6 +3,7 @@
 // Destination: packages/contracts/src/rfq.zod.ts
 // =============================================================================
 import { z } from "zod";
+import { RFQ_STATES } from "./rfq.fsm";
 import { DateTimeInput } from "./datetime-input";
 import { CatalogIntakeDTO } from "./catalog-rfq-intake";
 
@@ -53,18 +54,6 @@ export type CreateRfqDraftInput = z.infer<typeof CreateRfqDraftInput>;
 export const EditRfqDraftInput = CreateRfqDraftInput.partial();
 
 // ── Quotation submission (Sprint 2.7 — Quotation Submission Runtime) ─────────
-export const QuotationLineItemInput = z.object({
-  rfqLineItemId: z
-    .union([z.string().uuid(), z.literal(""), z.null()])
-    .optional()
-    .transform((v) => (v && v !== "" ? v : undefined)),
-  position:      z.number().int().positive(),
-  description:   z.string().min(1).max(500),
-  quantity:      z.number().positive(),
-  unitPrice:     z.number().nonnegative(),
-});
-export type QuotationLineItemInput = z.infer<typeof QuotationLineItemInput>;
-
 const optionalInt = (max: number) =>
   z
     .union([z.number(), z.string(), z.null()])
@@ -76,6 +65,21 @@ const optionalInt = (max: number) =>
       return Math.trunc(n);
     })
     .pipe(z.number().int().positive().max(max).optional());
+
+export const QuotationLineItemInput = z.object({
+  rfqLineItemId: z
+    .union([z.string().uuid(), z.literal(""), z.null()])
+    .optional()
+    .transform((v) => (v && v !== "" ? v : undefined)),
+  position:      z.number().int().positive(),
+  description:   z.string().min(1).max(500),
+  quantity:      z.number().positive(),
+  unitPrice:     z.number().nonnegative(),
+  packing:       z.string().max(200).nullish().transform((v) => (v && String(v).trim() ? String(v).trim() : undefined)),
+  priceUnit:     z.string().max(50).nullish().transform((v) => (v && String(v).trim() ? String(v).trim() : undefined)),
+  moq:           optionalInt(1_000_000),
+});
+export type QuotationLineItemInput = z.infer<typeof QuotationLineItemInput>;
 
 export const SubmitQuotationPayload = z.object({
   currency:     z.union([Currency, z.string()]).transform((c) => {
@@ -105,6 +109,12 @@ export const SubmitQuotationPayload = z.object({
   lineItems:    z.array(QuotationLineItemInput).min(1),
 });
 export type SubmitQuotationPayload = z.infer<typeof SubmitQuotationPayload>;
+
+/** Admin submits or revises a quotation on behalf of an assigned supplier. */
+export const AdminSubmitQuotationPayload = SubmitQuotationPayload.extend({
+  supplierUserId: z.string().uuid(),
+});
+export type AdminSubmitQuotationPayload = z.infer<typeof AdminSubmitQuotationPayload>;
 
 export const ReviseQuotationPayload = SubmitQuotationPayload;
 export type ReviseQuotationPayload = z.infer<typeof ReviseQuotationPayload>;
@@ -151,7 +161,60 @@ export const SelectSupplierPayload = z.object({
   rationale:      z.string().max(2000).optional(),
 });
 export const RevertSelectionPayload = z.object({ reason: z.string().min(3).max(2000) });
+export type RevertSelectionPayload = z.infer<typeof RevertSelectionPayload>;
+/** Admin workflow rollback actions (return to review, unpublish, revert evaluation). */
+export const AdminWorkflowRevertPayload = RevertSelectionPayload;
+export type AdminWorkflowRevertPayload = z.infer<typeof AdminWorkflowRevertPayload>;
+
+export const AdminSetStatePayload = z.object({
+  targetState: z.enum(RFQ_STATES),
+});
+export type AdminSetStatePayload = z.infer<typeof AdminSetStatePayload>;
+
 export const CloseWithoutAwardPayload = z.object({ reason: z.string().min(3).max(2000) });
+
+export const RfqLineAwardStatusSchema = z.enum([
+  "OPEN", "AWARDED", "NO_AWARD", "CANCELLED",
+] as const);
+
+export const AwardLineItemPayload = z.object({
+  rfqLineItemId: z.string().uuid(),
+  quotationId:   z.string().uuid(),
+  rationale:     z.string().max(2000).optional(),
+});
+
+export const RevertLineAwardPayload = z.object({
+  rfqLineItemId: z.string().uuid(),
+  reason:        z.string().min(3).max(2000),
+});
+
+export const MarkLineNoAwardPayload = z.object({
+  rfqLineItemId: z.string().uuid(),
+  reason:        z.string().max(2000).optional(),
+});
+
+export const IssueSupplierPoPayload = z
+  .object({
+    supplierUserId: z.string().uuid(),
+    mode:           z.enum(["auto", "manual"]).default("auto"),
+    poFileUrl:      z.string().url().optional(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.mode === "manual" && !v.poFileUrl) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "PO file is required for manual upload",
+        path: ["poFileUrl"],
+      });
+    }
+  });
+
+export const CloseRfqAwardsPayload = z.object({
+  reason: z.string().min(3).max(2000),
+  /** When true, remaining OPEN lines are marked NO_AWARD before close. */
+  markRemainingNoAward: z.boolean().default(true),
+});
+
 export const RequestProformaPayload = z.object({}).strict();
 export const SubmitProformaPayload = z.object({
   proformaFileUrl: z.string().url(),
@@ -210,10 +273,39 @@ export const RfqLineItemDTO = z.object({
   uom:        z.string(),
   notes:      z.string().nullable(),
   imageUrl:   z.string().nullable().optional(),
+  awardStatus: RfqLineAwardStatusSchema.default("OPEN"),
+  award: z.object({
+    quotationId:    z.string().uuid(),
+    supplierUserId: z.string().uuid(),
+    supplierName:   z.string().optional(),
+    awardedAt:      z.string().datetime(),
+    rationale:      z.string().nullable().optional(),
+    poIssued:       z.boolean().default(false),
+    orderWorkspaceId: z.string().uuid().nullable().optional(),
+  }).nullable().optional(),
+});
+
+export const RfqSupplierProductScopeDTO = z.object({
+  supplierUserId:   z.string().uuid(),
+  supplierName:     z.string().optional(),
+  supplierEmail:    z.string().optional(),
+  rfqLineItemIds:   z.array(z.string().uuid()),
+});
+
+export const RfqSupplierPoSpawnDTO = z.object({
+  id:               z.string().uuid(),
+  supplierUserId:   z.string().uuid(),
+  supplierName:     z.string().optional(),
+  poNumber:         z.string(),
+  orderWorkspaceId: z.string().uuid(),
+  issuedAt:         z.string().datetime(),
+  lineItemIds:      z.array(z.string().uuid()),
 });
 export const RfqDTO = z.object({
   id:                 z.string().uuid(),
   externalRef:        z.string(),
+  /** Public URL slug when set (e.g. rawabifood → /workspace/rfq/rawabifood). */
+  slug:               z.string().nullable().optional(),
   state:              z.string(),
   currency:           Currency.nullable(),
   title:              z.string(),
@@ -231,6 +323,8 @@ export const RfqDTO = z.object({
   lineItems:          z.array(RfqLineItemDTO),
   /** Supplier-only: allowed RFQ line IDs; null/omitted = all lines. */
   allowedQuoteLineItemIds: z.array(z.string().uuid()).nullable().optional(),
+  /** Admin-only: per-supplier product quote scopes. */
+  supplierProductScopes: z.array(RfqSupplierProductScopeDTO).optional(),
   selectedSupplierUserId: z.string().uuid().nullable().optional(),
   poNumber:           z.string().nullable().optional(),
   procurementMethod:  ProcurementMethod.nullable().optional(),
@@ -245,6 +339,7 @@ export type RfqDTO = z.infer<typeof RfqDTO>;
 export const RfqListItem = z.object({
   id:             z.string().uuid(),
   externalRef:    z.string(),
+  slug:           z.string().nullable().optional(),
   title:          z.string(),
   state:          z.string(),
   createdAt:      z.string().datetime(),

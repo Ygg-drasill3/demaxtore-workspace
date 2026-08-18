@@ -8,9 +8,17 @@ import type { ShipmentTrackingDTO } from "@dmx/contracts/shipment-tracking";
 export default function ShipmentTrackingPanel({
   shipmentId,
   defaultContainer,
+  bookingStatus,
+  bookingEta,
+  shipmentRef,
+  shipmentState,
 }: {
   shipmentId: string;
   defaultContainer?: string | null;
+  bookingStatus?: string | null;
+  bookingEta?: string | null;
+  shipmentRef?: string | null;
+  shipmentState?: string | null;
 }) {
   const qc = useQueryClient();
   const { t } = useT();
@@ -46,15 +54,27 @@ export default function ShipmentTrackingPanel({
   const snap = tracking?.latestSnapshot;
   const delayed = snap?.delayFlag && snap.delayFlag !== "NONE";
   const isSimulated = config?.provider === "manual" || tracking?.provider === "MANUAL" || snap?.provider === "MANUAL";
+  const maritimeEta = snap?.eta ?? null;
 
   return (
     <div data-testid="shipment-tracking-panel" className="space-y-4">
+      <dl className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm" data-testid="tracking-context">
+        <Info label="Shipment" value={shipmentRef} testId="tracking-shipment-ref" />
+        <Info label="Shipment state" value={shipmentState?.replace(/_/g, " ")} testId="tracking-shipment-state" />
+        <Info label="Booking status" value={bookingStatus?.replace(/_/g, " ")} testId="tracking-booking-status" />
+        <Info label="Booking ETA" value={bookingEta ? new Date(bookingEta).toLocaleString() : null} testId="tracking-booking-eta" />
+        <Info label="Maritime ETA" value={maritimeEta ? new Date(maritimeEta).toLocaleString() : null} testId="tracking-maritime-eta" />
+        <Info label={t("shipment.containerNumber")} value={defaultContainer || null} testId="tracking-container-context" />
+      </dl>
       {isSimulated && (
         <div
           data-testid="tracking-demo-banner"
           className="text-xs p-3 rounded border border-amber-200 bg-amber-50 text-amber-900"
         >
-          {t("shipment.trackingDemoMode")}
+          {t(
+            "shipment.trackingDemoMode",
+            "Tracking updates here are simulated in the workspace. This is not a live carrier GPS feed.",
+          )}
         </div>
       )}
 
@@ -111,7 +131,7 @@ export default function ShipmentTrackingPanel({
             <Info label="POL" value={snap?.pol} testId="tracking-pol" />
             <Info label="POD" value={snap?.pod} testId="tracking-pod" />
             <Info label="ETD" value={snap?.etd ? new Date(snap.etd).toLocaleString() : null} testId="tracking-etd" />
-            <Info label="ETA" value={snap?.eta ? new Date(snap.eta).toLocaleString() : null} testId="tracking-eta" />
+            <Info label="Maritime ETA" value={snap?.eta ? new Date(snap.eta).toLocaleString() : null} testId="tracking-eta" />
             <Info label={t("shipment.lastSync")} value={snap?.syncedAt ? new Date(snap.syncedAt).toLocaleString() : null} testId="tracking-last-sync" />
             <Info label={t("shipment.provider")} value={isSimulated ? t("shipment.providerSimulated") : (tracking.provider ?? snap?.provider)} testId="tracking-provider" />
           </div>

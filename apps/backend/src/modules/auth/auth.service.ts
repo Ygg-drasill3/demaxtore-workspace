@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "../../db/prisma.js";
 import { env } from "../../config/env.js";
 import { logger } from "../../config/logger.js";
-import { InvalidCredentials, Unauthorized, Validation, TooManyRequests, Conflict } from "../../lib/errors.js";
+import { InvalidCredentials, Unauthorized, Validation, TooManyRequests, Conflict, Forbidden } from "../../lib/errors.js";
 import {
   signAccessToken,
   signRefreshToken,
@@ -13,13 +13,18 @@ import {
   newJti,
 } from "./jwt.js";
 import { checkLock, recordFailure, recordSuccess } from "./bruteforce.js";
-import type { User } from "@prisma/client";
-import type { RegisterInput } from "@dmx/contracts/auth";
+import type { Prisma, User } from "@prisma/client";
+import type { RegisterInput, UpdateProfileInput } from "@dmx/contracts/auth";
+import { resolveBuyerOperatingModel } from "@dmx/contracts/buyer-operating-model";
 import { normalizePhoneInput, PENDING_PHONE_VERIFICATION } from "../phone-verification/phone-verification.policy.js";
 import { notifyAdminsPhoneSubmitted } from "../phone-verification/phone-verification.service.js";
 
+export const AUTH_ORG_SELECT = { name: true, buyerOperatingModel: true } as const;
+
+type AuthOrganisation = { name: string; buyerOperatingModel: string } | null;
+
 /** Public, serialisable user shape (matches @dmx/contracts UserDTO). */
-export function toUserDTO(u: User & { organisation?: { name: string } | null }) {
+export function toUserDTO(u: User & { organisation?: AuthOrganisation }) {
   return {
     id:           u.id,
     email:        u.email,
@@ -34,6 +39,7 @@ export function toUserDTO(u: User & { organisation?: { name: string } | null }) 
       | "PHONE_REJECTED"
       | null,
     createdAt:    u.createdAt.toISOString(),
+    buyerOperatingModel: resolveBuyerOperatingModel(u.organisation?.buyerOperatingModel),
   };
 }
 
@@ -79,7 +85,7 @@ export async function login(
 
   const user = await prisma.user.findUnique({
     where:   { email },
-    include: { organisation: { select: { name: true } } },
+    include: { organisation: { select: AUTH_ORG_SELECT } },
   });
 
   if (!user) {
@@ -132,7 +138,7 @@ export async function register(
         phoneNumber: phone,
         phoneVerificationStatus: PENDING_PHONE_VERIFICATION,
       },
-      include: { organisation: { select: { name: true } } },
+      include: { organisation: { select: AUTH_ORG_SELECT } },
     });
 
     await tx.phoneVerificationRequest.create({
@@ -210,10 +216,42 @@ export async function logout(rawRefreshToken: string | undefined): Promise<void>
 export async function getCurrentUser(userId: string) {
   const user = await prisma.user.findUnique({
     where:   { id: userId },
-    include: { organisation: { select: { name: true } } },
+    include: { organisation: { select: AUTH_ORG_SELECT } },
   });
   if (!user) throw Unauthorized("User not found");
   return toUserDTO(user);
+}
+
+/**
+ * Every field is optional, matching `UpdateProfileInput`. Previously this took a required
+ * `displayName` and called `.trim()` on it unconditionally, so a partial update — which the
+ * contract advertises — threw a TypeError and surfaced as a 500. `phoneNumber` and
+ * `avatarUrl` were validated and then silently dropped; both are now persisted, and an
+ * explicit null clears them.
+ */
+export async function updateProfile(userId: string, input: UpdateProfileInput) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { organisation: { select: AUTH_ORG_SELECT } },
+  });
+  if (!user) throw Unauthorized("User not found");
+  if (!["BUYER", "SUPPLIER"].includes(user.role)) {
+    throw Forbidden("Profile updates are only available for buyer and supplier accounts");
+  }
+
+  const data: Prisma.UserUpdateInput = {};
+  if (input.displayName !== undefined) data.displayName = input.displayName.trim();
+  if (input.phoneNumber !== undefined) data.phoneNumber = input.phoneNumber?.trim() ?? null;
+  if (input.avatarUrl !== undefined) data.avatarUrl = input.avatarUrl ?? null;
+
+  if (Object.keys(data).length === 0) return toUserDTO(user);
+
+  const updated = await prisma.user.update({
+    where: { id: userId },
+    data,
+    include: { organisation: { select: AUTH_ORG_SELECT } },
+  });
+  return toUserDTO(updated);
 }
 
 // ── forgot-password (always 200) ─────────────────────────────────────────────

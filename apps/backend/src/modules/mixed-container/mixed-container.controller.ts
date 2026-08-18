@@ -5,10 +5,13 @@ import {
   AddContainerLineInput,
   UpdateContainerLineInput,
 } from "@dmx/contracts/mixed-container.zod";
+import { SubmitProcurementRequestInput } from "@dmx/contracts/mixed-container-procurement";
+import { McInternalNoteInput, McProcurementInboxFilters } from "@dmx/contracts/mixed-container-procurement";
 import { MixedContainerService } from "./mixed-container.service.js";
 import { MixedContainerProcurementService } from "./mixed-container-procurement.service.js";
 import { MixedContainerAllocationService } from "./mixed-container-allocation.service.js";
 import { MixedContainerExecutionService } from "./mixed-container-execution.service.js";
+import { MixedContainerOrganizationService } from "./mixed-container-organization.service.js";
 import { BuyerRevisionInput, UpdateMcPaymentInput } from "@dmx/contracts/mixed-container.zod";
 import { canAccessMixedContainer } from "./mixed-container.policy.js";
 import { prisma } from "../../db/prisma.js";
@@ -18,6 +21,7 @@ const service = new MixedContainerService(prisma);
 const procurementService = new MixedContainerProcurementService(prisma);
 const allocationService = new MixedContainerAllocationService(prisma);
 const executionService = new MixedContainerExecutionService(prisma);
+const organizationService = new MixedContainerOrganizationService(prisma);
 
 function actor(req: Request) {
   return req.user!;
@@ -31,6 +35,10 @@ export const mixedContainerController = {
   create: async (req: Request, res: Response) => {
     const input = CreateMixedContainerInput.parse(req.body);
     res.status(201).json(await service.create(input, actor(req)));
+  },
+
+  addSiblingContainer: async (req: Request, res: Response) => {
+    res.status(201).json(await service.addSiblingContainer(req.params.id, actor(req)));
   },
 
   get: async (req: Request, res: Response) => {
@@ -59,11 +67,21 @@ export const mixedContainerController = {
   },
 
   requestPricing: async (req: Request, res: Response) => {
-    res.json(await service.requestPricing(req.params.id, actor(req)));
+    const input = SubmitProcurementRequestInput.parse(req.body ?? {});
+    res.json(await service.requestPricing(req.params.id, actor(req), input));
+  },
+
+  procurementRequest: async (req: Request, res: Response) => {
+    res.json(await procurementService.getProcurementRequest(req.params.id, actor(req)));
   },
 
   timeline: async (req: Request, res: Response) => {
     res.json({ items: await service.timeline(req.params.id, actor(req)) });
+  },
+
+  commercialProposal: async (req: Request, res: Response) => {
+    const offerId = typeof req.query.offerId === "string" ? req.query.offerId : undefined;
+    res.json(await procurementService.getCommercialProposal(req.params.id, actor(req), offerId));
   },
 
   getOffer: async (req: Request, res: Response) => {
@@ -94,5 +112,9 @@ export const mixedContainerController = {
 
   execution: async (req: Request, res: Response) => {
     res.json(await executionService.getExecution(req.params.id, actor(req)));
+  },
+
+  organization: async (req: Request, res: Response) => {
+    res.json(await organizationService.getOrganization(req.params.id, actor(req)));
   },
 };

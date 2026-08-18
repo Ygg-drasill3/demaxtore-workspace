@@ -5,8 +5,11 @@ import { catalogController } from "./catalog.controller.js";
 
 export const catalogRouter = Router();
 
+catalogRouter.get("/industries", requireAuth, asyncHandler(catalogController.listIndustries));
 catalogRouter.get("/categories", requireAuth, asyncHandler(catalogController.listCategories));
+catalogRouter.get("/categories/:id/image", asyncHandler(catalogController.getCategoryImage));
 catalogRouter.get("/products", requireAuth, requireRole("BUYER", "ADMIN"), asyncHandler(catalogController.listProducts));
+catalogRouter.get("/products/by-ref/:productRef", requireAuth, requireRole("BUYER", "ADMIN"), asyncHandler(catalogController.getProductByRef));
 catalogRouter.get("/products/:id", requireAuth, requireRole("BUYER", "ADMIN"), asyncHandler(catalogController.getProduct));
 catalogRouter.get("/products/:id/image", asyncHandler(catalogController.getProductImage));
 

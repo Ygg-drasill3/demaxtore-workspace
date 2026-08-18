@@ -1,0 +1,595 @@
+{
+  "startedAt": "2026-08-12T10:56:33.329Z",
+  "stages": [
+    {
+      "id": "AUTH",
+      "title": "Multi-role login",
+      "result": "PASS",
+      "note": "buyer1, admin, broker.smoke, trucker.smoke, supplier1@acme-mfg",
+      "at": "2026-08-12T10:56:33.841Z"
+    },
+    {
+      "id": "S1",
+      "title": "Product Master create",
+      "result": "PASS",
+      "note": "MTR-500-MVP-193842 status=CANDIDATE",
+      "at": "2026-08-12T10:56:33.862Z"
+    },
+    {
+      "id": "S2",
+      "title": "Direct PO create",
+      "result": "PASS",
+      "note": "PO-MSPZ536D-C49699AD source=DIRECT origin=DIRECT_PO",
+      "at": "2026-08-12T10:56:33.909Z"
+    },
+    {
+      "id": "S1b",
+      "title": "PO line snapshot after product rename",
+      "result": "PASS",
+      "at": "2026-08-12T10:56:33.951Z"
+    },
+    {
+      "id": "S3pre",
+      "title": "Advance Direct PO for freight eligibility",
+      "result": "PASS WITH FRICTION",
+      "note": "confirm=403 start=403 complete=403 state=ORDER_CREATED",
+      "at": "2026-08-12T10:56:34.011Z"
+    },
+    {
+      "id": "S3",
+      "title": "Freight Request",
+      "result": "PASS WITH FRICTION",
+      "note": "Buyer create-request failed; Admin created request",
+      "at": "2026-08-12T10:56:34.069Z"
+    },
+    {
+      "id": "S4a",
+      "title": "Freight offers intake (admin)",
+      "result": "PASS",
+      "note": "Manual ops offer loading — acceptable MVP",
+      "at": "2026-08-12T10:56:34.120Z"
+    },
+    {
+      "id": "S4",
+      "title": "Buyer view/compare offers",
+      "result": "PASS",
+      "note": "2 offers",
+      "at": "2026-08-12T10:56:34.133Z"
+    },
+    {
+      "id": "S4b",
+      "title": "Select freight offer",
+      "result": "PASS",
+      "at": "2026-08-12T10:56:34.191Z"
+    },
+    {
+      "id": "S5",
+      "title": "Booking → Shipment",
+      "result": "PASS",
+      "note": "SHP-ORD-DIR-PO-MSPZ536D-C49699AD-C49699AD",
+      "at": "2026-08-12T10:56:34.225Z"
+    },
+    {
+      "id": "S6",
+      "title": "Shipment workspace access",
+      "result": "PASS",
+      "note": "state=SHIPMENT_CREATED",
+      "at": "2026-08-12T10:56:34.291Z"
+    },
+    {
+      "id": "S6b",
+      "title": "Assign container",
+      "result": "PASS WITH FRICTION",
+      "note": "status=400",
+      "at": "2026-08-12T10:56:34.391Z"
+    },
+    {
+      "id": "S6c",
+      "title": "ShipmentLineAllocation",
+      "result": "PASS WITH FRICTION",
+      "note": "Manual /api/shipments/line-allocations after spawn",
+      "at": "2026-08-12T10:56:34.446Z"
+    },
+    {
+      "id": "S9",
+      "title": "Ensure CustomsCase",
+      "result": "PASS",
+      "note": "status=DRAFT readiness=NOT_READY",
+      "at": "2026-08-12T10:56:34.521Z"
+    },
+    {
+      "id": "S10a",
+      "title": "Broker access before assignment",
+      "result": "PASS",
+      "note": "status=403",
+      "at": "2026-08-12T10:56:34.528Z"
+    },
+    {
+      "id": "S10",
+      "title": "Assign customs broker",
+      "result": "PASS",
+      "note": "status=201",
+      "at": "2026-08-12T10:56:34.548Z"
+    },
+    {
+      "id": "S10b",
+      "title": "Broker access after assignment",
+      "result": "PASS",
+      "note": "status=200 sync=200",
+      "at": "2026-08-12T10:56:34.639Z"
+    },
+    {
+      "id": "S10c",
+      "title": "Broker Partner Workspace queue",
+      "result": "PASS",
+      "note": "cases=3 seen=true",
+      "at": "2026-08-12T10:56:34.676Z"
+    },
+    {
+      "id": "S11a",
+      "title": "Broker start review",
+      "result": "PASS",
+      "note": "status=200",
+      "at": "2026-08-12T10:56:34.828Z"
+    },
+    {
+      "id": "S11",
+      "title": "Broker GTIP verify",
+      "result": "PASS",
+      "note": "VERIFIED path",
+      "at": "2026-08-12T10:56:34.946Z"
+    },
+    {
+      "id": "S12",
+      "title": "Broker request document",
+      "result": "PASS",
+      "note": "status=200",
+      "at": "2026-08-12T10:56:35.098Z"
+    },
+    {
+      "id": "S12b",
+      "title": "Upload required trade documents",
+      "result": "PASS",
+      "note": "201,201,201,201",
+      "at": "2026-08-12T10:56:35.236Z"
+    },
+    {
+      "id": "S13",
+      "title": "Pre-arrival readiness after docs+verify",
+      "result": "PASS WITH FRICTION",
+      "note": "\"READY_FOR_BROKER\"",
+      "at": "2026-08-12T10:56:35.297Z"
+    },
+    {
+      "id": "S14",
+      "title": "Duty & Tax calculate",
+      "result": "PASS",
+      "note": "status=PROVISIONAL total=423004.5 est=undefined",
+      "at": "2026-08-12T10:56:35.346Z"
+    },
+    {
+      "id": "S14b",
+      "title": "Buyer views DutyTax estimate",
+      "result": "PASS",
+      "at": "2026-08-12T10:56:35.355Z"
+    },
+    {
+      "id": "S14c",
+      "title": "Trucker DutyTax denied",
+      "result": "PASS",
+      "note": "status=403",
+      "at": "2026-08-12T10:56:35.359Z"
+    },
+    {
+      "id": "S15",
+      "title": "External declaration recorded",
+      "result": "PASS",
+      "note": "prep=200 decl=200 {}",
+      "at": "2026-08-12T10:56:35.473Z"
+    },
+    {
+      "id": "S16",
+      "title": "Customs HOLD + resolve",
+      "result": "PASS",
+      "note": "hold=200 resolve=200",
+      "at": "2026-08-12T10:56:35.577Z"
+    },
+    {
+      "id": "S17",
+      "title": "Customs CLEARED ≠ Delivered",
+      "result": "PASS",
+      "note": "proc=200 pending=200 clear=200 customs=CLEARED shipDelivered=false",
+      "at": "2026-08-12T10:56:35.787Z"
+    },
+    {
+      "id": "S18",
+      "title": "Request inland delivery",
+      "result": "PASS",
+      "note": "REQUESTED",
+      "at": "2026-08-12T10:56:35.824Z"
+    },
+    {
+      "id": "S19a",
+      "title": "Trucker before assign",
+      "result": "PASS",
+      "note": "status=403",
+      "at": "2026-08-12T10:56:35.831Z"
+    },
+    {
+      "id": "S19",
+      "title": "Assign trucker + sync",
+      "result": "PASS",
+      "note": "assign=201 sync=200 status=TRUCKER_ASSIGNED",
+      "at": "2026-08-12T10:56:35.860Z"
+    },
+    {
+      "id": "S19b",
+      "title": "Trucker My Deliveries",
+      "result": "PASS",
+      "note": "count=1",
+      "at": "2026-08-12T10:56:35.875Z"
+    },
+    {
+      "id": "S20a",
+      "title": "Pickup confirm (CLEARED gate)",
+      "result": "PASS",
+      "note": "sched=200 pickup=200 code=PICKED_UP",
+      "at": "2026-08-12T10:56:35.923Z"
+    },
+    {
+      "id": "S20",
+      "title": "Inland lifecycle to DELIVERED",
+      "result": "PASS",
+      "note": "status=DELIVERED",
+      "at": "2026-08-12T10:56:36.018Z"
+    },
+    {
+      "id": "S22",
+      "title": "Landed Cost calculate",
+      "result": "PASS",
+      "note": "CURRENT LANDED COST (MIXED) total=67061 goods=50000",
+      "at": "2026-08-12T10:56:36.069Z"
+    },
+    {
+      "id": "S22b",
+      "title": "Landed Cost idempotent",
+      "result": "PASS",
+      "at": "2026-08-12T10:56:36.088Z"
+    },
+    {
+      "id": "S22c",
+      "title": "Landed Cost version on cost change",
+      "result": "PASS",
+      "note": "v=2 versions=MIXED,SUPERSEDED",
+      "at": "2026-08-12T10:56:36.156Z"
+    },
+    {
+      "id": "S22d",
+      "title": "Supplier/Trucker Landed Cost denied",
+      "result": "PASS",
+      "note": "supplier=403 trucker=403",
+      "at": "2026-08-12T10:56:36.161Z"
+    },
+    {
+      "id": "SEC-TENANT",
+      "title": "Cross-buyer isolation",
+      "result": "PASS",
+      "note": "403,403,403,403,403",
+      "at": "2026-08-12T10:56:36.357Z"
+    },
+    {
+      "id": "SEC-SUPPLIER",
+      "title": "Supplier cannot manage inland/landed cost",
+      "result": "PASS",
+      "note": "Covered by supplier landed-cost 403",
+      "at": "2026-08-12T10:56:36.361Z"
+    }
+  ],
+  "findings": [
+    {
+      "id": "GAP-S3-DIRECT-PO-FREIGHT-GATE",
+      "stage": "FreightIQ",
+      "role": "BUYER",
+      "expected": "Turkey importer with known supplier can request freight without RFQ/CommodityBid",
+      "actual": "Buyer freight requires PRODUCTION_COMPLETED; Direct PO remained ORDER_CREATED; supplier advance failed (403)",
+      "severity": "P1",
+      "customerImpact": "Buyer cannot self-serve FreightIQ after Direct PO; depends on supplier production steps or admin",
+      "operationalWorkaround": "Ops (ADMIN) creates freight request; or run supplier confirm→production→complete before Request Freight",
+      "workaroundOkForPilot": "YES",
+      "recommendedFix": "Document Direct PO freight gate; optionally allow buyer freight earlier for DIRECT_PO / FOB with ops approval",
+      "evidence": {
+        "supplierConfirm": {
+          "error": {
+            "code": "FORBIDDEN",
+            "message": "Forbidden"
+          }
+        },
+        "startProd": {
+          "error": {
+            "code": "FORBIDDEN",
+            "message": "Forbidden"
+          }
+        },
+        "completeProd": {
+          "error": {
+            "code": "FORBIDDEN",
+            "message": "Forbidden"
+          }
+        },
+        "state": "ORDER_CREATED"
+      }
+    },
+    {
+      "id": "GAP-S3-BUYER-FREIGHT-REQUEST",
+      "stage": "FreightIQ",
+      "role": "BUYER",
+      "expected": "Buyer can Request Freight from PO",
+      "actual": "Buyer blocked: {\"orderId\":\"ac00d027-b218-4ae7-be83-86385f0e7114\",\"request\":{\"id\":\"ab474266-af0a-4210-bf0c-250eb4a9601e\",\"orderId\":\"ac00d027-b218-4ae7-be83-86385f0e7114\",\"orderRef\":\"ORD-DIR-PO-MSPZ536D-C49699AD-C49699AD\",\"buyerId\":\"cc51; Admin OK (isOrderEligibleForFreight ADMIN bypass)",
+      "severity": "P1",
+      "customerImpact": "Buyer cannot start freight without DeMaxtore ops unless order reaches PRODUCTION_COMPLETED",
+      "operationalWorkaround": "Ops creates Freight Request OR complete supplier production first",
+      "workaroundOkForPilot": "YES",
+      "recommendedFix": "Surface freight eligibility + next action on Direct PO; consider DIRECT_PO early freight path",
+      "evidence": {
+        "buyerError": {
+          "orderId": "ac00d027-b218-4ae7-be83-86385f0e7114",
+          "request": {
+            "id": "ab474266-af0a-4210-bf0c-250eb4a9601e",
+            "orderId": "ac00d027-b218-4ae7-be83-86385f0e7114",
+            "orderRef": "ORD-DIR-PO-MSPZ536D-C49699AD-C49699AD",
+            "buyerId": "cc519972-e2a3-4daf-b838-32e0641a6c7c",
+            "supplierId": "2e97bf05-e340-41b3-aec5-1ee5cbbf7276",
+            "mode": "OCEAN_FCL",
+            "pol": "CNSHA",
+            "pod": "TRIZM",
+            "cargoDescription": "Industrial Electric Motor 500 PCS — TEST",
+            "containerType": "40HC",
+            "readyDate": null,
+            "status": "REQUESTED",
+            "createdAt": "2026-08-12T10:56:34.043Z",
+            "updatedAt": "2026-08-12T10:56:34.043Z"
+          },
+          "offers": [],
+          "selection": null,
+          "comparisonHints": {
+            "lowestPriceOfferId": null,
+            "fastestTransitOfferId": null,
+            "expiringSoonOfferIds": []
+          },
+          "execution": {
+            "state": "REQUESTED",
+            "freightRequestId": "ab474266-af0a-4210-bf0c-250eb4a9601e",
+            "selectedOfferId": null,
+            "selectedOfferPrice": null,
+            "selectedOfferCurrency": null,
+            "selectedCarrier": null,
+            "shipmentWorkspaceId": null,
+            "shipmentRef": null,
+            "shipmentState": null,
+            "bookingStatus": null,
+            "bookingReference": null,
+            "bookingEtd": null,
+            "bookingEta": null,
+            "maritimeEta": null,
+            "trackingLinked": false,
+            "trackingStatus": null,
+            "containerCount": 0,
+            "nextAction": "none",
+            "nextActionLabel": null,
+            "bookingUrl": null,
+            "shipmentUrl": null
+          }
+        },
+        "adminOk": true,
+        "orderState": "ORDER_CREATED"
+      }
+    },
+    {
+      "id": "GAP-S6-ALLOC-MANUAL",
+      "stage": "Lineage",
+      "role": "OPS",
+      "expected": "Single-line Direct PO auto-allocates on shipment spawn",
+      "actual": "Manual line-allocations POST required",
+      "severity": "P1",
+      "customerImpact": "Customs/Landed Cost incomplete until allocate",
+      "operationalWorkaround": "Ops allocate after spawn",
+      "workaroundOkForPilot": "YES",
+      "recommendedFix": "Auto-allocate on spawn for 1-line Direct PO",
+      "evidence": {
+        "allocCount": 1
+      }
+    }
+  ],
+  "ids": {
+    "productId": "a91b76cc-3ac2-41e8-9337-5cb39499cdb6",
+    "sku": "MTR-500-MVP-193842",
+    "supplierId": "2e97bf05-e340-41b3-aec5-1ee5cbbf7276",
+    "orderId": "ac00d027-b218-4ae7-be83-86385f0e7114",
+    "purchaseOrderId": "8cfda62b-c243-4ff8-ae1c-329587b6ac35",
+    "poNumber": "PO-MSPZ536D-C49699AD",
+    "freightOfferId": "4f0211e1-e80e-46f1-8754-daf5cf96f036",
+    "shipmentWorkspaceId": "149f066d-50dd-4912-a005-f3a63b4f5214",
+    "customsCaseId": "65ecd2de-1672-4650-adc1-ae0fa126576e",
+    "dutyTaxId": "ee70a173-2037-4a94-95a0-c4fb81101d78",
+    "inlandId": "c58ab627-1c9f-4c6f-ac7a-1435f749ce23",
+    "landedCostId": "a0a0f6df-33b6-4b34-8506-091348637fa7"
+  },
+  "finishedAt": "2026-08-12T10:56:36.361Z",
+  "finishReason": "COMPLETE",
+  "summary": {
+    "stages": [
+      {
+        "id": "AUTH",
+        "result": "PASS"
+      },
+      {
+        "id": "S1",
+        "result": "PASS"
+      },
+      {
+        "id": "S2",
+        "result": "PASS"
+      },
+      {
+        "id": "S1b",
+        "result": "PASS"
+      },
+      {
+        "id": "S3pre",
+        "result": "PASS WITH FRICTION"
+      },
+      {
+        "id": "S3",
+        "result": "PASS WITH FRICTION"
+      },
+      {
+        "id": "S4a",
+        "result": "PASS"
+      },
+      {
+        "id": "S4",
+        "result": "PASS"
+      },
+      {
+        "id": "S4b",
+        "result": "PASS"
+      },
+      {
+        "id": "S5",
+        "result": "PASS"
+      },
+      {
+        "id": "S6",
+        "result": "PASS"
+      },
+      {
+        "id": "S6b",
+        "result": "PASS WITH FRICTION"
+      },
+      {
+        "id": "S6c",
+        "result": "PASS WITH FRICTION"
+      },
+      {
+        "id": "S9",
+        "result": "PASS"
+      },
+      {
+        "id": "S10a",
+        "result": "PASS"
+      },
+      {
+        "id": "S10",
+        "result": "PASS"
+      },
+      {
+        "id": "S10b",
+        "result": "PASS"
+      },
+      {
+        "id": "S10c",
+        "result": "PASS"
+      },
+      {
+        "id": "S11a",
+        "result": "PASS"
+      },
+      {
+        "id": "S11",
+        "result": "PASS"
+      },
+      {
+        "id": "S12",
+        "result": "PASS"
+      },
+      {
+        "id": "S12b",
+        "result": "PASS"
+      },
+      {
+        "id": "S13",
+        "result": "PASS WITH FRICTION"
+      },
+      {
+        "id": "S14",
+        "result": "PASS"
+      },
+      {
+        "id": "S14b",
+        "result": "PASS"
+      },
+      {
+        "id": "S14c",
+        "result": "PASS"
+      },
+      {
+        "id": "S15",
+        "result": "PASS"
+      },
+      {
+        "id": "S16",
+        "result": "PASS"
+      },
+      {
+        "id": "S17",
+        "result": "PASS"
+      },
+      {
+        "id": "S18",
+        "result": "PASS"
+      },
+      {
+        "id": "S19a",
+        "result": "PASS"
+      },
+      {
+        "id": "S19",
+        "result": "PASS"
+      },
+      {
+        "id": "S19b",
+        "result": "PASS"
+      },
+      {
+        "id": "S20a",
+        "result": "PASS"
+      },
+      {
+        "id": "S20",
+        "result": "PASS"
+      },
+      {
+        "id": "S22",
+        "result": "PASS"
+      },
+      {
+        "id": "S22b",
+        "result": "PASS"
+      },
+      {
+        "id": "S22c",
+        "result": "PASS"
+      },
+      {
+        "id": "S22d",
+        "result": "PASS"
+      },
+      {
+        "id": "SEC-TENANT",
+        "result": "PASS"
+      },
+      {
+        "id": "SEC-SUPPLIER",
+        "result": "PASS"
+      }
+    ],
+    "p0": 0,
+    "p1": 3,
+    "p2": 0,
+    "findingIds": [
+      "GAP-S3-DIRECT-PO-FREIGHT-GATE",
+      "GAP-S3-BUYER-FREIGHT-REQUEST",
+      "GAP-S6-ALLOC-MANUAL"
+    ]
+  }
+}

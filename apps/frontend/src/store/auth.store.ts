@@ -98,9 +98,44 @@ export const useAuth = create<AuthState>()(
           return;
         }
         if (hydrateInFlight) return hydrateInFlight;
+
+        const priorUser = get().user;
+        const priorToken = get().accessToken;
+
         hydrateInFlight = (async () => {
           set({ status: "hydrating" });
           try {
+            // login-static persists user + accessToken; refresh cookie may be unavailable on HTTP dev.
+            if (priorUser && priorToken) {
+              try {
+                const { data: me } = await authHttp.get<UserDTO>("/auth/me", {
+                  headers: { Authorization: `Bearer ${priorToken}` },
+                });
+                set({
+                  user: me,
+                  accessToken: priorToken,
+                  accessMode: "full",
+                  passwordlessScope: null,
+                  status: "authenticated",
+                });
+                try {
+                  const { data } = await authHttp.post<{ user?: UserDTO; accessToken: string }>("/auth/refresh");
+                  set((s) => ({
+                    user: data.user ?? s.user,
+                    accessToken: data.accessToken,
+                    accessMode: "full",
+                    passwordlessScope: null,
+                    status: "authenticated",
+                  }));
+                } catch {
+                  /* keep persisted access token when refresh cookie is missing (local E2E over HTTP) */
+                }
+                return;
+              } catch {
+                /* fall through to cookie refresh */
+              }
+            }
+
             const { data } = await authHttp.post<{ user?: UserDTO; accessToken: string }>("/auth/refresh");
             set((s) => ({
               user: data.user ?? s.user,
@@ -192,8 +227,13 @@ export const useAuth = create<AuthState>()(
         accessMode: s.accessMode,
         passwordlessScope: s.passwordlessScope,
       }),
-      onRehydrateStorage: () => (state) => {
-        if (state && !state.user) state.status = "idle";
+      onRehydrateStorage: () => (state, error) => {
+        if (error || !state) return;
+        if (state.user && state.accessToken) {
+          state.status = "authenticated";
+        } else if (!state.user) {
+          state.status = "idle";
+        }
       },
     },
   ),

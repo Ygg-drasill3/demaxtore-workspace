@@ -1,5 +1,8 @@
+import { useMemo } from "react";
 import type { ShipmentPortfolioMapPoint } from "@dmx/contracts/shipment-portfolio";
 import { cn } from "@/lib/utils";
+import { interpolateLngLat, positionOnSeaRoute, resolvePortLngLat } from "../lib/port-coords";
+import { LiveShipmentMap, type LiveMapMarker } from "./LiveShipmentMap";
 
 const STATUS_COLORS: Record<string, string> = {
   "On Track": "text-emerald-600",
@@ -16,6 +19,30 @@ interface Props {
 }
 
 export function ShipmentPortfolioMap({ points, selectedId, onSelect }: Props) {
+  const markers = useMemo(() => {
+    const out: LiveMapMarker[] = [];
+    for (const p of points.slice(0, 8)) {
+      const o = resolvePortLngLat(p.origin);
+      const d = resolvePortLngLat(p.destination);
+      if (!o || !d) continue;
+      const t = Math.min(1, Math.max(0.05, p.progressPercent / 100));
+      const cur = positionOnSeaRoute(p.origin, p.destination, t) ?? interpolateLngLat(o, d, t);
+      out.push(
+        { id: `${p.shipmentId}-o`, label: p.origin, lng: o[0], lat: o[1], kind: "origin" },
+        { id: `${p.shipmentId}-d`, label: p.destination, lng: d[0], lat: d[1], kind: "destination" },
+        {
+          id: p.shipmentId,
+          label: p.shipmentNumber.slice(-8),
+          lng: cur[0],
+          lat: cur[1],
+          kind: "vessel",
+          progressPercent: p.progressPercent,
+        },
+      );
+    }
+    return out;
+  }, [points]);
+
   if (points.length === 0) {
     return (
       <div data-testid="shipment-portfolio-map-empty" className="rounded-xl border border-dashed border-zinc-200 p-8 text-center text-sm text-zinc-500">
@@ -26,43 +53,13 @@ export function ShipmentPortfolioMap({ points, selectedId, onSelect }: Props) {
 
   return (
     <div data-testid="shipment-portfolio-map" className="space-y-4">
-      <div className="rounded-xl border border-zinc-200 bg-gradient-to-br from-slate-50 to-blue-50/40 p-4 overflow-x-auto">
-        <svg viewBox="0 0 800 200" className="w-full min-w-[640px] h-48" role="img" aria-label="Shipment route map">
-          <defs>
-            <linearGradient id="routeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#0f766e" />
-              <stop offset="100%" stopColor="#1e3a8a" />
-            </linearGradient>
-          </defs>
-          <path d="M 60 100 Q 200 40, 400 100 T 740 100" fill="none" stroke="#cbd5e1" strokeWidth="3" strokeDasharray="8 6" />
-          {points.slice(0, 6).map((p, i) => {
-            const x = 60 + (680 * p.progressPercent) / 100;
-            const y = 100 + Math.sin(i * 1.2) * 18;
-            const isSelected = selectedId === p.shipmentId;
-            return (
-              <g key={p.shipmentId} data-testid={`map-route-${p.shipmentId}`}>
-                <circle
-                  cx={x}
-                  cy={y}
-                  r={isSelected ? 9 : 6}
-                  fill={p.hasLivePosition ? "#059669" : "#64748b"}
-                  stroke={isSelected ? "#0f172a" : "white"}
-                  strokeWidth={2}
-                  className="cursor-pointer"
-                  onClick={() => onSelect?.(p.shipmentId)}
-                />
-                <text x={x} y={y - 14} textAnchor="middle" className="fill-slate-600 text-[10px]">
-                  {p.shipmentNumber.slice(-8)}
-                </text>
-              </g>
-            );
-          })}
-          <circle cx="60" cy="100" r="8" fill="#0f766e" />
-          <text x="60" y="130" textAnchor="middle" className="fill-slate-700 text-[11px] font-medium">Origin</text>
-          <circle cx="740" cy="100" r="8" fill="#1e3a8a" />
-          <text x="740" y="130" textAnchor="middle" className="fill-slate-700 text-[11px] font-medium">Destination</text>
-        </svg>
-      </div>
+      <LiveShipmentMap
+        testId="shipment-portfolio-live-map"
+        eyebrow="Live map"
+        title="Active shipment positions"
+        markers={markers.length > 0 ? markers : undefined}
+        heightClassName="h-64 sm:h-80"
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {points.map((p) => (

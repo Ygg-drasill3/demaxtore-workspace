@@ -1,4 +1,8 @@
 import type { Prisma } from "@prisma/client";
+import {
+  canonicalizePurchaseOrderSource,
+  type PurchaseOrderSource,
+} from "@dmx/contracts/purchase-order";
 
 export interface PoSpawnLine {
   sku?: string | null;
@@ -21,7 +25,13 @@ export interface CreatePoOnOrderSpawnInput {
   actorEmail: string;
   actorRole: string;
   issueReason?: string;
-  source?: "auto" | "manual";
+  /**
+   * Required so provenance is always a deliberate choice. It used to default to "auto",
+   * which canonicalizes to RFQ — meaning CommodityBid and container spawns were labelled
+   * as RFQ-sourced. Normalized before it reaches the PurchaseOrderSource enum column,
+   * which rejects the legacy "auto"/"manual" aliases outright.
+   */
+  source: PurchaseOrderSource;
   documentUrl?: string | null;
   documentFileName?: string | null;
 }
@@ -46,7 +56,7 @@ export async function createPurchaseOrderOnOrderSpawn(
       paymentTerms: input.paymentTerms ?? null,
       deliveryTerms: input.deliveryTerms ?? null,
       status: "ISSUED",
-      source: input.source ?? "auto",
+      source: canonicalizePurchaseOrderSource(input.source),
       documentUrl: input.documentUrl ?? null,
       documentFileName: input.documentFileName ?? null,
       issuedAt: now,

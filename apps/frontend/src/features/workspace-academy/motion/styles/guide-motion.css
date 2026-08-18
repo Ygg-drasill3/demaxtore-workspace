@@ -1,0 +1,37 @@
+/* Workspace Academy tour chrome — solid, high-contrast (no glass/blur). */
+
+.dmx-guide-root {
+  --dmx-guide-ink: #0b1020;
+  --dmx-guide-accent: #1a237e;
+  --dmx-guide-accent-soft: #eef2ff;
+  --dmx-guide-paper: #ffffff;
+  --dmx-guide-muted: #475569;
+  --dmx-guide-border: #e4e4e7;
+  --dmx-guide-dim: rgba(11, 16, 32, 0.58);
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 999990;
+}
+
+.dmx-guide-root[data-theme="dark"] {
+  --dmx-guide-paper: #181c28;
+  --dmx-guide-ink: #f4f4f5;
+  --dmx-guide-muted: #a1a1aa;
+  --dmx-guide-border: rgba(255, 255, 255, 0.12);
+  --dmx-guide-dim: rgba(2, 6, 16, 0.68);
+  --dmx-guide-accent-soft: rgba(57, 73, 171, 0.25);
+}
+
+.dmx-guide-interactive {
+  pointer-events: auto;
+}
+
+.dmx-guide-card {
+  background: var(--dmx-guide-paper) !important;
+  color: var(--dmx-guide-ink);
+  border: 1px solid var(--dmx-guide-border);
+  box-shadow:
+    0 24px 48px -16px rgba(11, 16, 32, 0.36),
+    0 0 0 1px rgba(15, 23, 42, 0.04);
+}

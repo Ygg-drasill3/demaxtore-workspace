@@ -1,0 +1,16 @@
+R4 Golden Path → MVP-UI17-R4-20260814-K2W9
+
+[PASS] BUYER_LOGIN — https://workspace.demaxtore.com/buyer/control-tower
+[PASS] PRODUCT_CREATION — FLOUR-UI17R4-K2W9
+[PASS] DIRECT_PO — PO-MST3Q6LD-B50FA8F8
+[PASS] PRODUCT_TO_PO — https://workspace.demaxtore.com/workspace/order/77af1fcc-32d8-40f1-8916-0dc8fd683763
+[FRICTION] DEPOSIT_CONFIRMATION — No deposit gate visible
+[FRICTION] FREIGHT_REQUEST — Freight request may already exist
+[DEAD END] FREIGHT_OFFER — Admin offer form not available
+
+=== R4 SUMMARY ===
+Marker: MVP-UI17-R4-20260814-K2W9
+Fresh Transaction: FAIL
+Blocker: FREIGHT_OFFER — Admin offer form not available
+Unexpected 5xx: 0
+Evidence: /var/www/demaxtore/DemaxtoreSolitions-main/.r4-ui-fixtures/run/K2W9/evidence.json

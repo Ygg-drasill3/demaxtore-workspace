@@ -1,5 +1,5 @@
 // apps/frontend/src/lib/api.ts
-import axios, { type AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from "axios";
+import axios, { AxiosHeaders, type AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from "axios";
 import { useAuth } from "@/store/auth.store";
 import { useToast } from "@/store/toast.store";
 import type { ApiError } from "@dmx/contracts/api";
@@ -7,7 +7,7 @@ import { waitForAuthReady } from "@/lib/wait-for-auth";
 import { isOnLoginPage, redirectToLogin } from "@/lib/login-redirect";
 
 export const api: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL: import.meta.env.VITE_API_URL ?? "/api",
   withCredentials: true,                  // sends refresh-token cookie
   headers: { "Content-Type": "application/json" },
   timeout: 30_000,
@@ -18,6 +18,12 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   await waitForAuthReady();
   const token = useAuth.getState().accessToken;
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  if (config.data instanceof FormData) {
+    // Let the browser set multipart boundary — default application/json breaks uploads.
+    const headers = AxiosHeaders.from(config.headers);
+    headers.setContentType(false);
+    config.headers = headers;
+  }
   if (config.method && /^(post|put|patch|delete)$/i.test(config.method)) {
     if (!config.headers["Idempotency-Key"]) {
       config.headers["Idempotency-Key"] = crypto.randomUUID();
@@ -38,6 +44,12 @@ api.interceptors.response.use(
 
     // Pass through validation/business errors untouched
     if (status !== 401 || original._retried || original.url?.includes("/auth/")) {
+      maybeToastError(error);
+      return Promise.reject(error);
+    }
+
+    // FormData streams are single-use — retrying after refresh sends an empty body.
+    if (original.data instanceof FormData) {
       maybeToastError(error);
       return Promise.reject(error);
     }

@@ -75,7 +75,8 @@ export async function scanMixedContainerAlerts(db: PrismaClient): Promise<number
   const recentlyApproved = await db.workspace.findMany({
     where: {
       type: "MIXED_CONTAINER",
-      state: "MC_APPROVED",
+      state: { in: ["MC_EXECUTION_READY", "MC_ALLOCATION_IN_PROGRESS", "MC_PROFORMA_PENDING"] },
+      mixedContainerDetails: { organizationRef: { not: null } },
       updatedAt: { gte: new Date(now.getTime() - H_24) },
     },
     take: 30,

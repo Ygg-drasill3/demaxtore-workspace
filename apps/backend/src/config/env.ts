@@ -62,6 +62,13 @@ const EnvSchema = z.object({
   /** Dev: exclude E2E/test workspaces from Control Tower counts and scans. Set false to include all. */
   CONTROL_TOWER_EXCLUDE_TEST_DATA: z.coerce.boolean().optional(),
 
+  // ── Customs auto-seed FX defaults ─────────────────────────────────────────
+  // Only used when customs clearance auto-seeds a duty/tax and landed cost
+  // calculation. Written as SYSTEM_CONFIGURED so the broker can see the rate was
+  // not hand-verified and override it with the official rate.
+  CUSTOMS_DEFAULT_USD_TRY_RATE: z.coerce.number().positive().default(34),
+  CUSTOMS_DEFAULT_USD_EUR_RATE: z.coerce.number().positive().default(1.08),
+
   // ── Object storage (Sprint C3) ─────────────────────────────────────────────
   STORAGE_PROVIDER: z.enum(["local", "s3"]).default("local"),
   S3_BUCKET:        z.string().optional(),
@@ -114,9 +121,24 @@ const EnvSchema = z.object({
   UNIFIED_MESSAGING_WRITE_MODE: z.string().optional(),
   WHATSAPP_ACCESS_TOKEN:     z.string().optional(),
   WHATSAPP_PHONE_NUMBER_ID:  z.string().optional(),
+  /** Meta app ID for Embedded Signup (BYOWA). */
+  WHATSAPP_APP_ID:           z.string().optional(),
+  /** Meta Embedded Signup configuration ID from Business Manager. */
+  WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID: z.string().optional(),
+  /** AES master key for encrypting tenant WhatsApp tokens at rest (≥32 chars). Falls back to JWT_SECRET in dev. */
+  ENCRYPTION_MASTER_KEY:     z.string().min(32).optional(),
+  /** Dedicated key for WhatsApp connection token encryption — required in production. */
+  WHATSAPP_CONNECTION_ENCRYPTION_KEY: z.string().min(32).optional(),
+  /** shared = platform DeMaxtore number; buyer_connection = per-buyer BYOWA (no silent fallback). */
+  WHATSAPP_SENDER_MODE: z.enum(["shared", "buyer_connection"]).default("shared"),
+  /** E.164 digits of the DeMaxtore business WhatsApp line — blocked as outbound recipient. */
+  WHATSAPP_BUSINESS_PHONE_E164: z.string().optional(),
   WHATSAPP_VERIFY_TOKEN:     z.string().optional(),
   WHATSAPP_APP_SECRET:       z.string().optional(),
   WHATSAPP_API_VERSION:      z.string().default("v21.0"),
+  /** Approved Meta template for RFQ cold outreach (body vars: ref, message). */
+  WHATSAPP_RFQ_TEMPLATE_NAME: z.string().optional(),
+  WHATSAPP_RFQ_TEMPLATE_LANGUAGE: z.string().default("en"),
 
   // ── Google OAuth (optional) ─────────────────────────────────────────────────
   GOOGLE_CLIENT_ID:     z.string().optional(),
@@ -134,6 +156,7 @@ const ProdSecretSchema = z.object({
   WORKSPACE_BRIDGE_SECRET: z.string().min(32),
   CATALOG_RFQ_INGEST_TOKEN: z.string().min(32),
   WHATSAPP_APP_SECRET: z.string().min(32),
+  WHATSAPP_CONNECTION_ENCRYPTION_KEY: z.string().min(32),
   REDIS_URL: z.string().min(1),
 });
 
@@ -183,6 +206,16 @@ export function getUnifiedMessagingWriteMode(): UnifiedMessagingWriteMode {
 
 export function passwordlessAccessSecret(): string {
   return env.PASSWORDLESS_ACCESS_SECRET ?? env.JWT_SECRET;
+}
+
+export type WhatsAppSenderMode = "shared" | "buyer_connection";
+
+export function getWhatsAppSenderMode(): WhatsAppSenderMode {
+  return env.WHATSAPP_SENDER_MODE;
+}
+
+export function isBuyerConnectionWhatsAppMode(): boolean {
+  return getWhatsAppSenderMode() === "buyer_connection";
 }
 
 /** CORS origins — workspace app + embedded external panels (FreightIQ, CommodityBid). */

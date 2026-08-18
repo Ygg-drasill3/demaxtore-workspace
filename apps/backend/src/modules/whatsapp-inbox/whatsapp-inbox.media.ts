@@ -1,7 +1,9 @@
 import path from "node:path";
+import type { PrismaClient } from "@prisma/client";
 import { env } from "../../config/env.js";
 import { logger } from "../../config/logger.js";
 import { writeStoredFile } from "../../lib/file-storage.js";
+import { resolveMediaAccessCredentials } from "../whatsapp-business/whatsapp-business-media.resolver.js";
 
 const MAX_MEDIA_BYTES = 16 * 1024 * 1024;
 
@@ -38,22 +40,34 @@ function safeFilename(name: string | null | undefined, mimeType: string | null):
 }
 
 export async function downloadWhatsAppMedia(
+  db: PrismaClient,
   mediaId: string,
-  opts?: { filename?: string | null; mimeType?: string | null },
+  opts?: {
+    filename?: string | null;
+    mimeType?: string | null;
+    phoneNumberId?: string | null;
+  },
 ): Promise<{ storageKey: string; mimeType: string; filename: string } | null> {
-  const token = env.WHATSAPP_ACCESS_TOKEN;
-  const apiVersion = env.WHATSAPP_API_VERSION;
-  if (!token) {
-    logger.warn("[WA-Inbox] media download skipped — no access token configured");
+  const creds = await resolveMediaAccessCredentials(db, opts?.phoneNumberId);
+  if (!creds) {
+    logger.warn(
+      { mediaId, phoneNumberId: opts?.phoneNumberId ?? null },
+      "[WA-Inbox] media download skipped — no tenant credentials",
+    );
     return null;
   }
 
+  const apiVersion = env.WHATSAPP_API_VERSION;
+
   try {
     const metaResp = await fetch(`https://graph.facebook.com/${apiVersion}/${mediaId}`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${creds.accessToken}` },
     });
     if (!metaResp.ok) {
-      logger.warn({ mediaId, status: metaResp.status }, "[WA-Inbox] media metadata fetch failed");
+      logger.warn(
+        { mediaId, status: metaResp.status, phoneNumberId: creds.phoneNumberId, buyerId: creds.buyerId },
+        "[WA-Inbox] media metadata fetch failed",
+      );
       return null;
     }
     const meta = (await metaResp.json()) as { url?: string; mime_type?: string; file_size?: number };
@@ -71,7 +85,7 @@ export async function downloadWhatsAppMedia(
     }
 
     const fileResp = await fetch(meta.url, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${creds.accessToken}` },
     });
     if (!fileResp.ok) return null;
 
@@ -85,7 +99,10 @@ export async function downloadWhatsAppMedia(
     const { storageKey } = await writeStoredFile(buffer, filename);
     return { storageKey, mimeType, filename };
   } catch (err) {
-    logger.error({ err, mediaId }, "[WA-Inbox] media download failed");
+    logger.error(
+      { err, mediaId, phoneNumberId: creds.phoneNumberId, buyerId: creds.buyerId },
+      "[WA-Inbox] media download failed",
+    );
     return null;
   }
 }

@@ -41,7 +41,7 @@ export default function BulkContainerCoordinationPage() {
   }
 
   return (
-    <div data-testid="bc-coordination-page" className="max-w-[1200px] mx-auto space-y-6 animate-fade-in">
+    <div data-testid="bc-coordination-page" data-guide="bc-coordination" className="max-w-[1200px] mx-auto space-y-6 animate-fade-in">
       <header>
         <Link to="/buyer/bulk-container/requests" className="text-xs text-zinc-500 hover:underline">← My Bulk Requests</Link>
         <h1 className="font-display text-4xl font-semibold tracking-tight mt-1">Coordination · {data.externalRef}</h1>

@@ -20,12 +20,14 @@ const TEST_TITLE_PATTERNS = [
   /^Growth\s+E2E/i,
 ];
 
+// Prefix-only. A trailing hex-suffix rule was too broad: real DIRECT_PO refs end in
+// one (ORD-DIR-PO-…-92DE145C), so every Direct PO trade was hidden as test data.
 const TEST_EXTERNAL_REF_PATTERNS = [
   /^ORD-RFQ-/i,
   /^ORD-CB-/i,
+  /^ORD-DEMO-/i,
   /^SHP-ORD-/i,
   /^CB-CB-/i,
-  /-[0-9a-f]{8}$/i,
 ];
 
 export function shouldExcludeTestData(): boolean {
@@ -57,6 +59,7 @@ export function workspaceExcludesTestData(): Prisma.WorkspaceWhereInput {
       OR: [
         { externalRef: { startsWith: "ORD-RFQ-" } },
         { externalRef: { startsWith: "ORD-CB-" } },
+        { externalRef: { startsWith: "ORD-DEMO-" } },
         { externalRef: { startsWith: "SHP-ORD-" } },
         { rfqDetails: { productCategory: TEST_PRODUCT_CATEGORY } },
         { rfqDetails: { title: { startsWith: "E2E", mode: "insensitive" } } },
@@ -93,6 +96,7 @@ export async function getTestWorkspaceIds(db: PrismaClient): Promise<string[]> {
       OR: [
         { externalRef: { startsWith: "ORD-RFQ-" } },
         { externalRef: { startsWith: "ORD-CB-" } },
+        { externalRef: { startsWith: "ORD-DEMO-" } },
         { externalRef: { startsWith: "SHP-ORD-" } },
       ],
     },

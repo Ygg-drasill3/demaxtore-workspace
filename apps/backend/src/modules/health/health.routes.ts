@@ -3,8 +3,11 @@ import { Router } from "express";
 import { prisma } from "../../db/prisma.js";
 import { env } from "../../config/env.js";
 import { getSocketAdapterStatus } from "../../realtime/socket-adapter.js";
+import { getRedisClient, redisUrl } from "../../lib/redis.js";
 import { resolveStorageProvider } from "../../lib/storage-provider.js";
 import { getBuildInfo } from "../../lib/build-info.js";
+import { getSafetyGateStatuses, areProductionSafetyGatesSatisfied } from "../../config/production-safety.js";
+import { getPaymentCapabilities } from "../payments/payment-provider.factory.js";
 
 const router = Router();
 
@@ -35,9 +38,17 @@ export async function readinessHandler(
     checks.db = "down";
   }
 
-  if (env.SOCKET_ADAPTER === "redis") {
-    const { adapter, redisConnected } = getSocketAdapterStatus();
-    checks.redis = adapter === "redis" && redisConnected ? "up" : "down";
+  // Redis backs the rate limiters, which fail closed with 503 when it is unreachable —
+  // losing it takes down login. Probe it whenever REDIS_URL is set rather than only when
+  // it also serves as the socket adapter, or readiness stays green while auth is broken.
+  if (redisUrl()) {
+    try {
+      const client = await getRedisClient();
+      await client.ping();
+      checks.redis = "up";
+    } catch {
+      checks.redis = "down";
+    }
   } else {
     checks.redis = "skipped";
   }
@@ -68,11 +79,18 @@ export async function readinessHandler(
     : "up";
 
   const blocking = Object.values(checks).some((v) => v === "down");
-  const ready = !blocking;
+  const safetyGates = getSafetyGateStatuses();
+  const safetyGatesOk = areProductionSafetyGatesSatisfied();
+  const ready = !blocking && safetyGatesOk;
 
   res.status(ready ? 200 : 503).json({
     ready,
-    checks,
+    checks: {
+      ...checks,
+      safetyGates: safetyGatesOk ? "up" : "down",
+    },
+    safetyGates,
+    payments: getPaymentCapabilities(),
     timestamp: new Date().toISOString(),
   });
 }

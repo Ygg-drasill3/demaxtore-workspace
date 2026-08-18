@@ -1,3 +1,5 @@
+import { ROLE_DASHBOARD, type Role } from "@dmx/contracts/auth";
+
 /** Canonical login URL — workspace SPA auth routes. */
 export function loginPageUrl(from?: string): string {
   const url = new URL("/login", window.location.origin);
@@ -21,17 +23,5 @@ export function resolvePostLoginPath(role: string, from?: string | null): string
   if (from && from.startsWith("/") && !from.startsWith("/login")) {
     return from;
   }
-  const ROLE_DASHBOARD: Record<string, string> = {
-    BUYER: "/buyer/inbox",
-    SUPPLIER: "/supplier/dashboard",
-    ADMIN: "/admin/dashboard",
-    SALES_CONTROL: "/sales/dashboard",
-    SUPER_ADMIN: "/admin/dashboard",
-    OPS_MANAGER: "/operations",
-    LOGISTICS_OPERATOR: "/operations/freight",
-    FINANCE_OPERATOR: "/operations",
-    DOCUMENT_CONTROLLER: "/admin/dashboard",
-    FORWARDER: "/forwarder/dashboard",
-  };
-  return ROLE_DASHBOARD[role] ?? "/";
+  return ROLE_DASHBOARD[role as Role] ?? "/";
 }

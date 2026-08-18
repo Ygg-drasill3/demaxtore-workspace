@@ -1,7 +1,7 @@
 // apps/frontend/src/layouts/components/UserMenu.tsx
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronDown, LogOut, User as UserIcon } from "lucide-react";
+import { ChevronDown, LogOut, Settings, User as UserIcon } from "lucide-react";
 import { useAuth } from "@/store/auth.store";
 import { initials } from "@/lib/utils";
 import { ROLE_DASHBOARD } from "@dmx/contracts/auth";
@@ -60,6 +60,15 @@ export function UserMenu() {
           >
             <UserIcon className="h-3.5 w-3.5 text-zinc-500" /> {t("common.myDashboard")}
           </button>
+          {(user.role === "BUYER" || user.role === "SUPPLIER") && (
+            <button
+              data-testid="user-menu-account"
+              onClick={() => { setOpen(false); nav("/account"); }}
+              className="w-full text-left px-3 py-2 text-sm hover:bg-paper-50 inline-flex items-center gap-2"
+            >
+              <Settings className="h-3.5 w-3.5 text-zinc-500" /> Account settings
+            </button>
+          )}
           <button
             data-testid="user-menu-logout"
             onClick={async () => { setOpen(false); await logout(); redirectToLogin(); }}

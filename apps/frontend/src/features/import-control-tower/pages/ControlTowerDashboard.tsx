@@ -31,7 +31,7 @@ export default function ControlTowerDashboard() {
     return (
       <div data-testid="import-control-tower-error" className="max-w-3xl mx-auto p-8 text-center space-y-3">
         <p className="text-red-600">{t("importTower.error")}</p>
-        <button type="button" className="dmx-btn-secondary" onClick={() => void refetch()}>Retry</button>
+        <button type="button" className="dmx-btn-secondary" onClick={() => void refetch()}>{t("common.retry")}</button>
       </div>
     );
   }
@@ -47,7 +47,9 @@ export default function ControlTowerDashboard() {
           <p className="text-sm text-zinc-500 mt-1.5">
             {t("importTower.subtitle")}
             {data.refreshedAt && (
-              <span className="ml-2 text-zinc-400">· Updated {new Date(data.refreshedAt).toLocaleTimeString()}</span>
+              <span className="ml-2 text-zinc-400">
+                · {t("importTower.updatedAt")} {new Date(data.refreshedAt).toLocaleTimeString()}
+              </span>
             )}
           </p>
         </div>
@@ -57,7 +59,7 @@ export default function ControlTowerDashboard() {
             <input
               data-testid="ict-search"
               type="search"
-              placeholder="Trade ID, supplier, PO…"
+              placeholder={t("importTower.searchPlaceholder")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full sm:w-64 rounded-lg border border-zinc-200 pl-9 pr-3 py-2 text-sm"
@@ -69,10 +71,10 @@ export default function ControlTowerDashboard() {
             onChange={(e) => setStatus(e.target.value)}
             className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
           >
-            <option value="">All statuses</option>
-            <option value="PRODUCTION">Production</option>
-            <option value="TRANSIT">In transit</option>
-            <option value="DELIVERED">Delivered</option>
+            <option value="">{t("importTower.filter.allStatuses")}</option>
+            <option value="PRODUCTION">{t("importTower.filter.production")}</option>
+            <option value="TRANSIT">{t("importTower.filter.transit")}</option>
+            <option value="DELIVERED">{t("importTower.filter.delivered")}</option>
           </select>
           <button
             type="button"
@@ -80,7 +82,7 @@ export default function ControlTowerDashboard() {
             onClick={() => void refetch()}
             className="dmx-btn-secondary inline-flex items-center justify-center gap-2"
           >
-            <RefreshCw className={cnIcon(isFetching)} /> Refresh
+            <RefreshCw className={cnIcon(isFetching)} /> {t("importTower.refresh")}
           </button>
         </div>
       </header>

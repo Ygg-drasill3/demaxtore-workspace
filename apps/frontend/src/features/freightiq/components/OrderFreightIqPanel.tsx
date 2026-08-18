@@ -20,6 +20,10 @@ import { FreightAwaitingOffers } from "./FreightAwaitingOffers";
 import { FreightOfferList } from "./FreightOfferList";
 import { FreightSelectedWinnerCard } from "./FreightSelectedWinnerCard";
 import { FreightSelectConfirmModal } from "./FreightSelectConfirmModal";
+import { FreightAdminOfferForm, type AdminOfferFormValues } from "./FreightAdminOfferForm";
+import { FreightExecutionPanel } from "./FreightExecutionPanel";
+import { buildSubmitOfferPayload } from "../lib/freight-offer-submit";
+import { freightiqErrorMessage } from "../lib/freightiq.errors";
 import { OrderFreightChatPanel } from "@/features/chat/components/OrderFreightChatPanel";
 
 interface OrderPorts {
@@ -56,13 +60,24 @@ export function OrderFreightIqPanel({ orderId, order, spawnedShipments = [], ful
   });
 
   const eligible = order.state
-    ? isFreightIntakeEligible(order.state, (user?.role === "SUPPLIER" ? "SUPPLIER" : user?.role === "ADMIN" || user?.role === "SUPER_ADMIN" ? "ADMIN" : "BUYER"))
+    ? isFreightIntakeEligible(
+        order.state,
+        user?.role === "SUPPLIER"
+          ? "SUPPLIER"
+          : user?.role === "ADMIN" || user?.role === "SUPER_ADMIN" || user?.role === "OPS_MANAGER" || user?.role === "SALES_CONTROL" || user?.role === "LOGISTICS_OPERATOR"
+            ? "ADMIN"
+            : "BUYER",
+      )
     : false;
-  const canCreate = user?.role === "BUYER";
+  const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
+  const isOps =
+    isAdmin || user?.role === "OPS_MANAGER" || user?.role === "LOGISTICS_OPERATOR" || user?.role === "SALES_CONTROL";
+  const canCreate = user?.role === "BUYER" || isOps;
   const canSelect = user?.role === "BUYER";
   const request = summary?.request ?? null;
   const offers = summary?.offers ?? [];
   const communications = summary?.communications ?? [];
+  const canAdminOffer = isAdmin && !!request && !summary?.selection;
 
   const activeOffers = offers.filter((o) => o.status === "ACTIVE" || o.status === "REVISED");
   const phase = freightPhase(eligible, request?.status ?? null);
@@ -147,6 +162,34 @@ export function OrderFreightIqPanel({ orderId, order, spawnedShipments = [], ful
     }
   };
 
+  const handleProceedToBooking = async () => {
+    setBusy(true);
+    try {
+      await freightiqApi.action(orderId, "proceed-to-booking");
+      toast.success("Booking requested");
+      refresh();
+      const href = summary?.execution?.bookingUrl ?? summary?.execution?.shipmentUrl;
+      if (href) window.location.href = href;
+    } catch (e: unknown) {
+      toast.error(freightiqErrorMessage(e, order.state));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleAdminOffer = async (form: AdminOfferFormValues) => {
+    setBusy(true);
+    try {
+      await freightiqApi.action(orderId, "submit-offer", buildSubmitOfferPayload(form));
+      toast.success(t("order.freightiq.adminOfferPublished"));
+      refresh();
+    } catch (e: unknown) {
+      toast.error(freightiqErrorMessage(e, order.state));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const initialForm: FreightCreateForm = {
     mode: "OCEAN_FCL",
     pol: order.originPort ?? "",
@@ -221,6 +264,18 @@ export function OrderFreightIqPanel({ orderId, order, spawnedShipments = [], ful
 
       <FreightCommercialCard commercial={summary?.commercialSummary} />
 
+      {canAdminOffer && (
+        <FreightAdminOfferForm
+          pol={pol}
+          pod={pod}
+          busy={busy}
+          defaultOpen
+          onSubmit={async (form) => {
+            await handleAdminOffer(form);
+          }}
+        />
+      )}
+
       {isLoading ? (
         <div className="dmx-card p-6 text-sm text-zinc-500">{t("common.loading")}</div>
       ) : !request && !wizardOpen ? (
@@ -246,6 +301,18 @@ export function OrderFreightIqPanel({ orderId, order, spawnedShipments = [], ful
                 summary.commercialSummary?.estimatedCifUsd != null
                   ? `${summary.commercialSummary.estimatedCifUsd.toLocaleString()} USD`
                   : null
+              }
+            />
+          )}
+
+          {summary.execution && (
+            <FreightExecutionPanel
+              execution={summary.execution}
+              busy={busy}
+              onProceedToBooking={
+                summary.execution.nextAction === "proceed_to_booking" || summary.execution.nextAction === "open_booking"
+                  ? () => void handleProceedToBooking()
+                  : undefined
               }
             />
           )}

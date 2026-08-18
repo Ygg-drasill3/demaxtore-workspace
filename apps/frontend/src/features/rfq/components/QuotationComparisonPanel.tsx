@@ -24,6 +24,11 @@ import {
   productSectionTitle,
   type RfqLineRef,
 } from "../lib/quotations-by-product";
+import {
+  buildVariationsFromQuotation,
+  variationGridClass,
+  variationPriceUnitLabel,
+} from "../lib/offer-variations";
 import { QuotationAwardFlowModal } from "./QuotationAwardFlowModal";
 import { useT } from "@/i18n/useT";
 
@@ -172,6 +177,7 @@ function EmptyPanel() {
 type Row = {
   quotation: QuotationRowDTO;
   key: string;
+  rfqLineItemId: string;
   unitPrice: number;
   total: number;
   lineUom?: string;
@@ -212,6 +218,7 @@ function QuotationListPanel(props: {
           out.push({
             quotation: b.quotation,
             key: `${b.quotation.id}-${b.lineItem.id}`,
+            rfqLineItemId: b.lineItem.rfqLineItemId ?? b.lineItem.id,
             unitPrice: b.lineItem.unitPrice,
             total: b.lineTotal,
             lineUom: g.line.uom,
@@ -225,6 +232,7 @@ function QuotationListPanel(props: {
       .map((q) => ({
         quotation: q,
         key: q.id,
+        rfqLineItemId: q.lineItems?.[0]?.rfqLineItemId ?? q.lineItems?.[0]?.id ?? "",
         unitPrice: q.unitPriceAvg ?? q.total,
         total: q.total,
       }))
@@ -439,7 +447,8 @@ function QuotationListPanel(props: {
         open={!!awardRow}
         onClose={closeAwardFlow}
         workspaceId={workspaceId}
-        state={state}
+        rfqLineItemId={awardRow?.rfqLineItemId ?? ""}
+        productTitle={awardRow?.productTitle}
         quotation={awardRow?.quotation ?? null}
         unitPrice={awardRow?.unitPrice}
         currency={currency}
@@ -733,6 +742,10 @@ function QuotationCard(props: {
   const rankCfg = RANK_CONFIG[rank] ?? null;
   const RankIcon = rankCfg?.icon;
   const uomLabel = row.lineUom ?? "container";
+  // A supplier quoting several pack sizes was collapsed into one blended unit price, so
+  // the buyer could only see the individual prices after opening the award modal.
+  const variations = buildVariationsFromQuotation(q, row.lineUom);
+  const hasVariations = variations.length > 1;
 
   return (
     <article
@@ -779,28 +792,55 @@ function QuotationCard(props: {
           )}
         </div>
 
-        {/* Unit price — compact */}
-        <div
-          data-testid={`quote-total-${q.id}`}
-          className={cn(
-            "shrink-0 rounded-lg border px-3 py-2 text-right min-w-[128px]",
-            isLowest ? "border-accent-900/20 bg-accent-50/60" : "border-paper-200 bg-paper-50",
-          )}
-        >
-          <p className="text-[9px] font-semibold uppercase tracking-wider text-zinc-500" lang="en">Unit Price</p>
-          <p className={cn(
-            "text-base font-bold tabular-nums leading-tight mt-0.5",
-            isLowest ? "text-accent-900" : "text-ink-900",
-          )}>
-            {fmt(currency, row.unitPrice)}
-            {isLowest && <span className="sr-only"> lowest</span>}
-          </p>
-          <p className="text-[10px] text-zinc-500">/ {uomLabel}</p>
-        </div>
+        {/* Unit price — compact. Replaced by the variation grid below for multi-pack offers. */}
+        {!hasVariations && (
+          <div
+            data-testid={`quote-total-${q.id}`}
+            className={cn(
+              "shrink-0 rounded-lg border px-3 py-2 text-right min-w-[128px]",
+              isLowest ? "border-accent-900/20 bg-accent-50/60" : "border-paper-200 bg-paper-50",
+            )}
+          >
+            <p className="text-[9px] font-semibold uppercase tracking-wider text-zinc-500" lang="en">Unit Price</p>
+            <p className={cn(
+              "text-base font-bold tabular-nums leading-tight mt-0.5",
+              isLowest ? "text-accent-900" : "text-ink-900",
+            )}>
+              {fmt(currency, row.unitPrice)}
+              {isLowest && <span className="sr-only"> lowest</span>}
+            </p>
+            <p className="text-[10px] text-zinc-500">/ {uomLabel}</p>
+          </div>
+        )}
       </div>
 
-      {/* Middle: terms grid — wraps cleanly, never overlaps */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-4 gap-y-2 mt-3 pt-3 border-t border-paper-100 text-xs">
+      {hasVariations && (
+        <div
+          data-testid={`quote-variations-${q.id}`}
+          className={cn(variationGridClass(variations.length), "mt-3 pt-3 border-t border-paper-100")}
+        >
+          {variations.map((v) => (
+            <div
+              key={v.id}
+              data-testid={`quote-variation-${v.id}`}
+              className="rounded-lg border border-paper-200 bg-paper-50 px-3 py-2"
+            >
+              <p className="text-xs font-medium text-ink-900 leading-snug">{v.name}</p>
+              <p className="text-sm font-bold tabular-nums text-ink-900 mt-1">
+                {fmt(currency, v.unitPrice)}
+              </p>
+              <p className="text-[10px] text-zinc-500">/ {variationPriceUnitLabel(v)}</p>
+              {v.packing && <p className="text-[10px] text-zinc-500 mt-0.5">{v.packing}</p>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Middle: terms grid — shared across variations, shown once */}
+      <div
+        data-testid={`quote-terms-${q.id}`}
+        className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-4 gap-y-2 mt-3 pt-3 border-t border-paper-100 text-xs"
+      >
         <TermRow label="Lead Time" value={q.leadTimeDays != null ? `${q.leadTimeDays} Days` : "—"} dot={isFastest ? "green" : q.leadTimeDays != null && q.leadTimeDays <= 20 ? "green" : q.leadTimeDays != null ? "yellow" : undefined} />
         <TermRow label="MOQ" value={q.moq != null ? `${q.moq} Container${q.moq > 1 ? "s" : ""}` : "1 Container"} />
         <TermRow label="Incoterm" value={q.incoterm ?? "—"} />

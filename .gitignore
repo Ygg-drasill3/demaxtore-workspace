@@ -133,6 +133,9 @@ agenthub/agents/youtube/db
 # Build caches
 .cache/
 packages/build-info/build-info.json
+# Out-of-tree dependency trees linked in during builds.
+.build-node_modules
+.build-*/
 
 memory/test_credentials.md
 

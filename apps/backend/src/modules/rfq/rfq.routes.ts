@@ -6,8 +6,14 @@ import { Router } from "express";
 import { requireAuth, requireRole } from "../auth/auth.middleware";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { rfqController } from "./rfq.controller";
+import { resolveRfqParam } from "../../lib/resolve-rfq-ref.js";
 
 export const rfqRouter = Router();
+
+// Accept UUID or public slug in :id (rewrites to UUID for all handlers below).
+rfqRouter.param("id", (req, res, next, _value) => {
+  void resolveRfqParam(req, res, next);
+});
 
 // ---- Reads ----
 rfqRouter.get("/",                          requireAuth, asyncHandler(rfqController.list));
@@ -22,8 +28,8 @@ rfqRouter.get("/:id/spawned-orders",        requireAuth, asyncHandler(rfqControl
 // ---- Buyer drafts ----
 rfqRouter.post  ("/",                       requireAuth, requireRole("BUYER"), asyncHandler(rfqController.createDraft));
 rfqRouter.patch ("/:id/draft",              requireAuth, requireRole("BUYER"), asyncHandler(rfqController.editDraft));
-rfqRouter.post  ("/:id/trash",              requireAuth, requireRole("ADMIN"), asyncHandler(rfqController.trash));
-rfqRouter.post  ("/:id/restore",            requireAuth, requireRole("ADMIN"), asyncHandler(rfqController.restore));
+rfqRouter.post  ("/:id/trash",              requireAuth, requireRole("ADMIN", "SUPER_ADMIN"), asyncHandler(rfqController.trash));
+rfqRouter.post  ("/:id/restore",            requireAuth, requireRole("ADMIN", "SUPER_ADMIN"), asyncHandler(rfqController.restore));
 
 // Sprint 11A — procurement strategy (buyer must choose after RFQ creation)
 rfqRouter.post("/:id/procurement-strategy", requireAuth, requireRole("BUYER"), asyncHandler(rfqController.selectProcurementStrategy));
@@ -36,14 +42,19 @@ rfqRouter.post("/:id/actions/withdraw",          requireAuth, requireRole("BUYER
 rfqRouter.post("/:id/actions/cancel",            requireAuth, requireRole("BUYER","ADMIN"), asyncHandler(rfqController.action("cancel_rfq")));
 rfqRouter.post("/:id/actions/revise-rejected",   requireAuth, requireRole("BUYER"),         asyncHandler(rfqController.action("revise_rejected_rfq")));
 
-rfqRouter.post("/:id/actions/assign-suppliers",  requireAuth, requireRole("ADMIN"),         asyncHandler(rfqController.action("assign_suppliers")));
-rfqRouter.post("/:id/actions/add-suppliers",     requireAuth, requireRole("ADMIN"),         asyncHandler(rfqController.action("add_more_suppliers")));
-rfqRouter.post("/:id/actions/remove-supplier",   requireAuth, requireRole("ADMIN"),         asyncHandler(rfqController.action("remove_supplier")));
-rfqRouter.post("/:id/actions/reject",            requireAuth, requireRole("ADMIN"),         asyncHandler(rfqController.action("reject_rfq")));
-rfqRouter.post("/:id/actions/publish",           requireAuth, requireRole("ADMIN"),         asyncHandler(rfqController.action("publish_rfq")));
-rfqRouter.post("/:id/actions/reopen-quotations", requireAuth, requireRole("ADMIN"),         asyncHandler(rfqController.action("reopen_quotations")));
+rfqRouter.post("/:id/actions/assign-suppliers",  requireAuth, requireRole("ADMIN", "SUPER_ADMIN"),         asyncHandler(rfqController.action("assign_suppliers")));
+rfqRouter.post("/:id/actions/add-suppliers",     requireAuth, requireRole("ADMIN", "SUPER_ADMIN"),         asyncHandler(rfqController.action("add_more_suppliers")));
+rfqRouter.post("/:id/actions/update-supplier-scopes", requireAuth, requireRole("ADMIN", "SUPER_ADMIN"),    asyncHandler(rfqController.action("update_supplier_scopes")));
+rfqRouter.post("/:id/actions/remove-supplier",   requireAuth, requireRole("ADMIN", "SUPER_ADMIN"),         asyncHandler(rfqController.action("remove_supplier")));
+rfqRouter.post("/:id/actions/reject",            requireAuth, requireRole("ADMIN", "SUPER_ADMIN"),         asyncHandler(rfqController.action("reject_rfq")));
+rfqRouter.post("/:id/actions/publish",           requireAuth, requireRole("ADMIN", "SUPER_ADMIN"),         asyncHandler(rfqController.action("publish_rfq")));
+rfqRouter.post("/:id/actions/return-to-review",   requireAuth, requireRole("ADMIN", "SUPER_ADMIN"),         asyncHandler(rfqController.action("return_to_review")));
+rfqRouter.post("/:id/actions/unpublish",          requireAuth, requireRole("ADMIN", "SUPER_ADMIN"),         asyncHandler(rfqController.action("unpublish_rfq")));
+rfqRouter.post("/:id/actions/revert-evaluation",  requireAuth, requireRole("ADMIN", "SUPER_ADMIN"),         asyncHandler(rfqController.action("revert_evaluation")));
+rfqRouter.post("/:id/actions/set-state",           requireAuth, requireRole("ADMIN", "SUPER_ADMIN"),         asyncHandler(rfqController.action("admin_set_state")));
+rfqRouter.post("/:id/actions/reopen-quotations", requireAuth, requireRole("ADMIN", "SUPER_ADMIN"),         asyncHandler(rfqController.action("reopen_quotations")));
 
-rfqRouter.post("/:id/actions/extend-deadline",   requireAuth, requireRole("BUYER","ADMIN"), asyncHandler(rfqController.action("extend_deadline")));
+rfqRouter.post("/:id/actions/extend-deadline",   requireAuth, requireRole("BUYER","ADMIN","SUPER_ADMIN"), asyncHandler(rfqController.action("extend_deadline")));
 rfqRouter.post("/:id/actions/close-quotations",  requireAuth, requireRole("BUYER"),         asyncHandler(rfqController.action("close_quotations_early")));
 rfqRouter.post("/:id/actions/start-evaluation",  requireAuth, requireRole("BUYER"),         asyncHandler(rfqController.action("start_evaluation")));
 rfqRouter.post("/:id/actions/select-supplier",   requireAuth, requireRole("BUYER"),         asyncHandler(rfqController.action("select_supplier")));
@@ -56,8 +67,13 @@ rfqRouter.post("/:id/actions/decline-proforma",  requireAuth, requireRole("SUPPL
 rfqRouter.post("/:id/actions/approve-proforma",  requireAuth, requireRole("BUYER"),         asyncHandler(rfqController.action("approve_proforma")));
 rfqRouter.post("/:id/actions/reject-proforma",   requireAuth, requireRole("BUYER"),         asyncHandler(rfqController.action("reject_proforma")));
 rfqRouter.post("/:id/actions/issue-po",          requireAuth, requireRole("BUYER"),         asyncHandler(rfqController.action("issue_po")));
-rfqRouter.post("/:id/actions/add-observer",      requireAuth, requireRole("ADMIN"),         asyncHandler(rfqController.action("add_observer")));
-rfqRouter.post("/:id/actions/remove-observer",   requireAuth, requireRole("ADMIN"),         asyncHandler(rfqController.action("remove_observer")));
+rfqRouter.post("/:id/actions/issue-supplier-po", requireAuth, requireRole("BUYER"),         asyncHandler(rfqController.action("issue_supplier_po")));
+rfqRouter.post("/:id/actions/award-line-item",   requireAuth, requireRole("BUYER"),         asyncHandler(rfqController.action("award_line_item")));
+rfqRouter.post("/:id/actions/revert-line-award", requireAuth, requireRole("BUYER"),         asyncHandler(rfqController.action("revert_line_award")));
+rfqRouter.post("/:id/actions/mark-line-no-award", requireAuth, requireRole("BUYER"),        asyncHandler(rfqController.action("mark_line_no_award")));
+rfqRouter.post("/:id/actions/close-rfq-awards", requireAuth, requireRole("BUYER"),         asyncHandler(rfqController.action("close_rfq_awards")));
+rfqRouter.post("/:id/actions/add-observer",      requireAuth, requireRole("ADMIN", "SUPER_ADMIN"),         asyncHandler(rfqController.action("add_observer")));
+rfqRouter.post("/:id/actions/remove-observer",   requireAuth, requireRole("ADMIN", "SUPER_ADMIN"),         asyncHandler(rfqController.action("remove_observer")));
 
 // ---- Clarifications (self-loop transition) ----
 rfqRouter.post("/:id/clarifications",            requireAuth, asyncHandler(rfqController.postClarification));
@@ -65,6 +81,6 @@ rfqRouter.post("/:id/clarifications/:messageId/read", requireAuth, asyncHandler(
 
 // ---- Admin operational ----
 export const adminRfqRouter = Router();
-adminRfqRouter.get("/queue",     requireAuth, requireRole("ADMIN"), asyncHandler(rfqController.adminQueue));
-adminRfqRouter.get("/suppliers", requireAuth, requireRole("ADMIN"), asyncHandler(rfqController.lookupSuppliers));
-adminRfqRouter.post("/run-scheduler-tick", requireAuth, requireRole("ADMIN"), asyncHandler(rfqController.runSchedulerTick));
+adminRfqRouter.get("/queue",     requireAuth, requireRole("ADMIN", "SUPER_ADMIN"), asyncHandler(rfqController.adminQueue));
+adminRfqRouter.get("/suppliers", requireAuth, requireRole("ADMIN", "SUPER_ADMIN"), asyncHandler(rfqController.lookupSuppliers));
+adminRfqRouter.post("/run-scheduler-tick", requireAuth, requireRole("ADMIN", "SUPER_ADMIN"), asyncHandler(rfqController.runSchedulerTick));

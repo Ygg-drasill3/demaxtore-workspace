@@ -17,6 +17,8 @@ export type RfqState =
   | "RFQ_OPEN"
   | "QUOTATIONS_CLOSED"
   | "UNDER_EVALUATION"
+  | "PARTIALLY_AWARDED"
+  | "FULLY_AWARDED"
   | "SUPPLIER_SELECTED"
   | "PROFORMA_REQUESTED"
   | "PROFORMA_RECEIVED"
@@ -29,17 +31,42 @@ export type RfqState =
 
 export type RfqAction =
   | "create_rfq" | "edit_rfq_draft" | "submit_rfq" | "withdraw_rfq"
-  | "assign_suppliers" | "add_more_suppliers" | "remove_supplier"
+  | "assign_suppliers" | "add_more_suppliers" | "update_supplier_scopes" | "remove_supplier"
   | "reject_rfq" | "publish_rfq" | "revise_rejected_rfq"
   | "submit_quotation" | "revise_quotation" | "withdraw_quotation"
   | "post_clarification" | "extend_deadline"
   | "close_quotations_early" | "deadline_reached" | "deadline_reached_no_bids"
   | "start_evaluation" | "reopen_quotations"
   | "select_supplier" | "revert_selection" | "close_without_award"
+  | "return_to_review" | "unpublish_rfq" | "revert_evaluation"
+  | "award_line_item" | "revert_line_award" | "mark_line_no_award"
+  | "issue_supplier_po" | "close_rfq_awards"
   | "request_proforma" | "submit_proforma" | "decline_proforma"
   | "proforma_sla_expired" | "approve_proforma" | "reject_proforma"
   | "issue_po" | "sync_order_closed" | "cancel_rfq"
-  | "add_observer" | "remove_observer";
+  | "add_observer" | "remove_observer" | "admin_set_state";
+
+/** All valid RFQ workspace states (for admin override picker). */
+export const RFQ_STATES = [
+  "RFQ_DRAFT",
+  "RFQ_SUBMITTED",
+  "REJECTED_BY_ADMIN",
+  "SUPPLIERS_ASSIGNED",
+  "RFQ_OPEN",
+  "QUOTATIONS_CLOSED",
+  "UNDER_EVALUATION",
+  "PARTIALLY_AWARDED",
+  "FULLY_AWARDED",
+  "SUPPLIER_SELECTED",
+  "PROFORMA_REQUESTED",
+  "PROFORMA_RECEIVED",
+  "PROFORMA_APPROVED",
+  "PO_ISSUED",
+  "CLOSED",
+  "CANCELLED",
+  "EXPIRED",
+  "CLOSED_NO_AWARD",
+] as const satisfies readonly RfqState[];
 
 export type ActorRole =
   | "BUYER"
@@ -52,7 +79,10 @@ export type ActorRole =
   | "LOGISTICS_OPERATOR"
   | "FINANCE_OPERATOR"
   | "DOCUMENT_CONTROLLER"
-  | "FORWARDER";
+  | "FORWARDER"
+  | "ORIGIN_AGENT"
+  | "CUSTOMS_BROKER"
+  | "TRUCKER";
 export type ParticipantConstraint = "OWNER" | "COUNTERPARTY" | "OPERATOR" | "OBSERVER" | "ANY";
 export type NotificationType = "INFO" | "SUCCESS" | "WARNING" | "ERROR";
 
@@ -136,6 +166,11 @@ export const RFQ_TRANSITIONS: RfqTransition[] = [
     auditEvent: "rfq.suppliers.added",
     notifyRecipients: [{ target: "COUNTERPARTY", type: "INFO", titleKey: "rfq.suppliers.added" }] },
 
+  { from: "SUPPLIERS_ASSIGNED", to: "SUPPLIERS_ASSIGNED", action: "update_supplier_scopes",
+    allowedRoles: ["ADMIN"], preconditions: ["assertAssignable", "assertAssignedSuppliers", "assertSupplierScopesExpanded"],
+    auditEvent: "rfq.supplier_scopes.updated",
+    notifyRecipients: [{ target: "COUNTERPARTY", type: "INFO", titleKey: "rfq.supplier_scope.expanded" }] },
+
   { from: "SUPPLIERS_ASSIGNED", to: "SUPPLIERS_ASSIGNED", action: "remove_supplier",
     allowedRoles: ["ADMIN"], preconditions: ["assertSupplierHasNoQuotation"],
     auditEvent: "rfq.suppliers.removed", notifyRecipients: [] },
@@ -149,6 +184,26 @@ export const RFQ_TRANSITIONS: RfqTransition[] = [
     allowedRoles: ["BUYER", "ADMIN"], requiresReason: true,
     auditEvent: "rfq.cancelled",
     notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "WARNING", titleKey: "rfq.cancelled" }] },
+
+  { from: "SUPPLIERS_ASSIGNED", to: "RFQ_SUBMITTED", action: "return_to_review",
+    allowedRoles: ["ADMIN"], requiresReason: true,
+    preconditions: ["assertNoActiveQuotations"],
+    auditEvent: "rfq.returned_to_review",
+    notifyRecipients: [
+      { target: "OWNER", type: "INFO", titleKey: "rfq.returned_to_review" },
+      { broadcast: { role: "ADMIN" }, type: "INFO", titleKey: "rfq.returned_to_review" },
+    ] },
+
+  // ---------- RFQ open: admin supplier management ----------
+  { from: "RFQ_OPEN", to: "RFQ_OPEN", action: "add_more_suppliers",
+    allowedRoles: ["ADMIN"], preconditions: ["assertSuppliersNew"],
+    auditEvent: "rfq.suppliers.added",
+    notifyRecipients: [{ target: "COUNTERPARTY", type: "INFO", titleKey: "rfq.suppliers.added" }] },
+
+  { from: "RFQ_OPEN", to: "RFQ_OPEN", action: "update_supplier_scopes",
+    allowedRoles: ["ADMIN"], preconditions: ["assertAssignable", "assertAssignedSuppliers", "assertSupplierScopesExpanded"],
+    auditEvent: "rfq.supplier_scopes.updated",
+    notifyRecipients: [{ target: "COUNTERPARTY", type: "INFO", titleKey: "rfq.supplier_scope.expanded" }] },
 
   // ---------- RFQ open: supplier actions ----------
   { from: "RFQ_OPEN", to: "RFQ_OPEN", action: "submit_quotation",
@@ -203,6 +258,15 @@ export const RFQ_TRANSITIONS: RfqTransition[] = [
     auditEvent: "rfq.cancelled",
     notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "WARNING", titleKey: "rfq.cancelled" }] },
 
+  { from: "RFQ_OPEN", to: "SUPPLIERS_ASSIGNED", action: "unpublish_rfq",
+    allowedRoles: ["ADMIN"], requiresReason: true,
+    preconditions: ["assertNoActiveQuotations"],
+    auditEvent: "rfq.unpublished",
+    notifyRecipients: [
+      { target: "OWNER", type: "INFO", titleKey: "rfq.unpublished" },
+      { target: "COUNTERPARTY", type: "INFO", titleKey: "rfq.unpublished" },
+    ] },
+
   // ---------- Evaluation ----------
   { from: "QUOTATIONS_CLOSED", to: "UNDER_EVALUATION", action: "start_evaluation",
     allowedRoles: ["BUYER"], requiredParticipant: "OWNER",
@@ -243,6 +307,15 @@ export const RFQ_TRANSITIONS: RfqTransition[] = [
     allowedRoles: ["BUYER", "ADMIN"], requiresReason: true,
     auditEvent: "rfq.cancelled",
     notifyRecipients: [{ target: "ALL_PARTICIPANTS", type: "WARNING", titleKey: "rfq.cancelled" }] },
+
+  { from: "UNDER_EVALUATION", to: "QUOTATIONS_CLOSED", action: "revert_evaluation",
+    allowedRoles: ["ADMIN"], requiresReason: true,
+    preconditions: ["assertNoSupplierSelected"],
+    auditEvent: "rfq.evaluation.reverted",
+    notifyRecipients: [
+      { target: "OWNER", type: "INFO", titleKey: "rfq.evaluation.reverted" },
+      { broadcast: { role: "ADMIN" }, type: "INFO", titleKey: "rfq.evaluation.reverted" },
+    ] },
 
   // ---------- Proforma ----------
   { from: "SUPPLIER_SELECTED", to: "PROFORMA_REQUESTED", action: "request_proforma",
@@ -325,20 +398,46 @@ export const RFQ_TRANSITIONS: RfqTransition[] = [
 
   { from: "*", to: "*" as RfqState, action: "remove_observer",
     allowedRoles: ["ADMIN"], auditEvent: "workspace.participant.removed", notifyRecipients: [] },
+
+  // Admin override — jump to any RFQ state (ops / correction).
+  { from: "*", to: "*" as RfqState, action: "admin_set_state",
+    allowedRoles: ["ADMIN"], requiresReason: true,
+    preconditions: ["assertAdminSetStateTarget"],
+    auditEvent: "rfq.admin.state_set",
+    notifyRecipients: [
+      { target: "OWNER", type: "INFO", titleKey: "rfq.admin.state_set" },
+      { broadcast: { role: "ADMIN" }, type: "INFO", titleKey: "rfq.admin.state_set" },
+    ] },
+];
+
+import { RFQ_SPLIT_AWARD_TRANSITIONS } from "./rfq-split-award.fsm";
+
+/** Base + split-award transitions (split appended to avoid circular init). */
+export const RFQ_ALL_TRANSITIONS: RfqTransition[] = [
+  ...RFQ_TRANSITIONS,
+  ...(RFQ_SPLIT_AWARD_TRANSITIONS as RfqTransition[]),
 ];
 
 // -----------------------------------------------------------------------------
 // Convenience lookups for runtime
 // -----------------------------------------------------------------------------
 
-export const RFQ_TERMINAL_STATES: RfqState[] = ["CANCELLED", "EXPIRED", "CLOSED_NO_AWARD", "PO_ISSUED", "CLOSED"];
+export const RFQ_TERMINAL_STATES: RfqState[] = [
+  "CANCELLED", "EXPIRED", "CLOSED_NO_AWARD", "PO_ISSUED", "CLOSED",
+];
+
+/** Award-phase states where line-item awards and supplier PO spawn are active. */
+export const RFQ_SPLIT_AWARD_STATES: RfqState[] = [
+  "RFQ_OPEN", "QUOTATIONS_CLOSED", "UNDER_EVALUATION",
+  "PARTIALLY_AWARDED", "FULLY_AWARDED",
+];
 
 export function isRfqTerminal(state: RfqState): boolean {
   return RFQ_TERMINAL_STATES.includes(state);
 }
 
 export function findRfqTransition(from: RfqState, action: RfqAction): RfqTransition | undefined {
-  return RFQ_TRANSITIONS.find(
+  return RFQ_ALL_TRANSITIONS.find(
     (t) => (t.from === from || t.from === "*") && t.action === action,
   );
 }

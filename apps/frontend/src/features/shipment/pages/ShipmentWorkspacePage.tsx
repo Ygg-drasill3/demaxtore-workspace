@@ -1,5 +1,5 @@
-import { useCallback, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
+import { useParams, Link, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { shipmentApi } from "../lib/shipment.api";
 import { useAuth } from "@/store/auth.store";
@@ -21,6 +21,14 @@ import { WorkspaceProgressBar } from "@/features/workspace/components/WorkspaceP
 import { shipmentMilestones } from "@dmx/contracts/shipment.scripts";
 import { ShipmentJourneyMap } from "../components/ShipmentJourneyMap";
 import { ShipmentActionDrawer } from "../components/ShipmentActionDrawer";
+import { ShipmentPartnersPanel } from "@/features/partner-workspace/components/ShipmentPartnersPanel";
+import { TurkeyCustomsPanel } from "@/features/customs/components/TurkeyCustomsPanel";
+import { InlandDeliveryPanel } from "@/features/inland/components/InlandDeliveryPanel";
+import { LandedCostPanel } from "@/features/landed-cost/components/LandedCostPanel";
+import { ShipmentBookingPanel } from "../components/ShipmentBookingPanel";
+import { ShipmentContainersPanel } from "../components/ShipmentContainersPanel";
+import { RelatedLogisticsPanel } from "@/features/trade-lineage/components/RelatedLogisticsPanel";
+import { ShipmentLineAllocationPanel } from "@/features/trade-lineage/components/ShipmentLineAllocationPanel";
 import {
   WorkspaceActionModal,
   shipmentActionNeedsModal,
@@ -52,6 +60,7 @@ export default function ShipmentWorkspacePage() {
   const user = useAuth((s) => s.user);
   const qc = useQueryClient();
   const { t, locale } = useT();
+  const [searchParams] = useSearchParams();
   const [pendingAction, setPendingAction] = useState<ActionModalState | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -77,6 +86,11 @@ export default function ShipmentWorkspacePage() {
   const refreshShipment = useCallback(() => {
     qc.invalidateQueries({ queryKey: ["shipment", id] });
   }, [qc, id]);
+
+  useEffect(() => {
+    if (searchParams.get("focus") !== "booking") return;
+    document.getElementById("shipment-booking-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [searchParams, shipment]);
 
   useWorkspaceSocket(id, {
     "shipment.updated": refreshShipment,
@@ -125,8 +139,8 @@ export default function ShipmentWorkspacePage() {
     destinationPort: shipment.destinationPort ?? "—",
     carrierName: (shipment as { carrierName?: string }).carrierName ?? "—",
     vesselName: (shipment as { vesselName?: string }).vesselName ?? "—",
-    eta: (shipment as { currentEta?: string }).currentEta
-      ? new Date((shipment as { currentEta: string }).currentEta).toLocaleDateString()
+    eta: shipment.currentEta
+      ? new Date(shipment.currentEta).toLocaleDateString()
       : "—",
     progressPercent: String(Math.round(
       shipState === "EXCEPTION" ? 50 : shipState === "IN_TRANSIT" ? 60 : 30,
@@ -253,11 +267,73 @@ export default function ShipmentWorkspacePage() {
 
       <ConversationHubPanel workspaceType="SHIPMENT" workspaceId={id!} testId="shipment-communication" />
 
+      {id && <ShipmentPartnersPanel shipmentWorkspaceId={id} />}
+
+      <div id="shipment-booking-section">
+        <ShipmentBookingPanel
+          shipmentId={id!}
+          booking={
+            shipment.booking ?? {
+              bookingReference: shipment.bookingRef ?? null,
+              bookingDate: shipment.bookingDate ?? null,
+              carrier: shipment.carrierName ?? null,
+              forwarder: shipment.forwarderName ?? null,
+              vesselOrFlight: shipment.vesselName ?? null,
+              voyage: shipment.voyageNumber ?? null,
+              portOfLoading: shipment.originPort,
+              portOfDischarge: shipment.destinationPort,
+              etd: shipment.etd ?? null,
+              eta: shipment.eta ?? null,
+              confirmedAt: shipment.bookingConfirmedAt ?? null,
+              hasBooking: !!(shipment.bookingRef || shipment.carrierName),
+              status: null,
+              source: null,
+              requestedAt: null,
+              cancelledAt: null,
+              cancelReason: null,
+              carrierBookingNumber: null,
+              cargoReadyDate: null,
+              siCutoff: null,
+              vgmCutoff: null,
+              cyCutoff: null,
+              documentCutoff: null,
+              freightRequestId: null,
+              freightOfferId: null,
+            }
+          }
+          transportMode={(shipment.transportMode as "SEA" | "AIR" | "ROAD" | "RAIL") ?? "SEA"}
+          canEdit={!!shipment.permissions?.canEditBooking}
+        />
+      </div>
+
+      <ShipmentContainersPanel
+        shipmentId={id!}
+        containers={shipment.containers ?? []}
+        canManage={!!shipment.permissions?.canManageContainers}
+      />
+
+      <RelatedLogisticsPanel mode="shipment" entityId={id!} />
+      <ShipmentLineAllocationPanel
+        shipmentId={id!}
+        canMutate={!!shipment.permissions?.canManageContainers}
+      />
+
+      {id && <TurkeyCustomsPanel shipmentWorkspaceId={id} />}
+      {id && <InlandDeliveryPanel shipmentWorkspaceId={id} />}
+      {id && <LandedCostPanel shipmentWorkspaceId={id} />}
+
       <section data-testid="shipment-tracking-section" className="dmx-card p-4">
         <h2 className="font-medium mb-3">{t("shipment.tracking")}</h2>
         <ShipmentTrackingPanel
           shipmentId={id!}
-          defaultContainer={(shipment as { containerNumber?: string | null }).containerNumber}
+          defaultContainer={
+            shipment.containers?.[0]?.containerNumber
+            ?? (shipment as { containerNumber?: string | null }).containerNumber
+          }
+          bookingStatus={shipment.booking?.status ?? null}
+          bookingEta={shipment.booking?.eta ?? shipment.eta ?? null}
+          shipmentRef={shipment.externalRef}
+          shipmentState={shipment.state}
         />
       </section>
 
@@ -267,7 +343,9 @@ export default function ShipmentWorkspacePage() {
         {!!(documents as unknown[])?.length && (
           <ul data-testid="shipment-legacy-documents" className="text-xs mt-4 text-zinc-500 space-y-1">
             {(documents as Array<{ documentType: string; fileName: string; version: number }>).map((d, i) => (
-              <li key={i}>{t("shipment.legacyDoc")} {d.documentType} v{d.version}</li>
+              <li key={i}>
+                {t("shipment.legacyDoc")} {d.documentType.replace(/_/g, " ")} v{d.version}
+              </li>
             ))}
           </ul>
         )}
@@ -289,7 +367,10 @@ export default function ShipmentWorkspacePage() {
         <h2 className="font-medium">{t("shipment.timeline")}</h2>
         <ul data-testid="shipment-timeline" className="text-xs mt-2 space-y-1 max-h-48 overflow-auto">
           {(timeline as Array<{ eventType: string; createdAt: string }> | undefined)?.map((e, i) => (
-            <li key={i}>{e.eventType} · {new Date(e.createdAt).toLocaleString(locale === "tr" ? "tr-TR" : "en-GB")}</li>
+            <li key={i}>
+              {t(e.eventType, e.eventType.replace(/[._]/g, " "))} ·{" "}
+              {new Date(e.createdAt).toLocaleString(locale === "tr" ? "tr-TR" : "en-GB")}
+            </li>
           ))}
         </ul>
       </section>

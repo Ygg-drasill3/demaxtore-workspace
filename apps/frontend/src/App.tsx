@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { AppRoutes } from "./routes";
 import { useAuth } from "./store/auth.store";
 import { useAuthHydrated } from "./hooks/useAuthHydrated";
+import { useSessionKeepAlive } from "./hooks/useSessionKeepAlive";
 import { GlobalAlertBridge } from "./features/exception-hub/components/GlobalAlertBridge";
 
 /**
@@ -16,6 +17,8 @@ export default function App() {
   useEffect(() => {
     if (rehydrated) hydrate();
   }, [rehydrated, hydrate]);
+
+  useSessionKeepAlive();
 
   return (
     <>

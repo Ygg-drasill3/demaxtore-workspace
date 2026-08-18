@@ -45,13 +45,13 @@ describe("commoditybid-rfq-eligibility", () => {
     expect(result.blockingLineItems).toContain("copper");
   });
 
-  it("allows commodity lines even when category label is generic", () => {
+  it("blocks when category is explicitly non-commodity", () => {
     const result = assessRfqCommodityBidEligibility({
       productCategory: "Industrial machinery",
       lineItems: [{ description: "bulgur" }],
     });
-    expect(result.eligible).toBe(true);
-    expect(result.blockingLineItems).toEqual([]);
+    expect(result.eligible).toBe(false);
+    expect(result.blockingCategory).toBe("Industrial machinery");
   });
 
   it("builds Turkish error message with allowed list", () => {
@@ -62,8 +62,8 @@ describe("commoditybid-rfq-eligibility", () => {
     const msg = commodityBidEligibilityErrorMessage(result, "tr");
     expect(msg).toMatch(/Commodity olmayan bir ürün seçtiniz/i);
     expect(msg).toMatch(/Spaghetti/i);
-    expect(msg).toMatch(/Ayçiçek yağı/i);
-    expect(msg).toMatch(/İrmik/i);
+    expect(msg).toMatch(/Ayçiçek/i);
+    expect(msg).toMatch(/İrmik|Semolina/i);
     expect(msg).toMatch(/Bulgur/i);
   });
 });

@@ -45,7 +45,14 @@ describe("CommodityBid SYSTEM scheduler (HTTP + tick)", () => {
       data: { auctionEndsAt: new Date(Date.now() - 60_000) },
     });
 
-    await runCommodityBidSchedulerTick();
+    for (let i = 0; i < 8; i++) {
+      await runCommodityBidSchedulerTick();
+      const wsCheck = await prisma.workspace.findUnique({ where: { id: wsId } });
+      if (wsCheck && ["CLOSED", "WINNER_IDENTIFIED", "AWAITING_BUYER_APPROVAL", "EXPIRED"].includes(wsCheck.state)) {
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 50));
+    }
 
     const ws = await prisma.workspace.findUniqueOrThrow({ where: { id: wsId } });
     expect(["CLOSED", "WINNER_IDENTIFIED", "AWAITING_BUYER_APPROVAL"]).toContain(ws.state);

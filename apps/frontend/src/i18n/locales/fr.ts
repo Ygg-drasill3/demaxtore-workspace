@@ -1,6 +1,7 @@
 import type { TranslationDict } from "../types";
 import en from "./en";
 import workspaceFr from "./workspace-fr";
+import academyFr from "./academy-fr";
 
 /** French — workspace + chrome; other modules fall back to English via store.t */
 const frOverrides: TranslationDict = {
@@ -45,8 +46,12 @@ const frOverrides: TranslationDict = {
   "rfq.quotation.award.error": "Impossible de finaliser la sélection du fournisseur",
   "rfq.quotation.award.checkboxSelect": "Sélectionner {supplier} comme fournisseur",
   "rfq.quotation.compare.checkbox": "Comparer {supplier}",
+  "rfq.quotation.viewCatalog": "Voir le catalogue produits",
+  "rfq.quotation.offeredProduct": "Produit proposé",
+  "rfq.quotation.quantity": "Quantité",
+  "rfq.quotation.contactManufacturer": "Contacter le fabricant",
 };
 
-const fr: TranslationDict = { ...en, ...frOverrides };
+const fr: TranslationDict = { ...en, ...frOverrides, ...academyFr };
 
 export default fr;

@@ -14,12 +14,18 @@ const service = new CatalogService(prisma);
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 export const catalogController = {
-  listCategories: async (_req: Request, res: Response) => {
-    res.json({ items: await service.listCategories() });
+  listIndustries: async (_req: Request, res: Response) => {
+    res.json({ items: await service.listIndustries() });
+  },
+
+  listCategories: async (req: Request, res: Response) => {
+    const industry = req.query.industry as string | undefined;
+    res.json({ items: await service.listCategories(industry) });
   },
 
   listProducts: async (req: Request, res: Response) => {
     const query: CatalogListQuery = {
+      industry: req.query.industry as string | undefined,
       category: req.query.category as string | undefined,
       sampleAvailable: req.query.sampleAvailable === "true",
       certification: req.query.certification as string | undefined,
@@ -36,9 +42,21 @@ export const catalogController = {
     res.json(await service.getProduct(req.params.id));
   },
 
+  getProductByRef: async (req: Request, res: Response) => {
+    res.json(await service.getProductByRef(req.params.productRef));
+  },
+
   getProductImage: async (req: Request, res: Response) => {
     const { path: filePath, mime } = await service.getProductImage(req.params.id);
     res.setHeader("Content-Type", mime);
+    res.setHeader("Cache-Control", "public, max-age=604800, immutable");
+    fs.createReadStream(filePath).pipe(res);
+  },
+
+  getCategoryImage: async (req: Request, res: Response) => {
+    const { path: filePath, mime } = await service.getCategoryImage(req.params.id);
+    res.setHeader("Content-Type", mime);
+    res.setHeader("Cache-Control", "public, max-age=604800, immutable");
     fs.createReadStream(filePath).pipe(res);
   },
 

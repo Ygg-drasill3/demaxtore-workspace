@@ -133,10 +133,12 @@ export function assessRfqCommodityBidEligibility(
     }
   }
 
-  const blockingCategory =
-    category && !categoryMatch && blockingLineItems.length > 0 ? category : null;
+  const blockingCategory = category && !categoryMatch ? category : null;
 
-  const eligible = input.lineItems.length > 0 && blockingLineItems.length === 0;
+  const eligible =
+    input.lineItems.length > 0 &&
+    blockingLineItems.length === 0 &&
+    blockingCategory === null;
 
   return {
     eligible,

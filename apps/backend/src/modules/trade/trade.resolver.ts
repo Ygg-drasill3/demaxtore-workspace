@@ -32,6 +32,8 @@ export async function resolveTradeRoot(
     if (ow?.parentWorkspaceId) {
       return resolveTradeRoot(db, ow.parentWorkspaceId);
     }
+    // DIRECT_PO orders have no parent RFQ/CB/MC/BC, so the order itself is the trade root.
+    if (ow && !current.spawnedFromId) return current;
   }
 
   if (current.type === "SHIPMENT") {
@@ -66,11 +68,29 @@ export async function resolveTradeRoot(
   return ROOT_TYPES.has(cursor.type) ? cursor : null;
 }
 
+/**
+ * DIRECT_PO orders are their own trade root, so root-type queries alone miss them.
+ */
+export function findDirectOrderRoots(db: PrismaClient, take = 200): Promise<Workspace[]> {
+  return db.workspace.findMany({
+    where: {
+      type: "ORDER",
+      spawnedFromId: null,
+      orderWorkspace: { parentWorkspaceId: null },
+    },
+    take,
+    orderBy: { updatedAt: "desc" },
+  });
+}
+
 export async function collectTradeGraph(
   db: PrismaClient,
   root: Workspace,
 ): Promise<TradeGraph> {
   const orderIdSet = new Set<string>();
+
+  // A DIRECT_PO order is its own root, so it also counts as the trade's order.
+  if (root.type === "ORDER") orderIdSet.add(root.id);
 
   const spawnedOrders = await db.workspace.findMany({
     where: { spawnedFromId: root.id, type: "ORDER" },
@@ -142,6 +162,7 @@ export async function collectTradeGraph(
 export function tradeRefFromRoot(root: Workspace): string {
   const ref = root.externalRef;
   if (ref.startsWith("RFQ-")) return ref.replace(/^RFQ-/, "TRADE-");
+  if (ref.startsWith("ORD-")) return ref.replace(/^ORD-/, "TRADE-");
   if (ref.startsWith("TRADE-")) return ref;
   return `TRADE-${ref}`;
 }

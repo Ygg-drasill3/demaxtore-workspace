@@ -42,6 +42,51 @@ describe("normalizeQuotationList", () => {
     ]);
     expect(rows).toHaveLength(2);
   });
+
+  it("preserves rfqLineItemId on line items for product grouping", () => {
+    const rows = normalizeQuotationList([
+      {
+        ...base({ id: "q1", supplierId: "s1" }),
+        lineItems: [
+          {
+            id: "li-1",
+            rfqLineItemId: "0200f32c-993c-48e3-aedc-c160871f2966",
+            position: 1,
+            description: "500 ml Pet Bottle Extra Virgin Olive Oil",
+            quantity: 1,
+            unitPrice: 2.48,
+            total: 2.48,
+          },
+        ],
+      },
+    ]);
+    expect(rows[0]?.lineItems?.[0]?.rfqLineItemId).toBe("0200f32c-993c-48e3-aedc-c160871f2966");
+  });
+
+  it("preserves per-variation metadata on line items", () => {
+    const rows = normalizeQuotationList([
+      {
+        ...base({ id: "q1", supplierId: "s1" }),
+        lineItems: [
+          {
+            id: "li-1",
+            rfqLineItemId: "0200f32c-993c-48e3-aedc-c160871f2966",
+            position: 1,
+            description: "500 ml Glass Bottle",
+            quantity: 1,
+            unitPrice: 2.48,
+            total: 2.48,
+            priceUnit: "Piece",
+            packing: "12 Bottles / Carton",
+            moq: 50,
+          },
+        ],
+      },
+    ]);
+    expect(rows[0]?.lineItems?.[0]?.priceUnit).toBe("Piece");
+    expect(rows[0]?.lineItems?.[0]?.packing).toBe("12 Bottles / Carton");
+    expect(rows[0]?.lineItems?.[0]?.moq).toBe(50);
+  });
 });
 
 describe("activeQuotations", () => {

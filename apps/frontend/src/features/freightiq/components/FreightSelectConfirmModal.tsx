@@ -84,6 +84,7 @@ export function FreightSelectConfirmModal({ offer, summary, onConfirm, onCancel,
           <button
             type="button"
             data-testid="freightiq-confirm-selection"
+            data-guide="book-shipment"
             className="dmx-btn-primary flex-1"
             disabled={busy}
             onClick={onConfirm}

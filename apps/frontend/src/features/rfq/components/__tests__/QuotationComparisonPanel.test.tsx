@@ -41,23 +41,21 @@ describe("<QuotationComparisonPanel />", () => {
     expect(screen.getByTestId("quotations-panel-matrix")).toBeInTheDocument();
   });
 
-  it("renders the matrix table for UNDER_EVALUATION with select buttons", () => {
+  it("renders the matrix table for UNDER_EVALUATION with sidebar select action", () => {
     renderWithProviders(
       <QuotationComparisonPanel workspaceId="w1" state="UNDER_EVALUATION" isOwner buyerTargetTotal={50000} />,
     );
     expect(screen.getByTestId("quotation-matrix")).toBeInTheDocument();
-    // Card now surfaces the unit price (16.00) with a "lowest" a11y hint.
     expect(screen.getByTestId("quote-total-q1")).toHaveTextContent(/16\.00/);
     expect(screen.getByTestId("quote-total-q1")).toHaveTextContent(/lowest/i);
-    expect(screen.getByTestId("quote-select-q1")).toBeInTheDocument();
-    expect(screen.getByTestId("quote-select-q2")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Select as Preferred Supplier/i })).toBeInTheDocument();
   });
 
-  it("hides select buttons when not owner or not in UNDER_EVALUATION", () => {
+  it("hides sidebar select when not owner or not in UNDER_EVALUATION", () => {
     renderWithProviders(
       <QuotationComparisonPanel workspaceId="w1" state="QUOTATIONS_CLOSED" isOwner={false} />,
     );
-    expect(screen.queryByTestId("quote-select-q1")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Select as Preferred Supplier/i })).toBeNull();
   });
 
   it("renders nothing in pre-RFQ_OPEN states", () => {
@@ -81,10 +79,12 @@ describe("<QuotationComparisonPanel />", () => {
       <QuotationComparisonPanel workspaceId="w1" state="RFQ_OPEN" isOwner />,
     );
 
-    expect(screen.queryByTestId("quotation-award-close-modal")).toBeNull();
+    expect(screen.queryByTestId("quotation-award-select-modal")).toBeNull();
     await user.click(screen.getByTestId("quote-award-checkbox-q1"));
-    expect(screen.getByTestId("quotation-award-close-modal")).toBeInTheDocument();
-    expect(screen.getByText(/Teklifleri kapatıp devam edelim mi/i)).toBeInTheDocument();
+    expect(screen.getByTestId("quotation-award-select-modal")).toBeInTheDocument();
+    // Assert the controls, not the marketing copy — the wording is translated.
+    expect(screen.getByTestId("quotation-award-select-confirm")).toBeInTheDocument();
+    expect(screen.getByTestId("quotation-award-rationale")).toBeInTheDocument();
   });
 
   it("closes award flow modal when checkbox is unchecked", async () => {
@@ -95,9 +95,9 @@ describe("<QuotationComparisonPanel />", () => {
 
     const checkbox = screen.getByTestId("quote-award-checkbox-q1");
     await user.click(checkbox);
-    expect(screen.getByTestId("quotation-award-close-modal")).toBeInTheDocument();
+    expect(screen.getByTestId("quotation-award-select-modal")).toBeInTheDocument();
     await user.click(checkbox);
-    expect(screen.queryByTestId("quotation-award-close-modal")).toBeNull();
+    expect(screen.queryByTestId("quotation-award-select-modal")).toBeNull();
   });
 
   it("shows compare toggle instead of award checkbox when not owner", () => {

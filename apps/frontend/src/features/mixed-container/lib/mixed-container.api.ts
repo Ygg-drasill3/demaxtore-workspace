@@ -11,7 +11,8 @@ import type {
   McExecutionDTO,
   McSpawnResultDTO,
 } from "@dmx/contracts/mixed-container.zod";
-import type { CatalogProductCardDTO, CatalogCategoryDTO } from "@dmx/contracts/mixed-container-catalog";
+import type { ProcurementRequestDetailDTO } from "@dmx/contracts/mixed-container-procurement";
+import type { CatalogProductDiscoveryDTO, CatalogCategoryDTO, CatalogIndustryDTO } from "@dmx/contracts/mixed-container-catalog";
 
 export const mixedContainerApi = {
   list: () =>
@@ -20,14 +21,17 @@ export const mixedContainerApi = {
   create: (data: { containerType?: string; destinationMarket?: string; currency?: string }) =>
     api.post<MixedContainerDTO>("/mixed-containers", data).then((r) => r.data),
 
+  addSiblingContainer: (id: string) =>
+    api.post<MixedContainerDTO>(`/mixed-containers/${id}/actions/add-container`).then((r) => r.data),
+
   get: (id: string) =>
     api.get<MixedContainerDTO>(`/mixed-containers/${id}`).then((r) => r.data),
 
   update: (id: string, data: Record<string, unknown>) =>
     api.patch<MixedContainerDTO>(`/mixed-containers/${id}`, data).then((r) => r.data),
 
-  addLine: (id: string, catalogProductId: string, packingTypeId: string, palletCount: number) =>
-    api.post<MixedContainerDTO>(`/mixed-containers/${id}/lines`, { catalogProductId, packingTypeId, palletCount }).then((r) => r.data),
+  addLine: (id: string, catalogProductId: string, packagingId: string, palletCount: number) =>
+    api.post<MixedContainerDTO>(`/mixed-containers/${id}/lines`, { catalogProductId, packagingId, palletCount }).then((r) => r.data),
 
   updateLine: (id: string, lineId: string, palletCount: number) =>
     api.patch<MixedContainerDTO>(`/mixed-containers/${id}/lines/${lineId}`, { palletCount }).then((r) => r.data),
@@ -35,8 +39,18 @@ export const mixedContainerApi = {
   removeLine: (id: string, lineId: string) =>
     api.delete<MixedContainerDTO>(`/mixed-containers/${id}/lines/${lineId}`).then((r) => r.data),
 
-  requestPricing: (id: string) =>
-    api.post<MixedContainerDTO>(`/mixed-containers/${id}/actions/request-pricing`).then((r) => r.data),
+  requestPricing: (id: string, data?: { buyerNotes?: string; destinationMarket?: string }) =>
+    api.post<MixedContainerDTO>(`/mixed-containers/${id}/actions/request-pricing`, data ?? {}).then((r) => r.data),
+
+  getProcurementRequest: (id: string) =>
+    api.get<ProcurementRequestDetailDTO>(`/mixed-containers/${id}/procurement-request`).then((r) => r.data),
+
+  getCommercialProposal: (id: string, offerId?: string) =>
+    api
+      .get<ContainerOfferDTO>(`/mixed-containers/${id}/commercial-proposal`, {
+        params: offerId ? { offerId } : undefined,
+      })
+      .then((r) => r.data),
 
   getOffer: (offerId: string) =>
     api.get<ContainerOfferDTO>(`/mixed-containers/offers/${offerId}`).then((r) => r.data),
@@ -61,13 +75,25 @@ export const mixedContainerApi = {
 
   execution: (id: string) =>
     api.get<McExecutionDTO>(`/mixed-containers/${id}/execution`).then((r) => r.data),
+
+  organization: (id: string) =>
+    api.get<import("@dmx/contracts/mixed-container-organization").McOrganizationWorkspaceDTO>(`/mixed-containers/${id}/organization`).then((r) => r.data),
 };
 
 export const adminMixedContainerApi = {
   kpis: () => api.get<McOpsKpiDTO>("/admin/mixed-containers/kpis").then((r) => r.data),
 
-  inbox: () =>
-    api.get<{ items: AdminMixedContainerInboxItem[] }>("/admin/mixed-containers/inbox").then((r) => r.data),
+  inbox: (params?: { status?: string; managerId?: string; submittedFrom?: string; submittedTo?: string }) =>
+    api.get<{ items: AdminMixedContainerInboxItem[] }>("/admin/mixed-containers/inbox", { params }).then((r) => r.data),
+
+  procurementManagers: () =>
+    api.get<{ items: Array<{ id: string; displayName: string; email: string }> }>("/admin/mixed-containers/procurement-managers").then((r) => r.data),
+
+  getProcurementRequest: (id: string) =>
+    api.get<ProcurementRequestDetailDTO>(`/admin/mixed-containers/${id}/procurement-request`).then((r) => r.data),
+
+  addInternalNote: (id: string, body: string) =>
+    api.post<ProcurementRequestDetailDTO>(`/admin/mixed-containers/${id}/internal-notes`, { body }).then((r) => r.data),
 
   get: (id: string) => api.get(`/admin/mixed-containers/${id}`).then((r) => r.data),
 
@@ -91,6 +117,18 @@ export const adminMixedContainerApi = {
 
   expireOffers: () =>
     api.post<{ expired: number }>("/admin/mixed-containers/actions/expire-offers").then((r) => r.data),
+
+  getOrganization: (id: string) =>
+    api.get<import("@dmx/contracts/mixed-container-organization").McOrganizationWorkspaceDTO>(`/admin/mixed-containers/organization/${id}`).then((r) => r.data),
+
+  updateOrganizationStatus: (id: string, data: { status: string; note?: string }) =>
+    api.post(`/admin/mixed-containers/organization/${id}/actions/update-status`, data).then((r) => r.data),
+
+  assignOperationsManager: (id: string, managerId: string) =>
+    api.post(`/admin/mixed-containers/organization/${id}/actions/assign-manager`, { managerId }).then((r) => r.data),
+
+  addOrganizationInternalNote: (id: string, body: string) =>
+    api.post(`/admin/mixed-containers/organization/${id}/internal-notes`, { body }).then((r) => r.data),
 };
 
 export const adminMcAllocationApi = {
@@ -129,21 +167,29 @@ export const adminMcExecutionApi = {
 };
 
 export const catalogApi = {
-  categories: () =>
-    api.get<{ items: CatalogCategoryDTO[] }>("/mixed-container/catalog/categories").then((r) => r.data),
+  industries: () =>
+    api.get<{ items: CatalogIndustryDTO[] }>("/mixed-container/catalog/industries").then((r) => r.data),
+
+  categories: (industry?: string) =>
+    api.get<{ items: CatalogCategoryDTO[] }>("/mixed-container/catalog/categories", {
+      params: industry ? { industry } : undefined,
+    }).then((r) => r.data),
 
   products: (params?: Record<string, string | number | boolean>) =>
-    api.get<{ items: CatalogProductCardDTO[]; total: number }>("/mixed-container/catalog/products", { params }).then((r) => r.data),
+    api.get<{ items: CatalogProductDiscoveryDTO[]; total: number }>("/mixed-container/catalog/products", { params }).then((r) => r.data),
 
   product: (id: string) =>
-    api.get<CatalogProductCardDTO>(`/mixed-container/catalog/products/${id}`).then((r) => r.data),
+    api.get<CatalogProductDiscoveryDTO & { description: string | null }>(`/mixed-container/catalog/products/${id}`).then((r) => r.data),
+
+  productByRef: (productRef: string) =>
+    api.get<CatalogProductDiscoveryDTO & { description: string | null }>(`/mixed-container/catalog/products/by-ref/${productRef}`).then((r) => r.data),
 };
 
 export const adminCatalogApi = {
   categories: () =>
     api.get<{ items: unknown[] }>("/admin/mixed-container/catalog/categories").then((r) => r.data),
 
-  createCategory: (data: { slug: string; name: string; sortOrder?: number }) =>
+  createCategory: (data: { industryId: string; slug: string; name: string; sortOrder?: number }) =>
     api.post("/admin/mixed-container/catalog/categories", data).then((r) => r.data),
 
   products: () =>

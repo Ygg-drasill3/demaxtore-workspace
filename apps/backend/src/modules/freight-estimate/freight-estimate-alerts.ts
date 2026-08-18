@@ -74,7 +74,7 @@ export async function scanFreightEstimateAlerts(db: PrismaClient): Promise<numbe
       workspaceType: ws.type,
       title: "Freight estimate refresh required",
       description: `${ws.externalRef} needs a refreshed indicative freight estimate before PO approval.`,
-    })) n++;
+    }, { allowTestWorkspace: true })) n++;
   }
 
   return n;

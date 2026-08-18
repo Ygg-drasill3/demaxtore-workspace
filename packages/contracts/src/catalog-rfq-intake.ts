@@ -12,7 +12,6 @@ export const CatalogIntakeDTO = z.object({
   contactPerson: z.string().optional(),
   phone: z.string().optional(),
   sessionId: z.string().optional(),
-  productImageUrl: z.string().optional(),
 });
 export type CatalogIntakeDTO = z.infer<typeof CatalogIntakeDTO>;
 
@@ -27,7 +26,6 @@ export const CatalogRfqFormFields = z.object({
   company_name: z.string().max(200).optional(),
   contact_person: z.string().max(200).optional(),
   phone: z.string().max(64).optional(),
-  product_image: z.string().max(2000).optional(),
 });
 export type CatalogRfqFormFields = z.infer<typeof CatalogRfqFormFields>;
 
@@ -50,25 +48,20 @@ export function buildCatalogProductDescription(
   intake: CatalogIntakeDTO,
   extraBlocks: string[] = [],
 ): string {
-  const catalogLines = [
-    fieldLine("Product or service", intake.productOrService),
-    fieldLine("Delivery location", intake.deliveryLocation),
-    fieldLine("Quantity", intake.quantity),
-    fieldLine("Supplier type", intake.supplierType),
-  ].filter(Boolean);
-
-  const requestText = (intake.requestDetails ?? "").trim();
-  if (requestText) {
-    const bullets = requestText
-      .split("\n")
-      .map((l) => l.trim())
-      .filter(Boolean)
-      .map((l) => (l.startsWith("- ") ? l : `- ${l}`));
-    catalogLines.push("Request details:", ...bullets);
-  }
+  const requestBullets = (intake.requestDetails ?? "")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((l) => (l.startsWith("- ") ? l : `- ${l}`));
 
   const blocks = [
-    section("Catalog request", catalogLines),
+    section("Catalog request", [
+      fieldLine("Product or service", intake.productOrService),
+      fieldLine("Delivery location", intake.deliveryLocation),
+      fieldLine("Quantity", intake.quantity),
+      fieldLine("Supplier type", intake.supplierType),
+      requestBullets.length ? "Request details:\n" + requestBullets.join("\n") : fieldLine("Request details", intake.requestDetails),
+    ].filter(Boolean) as string[]),
     section("Your contact details", [
       fieldLine("Business email", intake.businessEmail),
       fieldLine("Company name", intake.companyName),
@@ -89,7 +82,6 @@ export function catalogIntakeFromIngestBody(body: CatalogRfqFormFields & {
   session_id?: string;
   category?: string;
   description?: string;
-  product_image?: string;
 }): CatalogIntakeDTO {
   const qty =
     body.quantity == null
@@ -109,6 +101,5 @@ export function catalogIntakeFromIngestBody(body: CatalogRfqFormFields & {
     contactPerson: body.contact_person?.trim() || body.contact_name?.trim() || undefined,
     phone: body.phone?.trim() || undefined,
     sessionId: body.session_id?.trim() || undefined,
-    productImageUrl: body.product_image?.trim() || undefined,
   });
 }

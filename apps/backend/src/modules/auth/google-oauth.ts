@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "../../db/prisma.js";
 import { env } from "../../config/env.js";
 import { Validation } from "../../lib/errors.js";
-import { issueTokensForUser, toUserDTO } from "./auth.service.js";
+import { AUTH_ORG_SELECT, issueTokensForUser, toUserDTO } from "./auth.service.js";
 
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -113,7 +113,7 @@ export async function loginOrRegisterWithGoogle(profile: GoogleUserInfo) {
 
   let user = await prisma.user.findFirst({
     where: { OR: [{ googleId }, { email }] },
-    include: { organisation: { select: { name: true } } },
+    include: { organisation: { select: AUTH_ORG_SELECT } },
   });
 
   if (user) {
@@ -124,7 +124,7 @@ export async function loginOrRegisterWithGoogle(profile: GoogleUserInfo) {
         displayName: user.displayName || displayName,
         avatarUrl: user.avatarUrl ?? avatarUrl,
       },
-      include: { organisation: { select: { name: true } } },
+      include: { organisation: { select: AUTH_ORG_SELECT } },
     });
   } else {
     const passwordHash = await randomPasswordHash();
@@ -146,7 +146,7 @@ export async function loginOrRegisterWithGoogle(profile: GoogleUserInfo) {
           googleId,
           avatarUrl,
         },
-        include: { organisation: { select: { name: true } } },
+        include: { organisation: { select: AUTH_ORG_SELECT } },
       });
     });
   }

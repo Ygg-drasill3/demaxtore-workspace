@@ -58,11 +58,11 @@ export const FREIGHTIQ_SCRIPTS: Record<FreightIqScriptPhase, WorkspaceScript> = 
   QUOTED: {
     mood: "action",
     past: "{{offerCount}} freight offers received",
-    future: "Compare forwarder prices, then choose the vessel and sailing schedule that fits your cargo",
+    future: "Compare price, transit time, and sailing schedule — select the best option",
     statL: { label: "Lowest", value: "{{lowestPrice}}" },
     statR: { label: "Fastest", value: "{{fastestTransit}} days" },
     primaryAction: "select_freight_offer",
-    primaryLabel: "Compare & select vessel",
+    primaryLabel: "Compare & select offer",
   },
   SELECTED: {
     mood: "terminal-plus",

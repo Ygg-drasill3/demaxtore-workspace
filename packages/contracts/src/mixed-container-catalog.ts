@@ -1,4 +1,4 @@
-// Sprint 12B — Mixed Container catalog contracts (buyer-safe DTOs)
+// Sprint 12B + Sprint 01/02 — Mixed Container catalog contracts (buyer-safe DTOs)
 
 import type { PackingTypeSummaryDTO } from "./packing-type.js";
 
@@ -11,11 +11,51 @@ export type CatalogProductStatus = (typeof CATALOG_PRODUCT_STATUS)[number];
 export const MC_CONTAINER_TYPES = ["CONTAINER_20FT", "CONTAINER_40FT", "CONTAINER_40FT_HC"] as const;
 export type McContainerType = (typeof MC_CONTAINER_TYPES)[number];
 
+export interface CatalogIndustryDTO {
+  id: string;
+  slug: string;
+  name: string;
+  categoryCount: number;
+}
+
 export interface CatalogCategoryDTO {
   id: string;
   slug: string;
   name: string;
+  description: string | null;
+  imageUrl: string | null;
+  industrySlug: string;
+  industryName: string;
   productCount: number;
+}
+
+export interface CatalogPackagingDTO {
+  id: string;
+  slug: string;
+  name: string;
+  unitsPerPallet: number;
+  moqPallets: number;
+  isDefault: boolean;
+  /** @deprecated use packaging options; kept for container-line compatibility */
+  packingTypeId?: string | null;
+}
+
+/** Buyer discovery view — no pricing or supplier information */
+export interface CatalogProductDiscoveryDTO {
+  id: string;
+  productRef: string;
+  name: string;
+  shortDescription: string | null;
+  category: string;
+  categorySlug: string;
+  originCountry: string | null;
+  packagingOptions: CatalogPackagingDTO[];
+  imageUrl: string | null;
+  moqPallets: number;
+}
+
+export interface CatalogProductDetailDTO extends CatalogProductDiscoveryDTO {
+  description: string | null;
 }
 
 export interface CatalogProductCardDTO {
@@ -24,6 +64,8 @@ export interface CatalogProductCardDTO {
   name: string;
   category: string;
   categorySlug: string;
+  industrySlug: string;
+  industryName: string;
   packagingDescription: string;
   moqPallets: number;
   unitsPerPallet: number;
@@ -38,16 +80,15 @@ export interface CatalogProductCardDTO {
   originCountry: string | null;
   certifications: string[];
   supplierAvailabilityLabel: string;
+  packagingOptions: CatalogPackagingDTO[];
+  /** @deprecated use packagingOptions */
   packingTypes: PackingTypeSummaryDTO[];
   imageUrl: string | null;
   updatedAt: string;
 }
 
-export interface CatalogProductDetailDTO extends CatalogProductCardDTO {
-  marketInsightSummary: string | null;
-}
-
 export interface CatalogListQuery {
+  industry?: string;
   category?: string;
   sampleAvailable?: boolean;
   certification?: string;

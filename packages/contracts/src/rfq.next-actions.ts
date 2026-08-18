@@ -8,7 +8,7 @@
 // =============================================================================
 
 import {
-  RFQ_TRANSITIONS, isRfqTerminal,
+  RFQ_ALL_TRANSITIONS, isRfqTerminal,
   type RfqState, type RfqAction, type RfqTransition, type ActorRole,
 } from "./rfq.fsm";
 
@@ -45,6 +45,7 @@ const LABELS: Record<RfqAction, { label: string; description: string; variant: N
   withdraw_rfq:             { label: "Withdraw", description: "Cancel before admin triage", variant: "destructive", confirm: "This will withdraw your RFQ. Continue?" },
   assign_suppliers:         { label: "Assign Suppliers", description: "Select suppliers to invite", variant: "primary" },
   add_more_suppliers:       { label: "Add Suppliers", description: "Invite additional suppliers", variant: "secondary" },
+  update_supplier_scopes:   { label: "Update supplier products", description: "Add more products for an assigned supplier to quote on", variant: "secondary" },
   remove_supplier:          { label: "Remove Supplier", description: "Remove a supplier who hasn't quoted yet", variant: "secondary" },
   reject_rfq:               { label: "Reject RFQ", description: "Return RFQ to the buyer with reason", variant: "destructive" },
   publish_rfq:              { label: "Publish RFQ", description: "Open the RFQ to assigned suppliers", variant: "primary" },
@@ -59,7 +60,15 @@ const LABELS: Record<RfqAction, { label: string; description: string; variant: N
   deadline_reached_no_bids: { label: "(system)", description: "", variant: "secondary" },
   start_evaluation:         { label: "Start Evaluation", description: "Begin reviewing supplier quotations", variant: "primary" },
   reopen_quotations:        { label: "Reopen Quotations", description: "Re-open the RFQ (Admin only, requires reason + new deadline)", variant: "secondary" },
+  return_to_review:         { label: "Return to review", description: "Move back to Under review and clear supplier assignments", variant: "secondary", confirm: "Supplier assignments will be removed. Continue?" },
+  unpublish_rfq:            { label: "Unpublish RFQ", description: "Close quotations and return to supplier assignment step", variant: "secondary", confirm: "Suppliers will no longer see this RFQ as open. Continue?" },
+  revert_evaluation:        { label: "Revert evaluation", description: "Return to quotes closed — buyer has not selected a supplier yet", variant: "secondary", confirm: "Evaluation will be rolled back. Continue?" },
   select_supplier:          { label: "Select Supplier", description: "Pick the winning quotation", variant: "primary" },
+  award_line_item:          { label: "Award Line", description: "Award this product to the selected supplier", variant: "primary" },
+  revert_line_award:        { label: "Revert Award", description: "Undo award for this line item", variant: "secondary" },
+  mark_line_no_award:       { label: "No Award", description: "Close this line without selecting a supplier", variant: "secondary" },
+  issue_supplier_po:        { label: "Issue PO", description: "Create PO for this supplier's awarded lines", variant: "primary" },
+  close_rfq_awards:         { label: "Close RFQ", description: "Close RFQ (remaining lines may be marked no award)", variant: "secondary" },
   revert_selection:         { label: "Revert Selection", description: "Undo selection before requesting proforma", variant: "secondary" },
   close_without_award:      { label: "Close — No Award", description: "End the RFQ without selecting any supplier", variant: "destructive" },
   request_proforma:         { label: "Request Proforma", description: "Ask supplier for proforma invoice (5 BD SLA)", variant: "primary" },
@@ -73,6 +82,7 @@ const LABELS: Record<RfqAction, { label: string; description: string; variant: N
   cancel_rfq:               { label: "Cancel RFQ", description: "Permanently cancel this RFQ (requires reason)", variant: "destructive", confirm: "This will cancel the RFQ for all participants. Continue?" },
   add_observer:             { label: "Add Observer", description: "Invite a read-only observer", variant: "secondary" },
   remove_observer:          { label: "Remove Observer", description: "Remove an observer", variant: "secondary" },
+  admin_set_state:          { label: "Set RFQ state", description: "Admin override — jump to any workflow stage", variant: "secondary" },
 };
 
 // -----------------------------------------------------------------------------
@@ -83,7 +93,7 @@ export function computeRfqNextActions(ctx: NextActionContext): NextAction[] {
   // Terminal states have no actions
   if (isRfqTerminal(ctx.state)) return [];
 
-  return RFQ_TRANSITIONS
+  return RFQ_ALL_TRANSITIONS
     .filter((t) => t.from === ctx.state || t.from === "*")
     // Hide SYSTEM transitions — they aren't user-facing CTAs
     .filter((t) => !t.allowedRoles.every((r) => r === "SYSTEM"))
@@ -91,7 +101,8 @@ export function computeRfqNextActions(ctx: NextActionContext): NextAction[] {
     .filter((t) => satisfiesParticipantConstraint(t, ctx))
     .filter((t) => satisfiesSemanticConstraint(t, ctx))
     .map(toNextAction)
-    .filter((a) => a.label !== "(system)");
+    .filter((a) => a.label !== "(system)")
+    .filter((a, idx, arr) => arr.findIndex((x) => x.action === a.action) === idx);
 }
 
 function satisfiesParticipantConstraint(t: RfqTransition, ctx: NextActionContext): boolean {
@@ -128,7 +139,13 @@ function satisfiesSemanticConstraint(t: RfqTransition, ctx: NextActionContext): 
       return ctx.isSelectedSupplier === true;
     case "add_observer":
     case "remove_observer":
-      // Hidden from primary CTA panel — surfaced in the participants management UI
+    case "admin_set_state":
+      // Hidden from primary CTA panel — surfaced in the participants / admin workflow UI
+      return false;
+    case "award_line_item":
+    case "revert_line_award":
+    case "mark_line_no_award":
+      // Line-scoped — handled in the quotation comparison / award flow UI
       return false;
     default:
       return true;

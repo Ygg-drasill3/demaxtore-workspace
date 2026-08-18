@@ -70,12 +70,14 @@ export async function assertSupplierQuoteLinesAllowed(
   if (!allowed) return;
 
   const allowedSet = new Set(allowed);
+  const soleAllowed = allowed.length === 1 ? allowed[0]! : null;
   for (const li of payload.lineItems) {
-    if (!li.rfqLineItemId) {
+    const rfqLineItemId = li.rfqLineItemId ?? soleAllowed;
+    if (!rfqLineItemId) {
       throw new AppError(403, "QUOTE_LINE_NOT_ALLOWED", { line: li.description });
     }
-    if (!allowedSet.has(li.rfqLineItemId)) {
-      throw new AppError(403, "QUOTE_LINE_NOT_ALLOWED", { rfqLineItemId: li.rfqLineItemId });
+    if (!allowedSet.has(rfqLineItemId)) {
+      throw new AppError(403, "QUOTE_LINE_NOT_ALLOWED", { rfqLineItemId });
     }
   }
 }

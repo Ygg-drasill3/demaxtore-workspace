@@ -15,6 +15,10 @@ import { socketBus } from "../../realtime/socket-bus";
 import { buildFsmNotificationMetadata } from "../notification-engine/fsm-notification-metadata.js";
 import { AppError } from "../../utils/httpErrors.js";
 import { claimProcessedEvent, releaseProcessedEvent } from "../../lib/processed-event.js";
+import {
+  computeShipmentPermissions,
+  ShipmentWorkspaceOps,
+} from "./shipment-workspace.ops.js";
 
 export interface ApplyTransitionInput {
   workspaceId: string;
@@ -365,12 +369,30 @@ export class ShipmentService {
           await update({ bookingConfirmedAt: new Date() });
         }
         break;
-      case "assign_container":
+      case "assign_container": {
+        const containerNumber = payload.containerNumber as string;
         await update({
-          containerNumber: payload.containerNumber as string,
+          containerNumber,
           containerAssignedAt: new Date(),
         });
+        const swId = sw.id as string | undefined;
+        if (swId && containerNumber?.trim()) {
+          const existing = await tx.shipmentContainer.findFirst({
+            where: { shipmentWorkspaceId: swId, containerNumber },
+            select: { id: true },
+          });
+          if (!existing) {
+            await tx.shipmentContainer.create({
+              data: {
+                shipmentWorkspaceId: swId,
+                containerNumber,
+                status: "PLANNED",
+              },
+            });
+          }
+        }
         break;
+      }
       case "pickup_cargo":
         if (currentState === "CONTAINER_ASSIGNED") break;
         await update({ pickedUpAt: new Date() });
@@ -478,7 +500,7 @@ export class ShipmentService {
     const ws = await this.prisma.workspace.findUniqueOrThrow({
       where: { id: workspaceId },
       include: {
-        shipmentWorkspace: true,
+        shipmentWorkspace: { include: { containers: { orderBy: { createdAt: "asc" as const } } } },
         participants: { include: { user: { select: { id: true, email: true, displayName: true } } } },
         spawnedFrom: { select: { id: true, externalRef: true, type: true } },
         shipmentExceptions: { orderBy: { reportedAt: "desc" }, take: 20 },
@@ -489,6 +511,21 @@ export class ShipmentService {
     const supplier = ws.participants.find((p) => p.participantRole === "COUNTERPARTY");
     const buyer = ws.participants.find((p) => p.participantRole === "OWNER");
     const openException = ws.shipmentExceptions.find((e) => e.status === "OPEN");
+    const ops = new ShipmentWorkspaceOps(this.prisma);
+    const containers = (sw.containers ?? []).map((c) => ({
+      id: c.id,
+      containerNumber: c.containerNumber,
+      containerType: c.containerType,
+      sealNumber: c.sealNumber,
+      grossWeightKg: c.grossWeightKg != null ? Number(c.grossWeightKg) : null,
+      netWeightKg: c.netWeightKg != null ? Number(c.netWeightKg) : null,
+      volumeCbm: c.volumeCbm != null ? Number(c.volumeCbm) : null,
+      packageCount: c.packageCount,
+      status: c.status,
+      createdAt: c.createdAt.toISOString(),
+      updatedAt: c.updatedAt.toISOString(),
+    }));
+    const primaryContainer = containers[0]?.containerNumber ?? sw.containerNumber;
     return {
       id: ws.id,
       externalRef: ws.externalRef,
@@ -501,13 +538,22 @@ export class ShipmentService {
       contractRef: sw.contractRef,
       originPort: sw.originPort,
       destinationPort: sw.destinationPort,
-      containerNumber: sw.containerNumber,
+      containerNumber: primaryContainer,
       vesselName: sw.vesselName,
+      voyageNumber: sw.voyageNumber,
       bookingRef: sw.bookingRef,
       carrierName: sw.carrierName,
+      transportMode: sw.transportMode,
+      forwarderName: sw.forwarderName,
+      etd: sw.etd?.toISOString() ?? null,
+      eta: sw.eta?.toISOString() ?? null,
+      currentEta: sw.eta?.toISOString() ?? null,
       ownerUserId: buyer?.userId,
       supplierUserId: supplier?.userId,
       hasOpenException: !!openException,
+      booking: ops.buildBooking(sw),
+      containers,
+      permissions: computeShipmentPermissions(_user.role),
       participants: ws.participants.map((p) => ({
         userId: p.userId,
         participantRole: p.participantRole,

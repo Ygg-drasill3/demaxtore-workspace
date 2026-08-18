@@ -17,7 +17,7 @@ export default function TradeDocumentsPanelPage() {
   }
 
   return (
-    <div data-testid="trade-documents-panel" className="max-w-5xl mx-auto space-y-6 pb-10 animate-fade-in">
+    <div data-testid="trade-documents-panel" data-guide="trade-documents-panel" className="max-w-5xl mx-auto space-y-6 pb-10 animate-fade-in">
       <header className="flex items-center justify-between gap-4">
         <div>
           <Link to={`/workspace/trade/${id}`} className="text-xs text-zinc-500 hover:underline">← Trade workspace</Link>

@@ -69,7 +69,7 @@ export default function BulkContainerOfferPage() {
   const canAct = offer.status === "SENT" && !expired && offer.state === "BC_BUYER_REVIEW";
 
   return (
-    <div data-testid="bc-offer-page" className="max-w-[1200px] mx-auto space-y-6 animate-fade-in">
+    <div data-testid="bc-offer-page" data-guide="bc-offer" className="max-w-[1200px] mx-auto space-y-6 animate-fade-in">
       <header>
         <Link to="/buyer/bulk-container/requests" className="text-xs text-zinc-500 hover:underline">← My Bulk Containers</Link>
         <h1 className="font-display text-4xl font-semibold tracking-tight mt-1">Bulk Offer · {offer.externalRef}</h1>

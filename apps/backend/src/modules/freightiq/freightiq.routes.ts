@@ -10,6 +10,13 @@ export const freightiqRouter = Router();
 freightiqRouter.use("/commercial", freightCommercialRouter);
 
 freightiqRouter.get(
+  "/my-portfolio",
+  requireAuth,
+  requireRole("BUYER", "SUPPLIER", "ADMIN", "SUPER_ADMIN", "SALES_CONTROL"),
+  asyncHandler(freightiqExtController.myPortfolio),
+);
+
+freightiqRouter.get(
   "/operations/overview",
   requireAuth,
   requireRole("ADMIN"),

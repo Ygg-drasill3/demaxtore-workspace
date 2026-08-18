@@ -1,9 +1,9 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import type { CommWorkspaceType } from "@dmx/contracts/workspace-communication";
+import { InboxFilter } from "@dmx/contracts/workspace-inbox";
 import type {
   InboxActivity,
   InboxAttentionBadge,
-  InboxFilter,
   InboxPriority,
   InboxSummaryCards,
   InboxWorkspaceCard,
@@ -51,6 +51,10 @@ type WsRow = {
 function workspaceAccessFilter(actor: AuthUser): Prisma.WorkspaceWhereInput {
   if (hasPortfolioVisibility(actor.role)) return {};
   return { participants: { some: { userId: actor.id, leftAt: null } } };
+}
+
+function isInboxFilter(value: string | undefined): value is InboxFilter {
+  return InboxFilter.some((candidate) => candidate === value);
 }
 
 function humanize(state: string): string {
@@ -370,7 +374,7 @@ export class WorkspaceInboxService {
       );
     }
 
-    const filter: InboxFilter = query.filter ?? "all";
+    const filter: InboxFilter = isInboxFilter(query.filter) ? query.filter : "all";
     filtered = this.applyFilter(filtered, filter, actor.role);
 
     const summary = this.buildSummary(cards);

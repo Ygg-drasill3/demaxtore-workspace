@@ -47,7 +47,7 @@ export default function DocumentDetailPage() {
   const hasFile = Boolean(data.downloadUrl);
 
   return (
-    <div data-testid="document-detail" className="max-w-5xl mx-auto space-y-6 pb-10 animate-fade-in">
+    <div data-testid="document-detail" data-guide="document-detail" className="max-w-5xl mx-auto space-y-6 pb-10 animate-fade-in">
       <div className="flex items-start justify-between gap-4">
         <div>
           <Link to="/documents" className="text-xs text-zinc-500 hover:underline">← Document Center</Link>
@@ -89,6 +89,18 @@ export default function DocumentDetailPage() {
         <section className="dmx-card p-5 space-y-3 text-sm">
           <h2 className="text-sm font-semibold">Metadata</h2>
           <div><span className="text-zinc-500">Source</span><div>{data.source}</div></div>
+          {data.poNumber && (
+            <div>
+              <span className="text-zinc-500">{t("documents.dc.colPo", "PO No.")}</span>
+              <div className="font-mono text-xs">
+                {data.orderWorkspaceUrl ? (
+                  <Link to={data.orderWorkspaceUrl} className="text-accent-900 hover:underline">{data.poNumber}</Link>
+                ) : (
+                  data.poNumber
+                )}
+              </div>
+            </div>
+          )}
           <div><span className="text-zinc-500">Trade / RFQ</span><div className="font-mono text-xs">{data.tradeId ?? data.relatedEntityRef ?? "—"}</div></div>
           <div><span className="text-zinc-500">Entity</span><div>{data.relatedEntityType} · {data.relatedEntityRef}</div></div>
           <div><span className="text-zinc-500">Uploaded</span><div>{data.uploadedAt ? new Date(data.uploadedAt).toLocaleString() : "—"}</div></div>

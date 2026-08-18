@@ -6,12 +6,12 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "node ../../scripts/generate-build-info.mjs && yarn workspace @dmx/contracts build && tsc && bash scripts/flatten-dist.sh",
+    "build": "node ../../scripts/generate-build-info.mjs && yarn workspace @dmx/contracts build && node scripts/emit-dist.mjs --strict",
     "start": "node dist/server.js",
     "test": "vitest run",
     "test:unit": "vitest run --exclude '**/commoditybid.sealed-bid.test.ts' --exclude '**/commoditybid.scheduler.test.ts'",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
@@ -19,7 +19,9 @@
     "demo:seed": "tsx prisma/seed-demo.ts",
     "demo:reset": "tsx prisma/reset-demo.ts",
     "setup:production": "tsx prisma/setup-production.ts",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "logos:fetch-missing": "tsx scripts/fetch-missing-supplier-logos.ts",
+    "logos:fetch-missing:dry": "DRY_RUN=1 tsx scripts/fetch-missing-supplier-logos.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

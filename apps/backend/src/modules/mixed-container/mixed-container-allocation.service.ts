@@ -250,7 +250,7 @@ export class MixedContainerAllocationService {
   async createAllocation(id: string, input: CreateMcAllocationInput, actor: AuthUser) {
     if (actor.role !== "ADMIN") throw new AppError(403, "FORBIDDEN");
     const ws = await this.assertAdminMcWorkspace(id);
-    if (!["MC_ALLOCATION_IN_PROGRESS", "MC_APPROVED"].includes(ws.state)) {
+    if (!["MC_ALLOCATION_IN_PROGRESS", "MC_APPROVED", "MC_EXECUTION_READY"].includes(ws.state)) {
       throw new AppError(409, "ALLOCATION_NOT_ALLOWED", { state: ws.state });
     }
 
@@ -280,7 +280,7 @@ export class MixedContainerAllocationService {
     }
 
     await this.prisma.$transaction(async (tx) => {
-      if (ws.state === "MC_APPROVED") {
+      if (ws.state === "MC_APPROVED" || ws.state === "MC_EXECUTION_READY") {
         await applyMcTransition(tx, id, "start_allocation", actor, "mixed_container.allocation_started");
       }
       const alloc = await tx.mcSupplierAllocation.create({
@@ -372,11 +372,29 @@ export class MixedContainerAllocationService {
         data: { status: "PROFORMA_UPLOADED" },
       });
       if (ws.state === "MC_ALLOCATION_IN_PROGRESS") {
+        const fresh = await tx.workspace.findUniqueOrThrow({
+          where: { id },
+          include: { containerLines: { where: { removedAt: null } }, mcSupplierAllocations: true },
+        });
+        const allocatedLineIds = new Set(fresh.mcSupplierAllocations.map((a) => a.containerLineId));
+        const unallocated = fresh.containerLines.filter((l) => !allocatedLineIds.has(l.id));
+        if (unallocated.length > 0) {
+          throw new AppError(409, "LINES_NOT_ALLOCATED", { count: unallocated.length });
+        }
         await applyMcTransition(tx, id, "complete_allocations", actor, "mixed_container.allocations_completed");
       }
       await applyMcTransition(tx, id, "upload_proforma", actor, "mixed_container.proforma_uploaded", {
         allocationId,
         proformaNumber: input.proformaNumber,
+      });
+      const { bridgeModuleEventToOrganization } = await import("./mc-organization-sync.service.js");
+      await bridgeModuleEventToOrganization(tx, {
+        organizationWorkspaceId: id,
+        sourceModule: "PROFORMA_INVOICES",
+        sourceEventType: "mixed_container.proforma_uploaded",
+        sourceEntityId: allocationId,
+        actorUserId: actor.id,
+        payload: { allocationId, proformaNumber: input.proformaNumber },
       });
       await this.tryBeginPaymentTracking(tx, id, actor);
     });
@@ -496,7 +514,7 @@ export class MixedContainerAllocationService {
       }
     });
 
-    return this.getAllocationWorkspace(id);
+    return actor.role === "BUYER" ? this.getCoordination(id, actor) : this.getAllocationWorkspace(id);
   }
 
   private async tryMarkExecutionReady(tx: Prisma.TransactionClient, id: string, actor: AuthUser) {

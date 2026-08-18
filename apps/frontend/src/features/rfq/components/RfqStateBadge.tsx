@@ -14,6 +14,8 @@ const STATE_TONE: Record<RfqState, BadgeTone> = {
   RFQ_OPEN:            "accent",
   QUOTATIONS_CLOSED:   "amber",
   UNDER_EVALUATION:    "amber",
+  PARTIALLY_AWARDED:   "success",
+  FULLY_AWARDED:       "success",
   SUPPLIER_SELECTED:   "success",
   PROFORMA_REQUESTED:  "info",
   PROFORMA_RECEIVED:   "info",

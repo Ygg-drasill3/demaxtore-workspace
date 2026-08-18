@@ -1,0 +1,35 @@
+R4 Golden Path → MVP-UI17-R4-20260814-J4N6
+
+[PASS] BUYER_LOGIN — https://workspace.demaxtore.com/buyer/control-tower
+[PASS] PRODUCT_CREATION — FLOUR-UI17R4-J4N6
+[PASS] DIRECT_PO — PO-MST47294-AC439AB0
+[PASS] PRODUCT_TO_PO — https://workspace.demaxtore.com/workspace/order/f6037abb-b0f9-4c26-8940-33fccd9c8788
+[PASS] DEPOSIT_CONFIRMATION — Admin recorded DEPOSIT_PAID
+[PASS] FREIGHT_REQUEST — Admin created freight request
+[PASS] FREIGHT_OFFER — 2100 USD offer published
+[PASS] OFFER_SELECTION
+[PASS] OFFER_TO_BOOKING
+[PASS] BOOKING_TO_SHIPMENT — https://workspace.demaxtore.com/workspace/shipment/16ecce60-4dc8-40f8-8562-9b441f417cab
+[PASS] BOOKING_LIFECYCLE — MSCBK-R4-J4N6
+[PASS] LINE_ALLOCATION — 90 PCS
+[PASS] CONTAINER — MSKU17R4J4N6
+[PASS] TRACKING
+[PASS] SHIPMENT_TO_CUSTOMS
+[PASS] BROKER_ASSIGNMENT
+[PASS] DOCUMENT_READINESS — Trade docs uploaded via UI
+[PASS] BROKER_CASE_DISCOVERY
+[PASS] BROKER_EXECUTION — Start review
+[PASS] GTIP_VERIFICATION
+[PASS] DUTY_TAX
+[PASS] CUSTOMS_CLEARED
+[PASS] CLEARED_TO_INLAND
+[PASS] TRUCKER_ASSIGNMENT
+[PASS] TRUCKER_DELIVERY_DISCOVERY
+[DEAD END] DELIVERED — Mark delivered unavailable
+
+=== R4 SUMMARY ===
+Marker: MVP-UI17-R4-20260814-J4N6
+Fresh Transaction: FAIL
+Blocker: DELIVERED — Mark delivered unavailable
+Unexpected 5xx: 0
+Evidence: /var/www/demaxtore/DemaxtoreSolitions-main/.r4-ui-fixtures/run/J4N6/evidence.json

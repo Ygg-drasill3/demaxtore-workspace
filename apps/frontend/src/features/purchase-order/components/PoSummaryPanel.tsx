@@ -31,7 +31,7 @@ export default function PoSummaryPanel({ orderId }: { orderId: string }) {
   }
 
   const po = data.purchaseOrder;
-  const total = data.lines.reduce((s, l) => s + l.lineTotal, 0);
+  const total = data.lines.reduce((s, l) => s + (l.lineTotal ?? 0), 0);
 
   return (
     <section data-testid="order-po-summary" className="dmx-card p-4 space-y-2">
@@ -54,7 +54,7 @@ export default function PoSummaryPanel({ orderId }: { orderId: string }) {
               }
             }}
           >
-            <FileText className="h-3.5 w-3.5" /> {po.source === "manual" ? "Yüklenen PO" : "View PDF"}
+            <FileText className="h-3.5 w-3.5" /> {po.source === "DIRECT" ? "Yüklenen PO" : "View PDF"}
           </button>
           <Link
             data-testid="order-po-workspace-link"
@@ -69,7 +69,7 @@ export default function PoSummaryPanel({ orderId }: { orderId: string }) {
         <span data-testid="order-po-number">PO: {po.poNumber}</span>
         <span data-testid="order-po-status">Status: {po.status}</span>
         <span data-testid="order-po-source" className="col-span-2 text-zinc-500">
-          {po.source === "manual" ? "Kaynak: Yüklenen belge" : "Kaynak: Sistem üretimi"}
+          {po.source === "DIRECT" ? "Kaynak: Yüklenen belge" : "Kaynak: Sistem üretimi"}
         </span>
         <span>Currency: {po.currency}</span>
         <span data-testid="order-po-value">Value: {total.toLocaleString()}</span>

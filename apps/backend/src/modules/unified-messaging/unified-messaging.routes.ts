@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type RequestHandler } from "express";
 import { requireAuth, requireRole } from "../../middleware/auth.js";
 import { asyncHandler } from "../../middleware/asyncHandler.js";
 import { prisma } from "../../db/prisma.js";
@@ -10,6 +10,7 @@ import multer from "multer";
 import { createUploadFileFilter } from "../../lib/multer-file-guard.js";
 import { streamStoredFileToResponse } from "../../lib/file-storage.js";
 
+import { uploadLimiter } from "../../middleware/rate-limit.js";
 import {
   AddContextRequestSchema,
   AddParticipantRequestSchema,
@@ -28,6 +29,7 @@ const uploadAttachment = multer({
   limits: { fileSize: 25 * 1024 * 1024 },
   fileFilter: createUploadFileFilter(),
 });
+const uploadAttachmentSingle = uploadAttachment.single("file") as unknown as RequestHandler;
 
 const router = Router();
 const service = () => new UnifiedMessagingService(prisma);
@@ -234,7 +236,8 @@ router.delete(
 
 router.post(
   "/:conversationId/attachments",
-  uploadAttachment.single("file"),
+  uploadLimiter,
+  uploadAttachmentSingle,
   asyncHandler(async (req, res) => {
     const file = req.file;
     if (!file) return res.status(400).json({ error: { code: "FILE_REQUIRED" } });

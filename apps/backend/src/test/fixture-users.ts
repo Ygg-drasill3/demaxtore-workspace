@@ -40,7 +40,8 @@ type SeedUser = {
   phoneVerificationStatus?: string;
 };
 
-const VERIFIED_PHONE = "+905551000001";
+const BUYER1_PHONE = "+905459652686";
+const VERIFIED_PHONE = BUYER1_PHONE;
 
 const FIXTURE_USERS: SeedUser[] = [
   { email: TEST_USER_EMAILS.admin, displayName: "DeMaxtore Admin", role: Role.ADMIN, orgId: ORG_IDS.demaxtore, orgName: "DeMaxtore Operations", orgKind: "DEMAXTORE" },

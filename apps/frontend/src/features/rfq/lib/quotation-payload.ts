@@ -16,6 +16,10 @@ export interface QuoteFormLine {
   description: string;
   quantity: string;
   unitPrice: string;
+  /** Display/submit unit label — mapped to API priceUnit. */
+  uom?: string;
+  packing?: string;
+  moq?: string;
 }
 
 export interface QuoteFormFields {
@@ -48,7 +52,8 @@ function normalizeCurrency(c: string): (typeof CURRENCIES)[number] {
 
 /** Build API body matching SubmitQuotationPayload — strips invalid optional fields. */
 export function buildSubmitQuotationPayload(form: QuoteFormFields): Payload {
-  const lineItems = form.lines.map((l, i) => {
+  const pricedLines = form.lines.filter((l) => l.unitPrice.trim() !== "");
+  const lineItems = pricedLines.map((l, i) => {
     const row: Payload["lineItems"][number] = {
       position:    Number.isFinite(l.position) && l.position > 0 ? Math.trunc(l.position) : i + 1,
       description: l.description.trim(),
@@ -57,6 +62,16 @@ export function buildSubmitQuotationPayload(form: QuoteFormFields): Payload {
     };
     if (l.rfqLineItemId && UUID_RE.test(l.rfqLineItemId)) {
       row.rfqLineItemId = l.rfqLineItemId;
+    }
+    if (l.uom?.trim()) {
+      row.priceUnit = l.uom.trim();
+    }
+    if (l.packing?.trim()) {
+      row.packing = l.packing.trim();
+    }
+    const lineMoq = positiveInt(l.moq ?? "");
+    if (lineMoq) {
+      row.moq = lineMoq;
     }
     return row;
   });

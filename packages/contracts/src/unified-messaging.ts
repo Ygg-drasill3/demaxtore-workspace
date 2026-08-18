@@ -109,6 +109,8 @@ export interface UnifiedMessageDto {
   deliveredAt: string | null;
   readAt: string | null;
   failedAt: string | null;
+  /** Backed by `WorkspaceMessage.failureReason`; already serialized to clients. */
+  failureReason: string | null;
 }
 
 export interface CreateConversationRequest {

@@ -26,7 +26,7 @@ const TONE_STYLES = {
 export function KpiRow({ kpis, loading }: { kpis?: CommandCenterKpis; loading?: boolean }) {
   const { t } = useT();
   return (
-    <section data-testid="cc-kpi-row" className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-7 gap-3">
+    <section data-testid="cc-kpi-row" data-guide="dashboard-kpis" className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-7 gap-3">
       {KPIS.map(({ key, labelKey, fallback, to, icon: Icon, testId, tone }) => {
         const value = loading ? "—" : (kpis?.[key] ?? 0);
         const hasValue = !loading && (kpis?.[key] ?? 0) > 0;

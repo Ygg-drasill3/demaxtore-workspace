@@ -73,14 +73,23 @@ export type ParsedStatusUpdate = {
 
 export type SendMessageInput = {
   to: string;
-  type: "text" | "template" | "image" | "document";
+  type: "text" | "template" | "image" | "document" | "interactive";
   text?: string;
   templateName?: string;
   templateLanguage?: string;
   templateComponents?: Record<string, unknown>[];
+  interactiveBody?: string;
+  interactiveButtonLabel?: string;
+  interactiveButtonUrl?: string;
   mediaId?: string;
   mediaUrl?: string;
   caption?: string;
   filename?: string;
   replyToMetaId?: string;
+  /** Tenant BYOWA credentials — required for buyer outbound messaging. */
+  credentials?: {
+    accessToken: string;
+    phoneNumberId: string;
+    buyerId?: string;
+  };
 };

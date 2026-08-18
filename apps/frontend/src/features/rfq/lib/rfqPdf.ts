@@ -109,6 +109,7 @@ function publicRef(rfq: RfqPdfSource, intake: CatalogIntakeDTO | null) {
 function specSections(rfq: RfqPdfSource): ParsedSection[] {
   const skip = new Set([
     "catalog request",
+    "price quotation request",
     "your contact details",
     "line items",
     "request details",

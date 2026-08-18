@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { TradeLineageService } from "../trade-lineage/trade-lineage.service.js";
 
 const SYSTEM_USER = "00000000-0000-0000-0000-000000000001";
 
@@ -21,7 +22,17 @@ export async function spawnShipmentFromOrder(
 ): Promise<{ shipmentWorkspaceId: string; externalRef: string }> {
   const extRef = `SHP-${input.orderExternalRef}`;
   const existing = await tx.workspace.findUnique({ where: { externalRef: extRef } });
-  if (existing) return { shipmentWorkspaceId: existing.id, externalRef: extRef };
+  if (existing) {
+    // Ensure remaining PO lines are allocated even when the workspace already exists.
+    const lineage = new TradeLineageService(tx as never);
+    await lineage.allocateRemainingLinesForShipment(tx, {
+      orderWorkspaceId: input.orderWorkspaceId,
+      shipmentWorkspaceId: existing.id,
+      actorUserId: input.actorUserId,
+      linkSource: "SPAWN",
+    });
+    return { shipmentWorkspaceId: existing.id, externalRef: extRef };
+  }
 
   const shpWs = await tx.workspace.create({
     data: {
@@ -53,6 +64,15 @@ export async function spawnShipmentFromOrder(
       originPort: input.originPort,
       destinationPort: input.destinationPort,
     },
+  });
+
+  // Sprint 31 — header link + line allocations for PO qty remaining.
+  const lineage = new TradeLineageService(tx as never);
+  await lineage.allocateRemainingLinesForShipment(tx, {
+    orderWorkspaceId: input.orderWorkspaceId,
+    shipmentWorkspaceId: shpWs.id,
+    actorUserId: input.actorUserId,
+    linkSource: "SPAWN",
   });
 
   await tx.timelineEvent.create({
@@ -102,7 +122,7 @@ export interface FreightOfferSeed {
   vesselName?: string | null;
   etd?: Date | null;
   eta?: Date | null;
-  freightRequest: { pol: string; pod: string };
+  freightRequest: { id?: string; pol: string; pod: string };
 }
 
 /** Copy selected freight offer metadata onto shipment workspace + tracking snapshot. */
@@ -122,6 +142,13 @@ export async function enrichFromFreightOffer(
       originPort: offer.freightRequest.pol,
       destinationPort: offer.freightRequest.pod,
       bookingRef: offer.providerName,
+      bookingStatus: shp.bookingStatus ?? "REQUESTED",
+      bookingSource: shp.bookingSource ?? "SYSTEM",
+      bookingRequestedAt: shp.bookingRequestedAt ?? new Date(),
+      freightOfferId: offer.id,
+      freightRequestId: offer.freightRequest.id ?? shp.freightRequestId,
+      etd: offer.etd ?? shp.etd,
+      eta: offer.eta ?? shp.eta,
     },
   });
 

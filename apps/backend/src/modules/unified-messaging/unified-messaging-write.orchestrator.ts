@@ -12,7 +12,8 @@ import type { AuthUser } from "./unified-messaging.types.js";
 
 export interface CreateExternalMessageInput {
   conversationId: string;
-  authorUserId: string;
+  /** Null for system-generated messages that have no human author. */
+  authorUserId: string | null;
   body: string;
   channel?: "WORKSPACE" | "WHATSAPP";
   messageType?: string;
@@ -57,6 +58,7 @@ export class UnifiedMessagingWriteOrchestrator {
         direction: "INTERNAL",
         channelSource: "WORKSPACE",
         parentMessageId: input.parentMessageId,
+        sentAt: new Date(),
       });
     }
 
@@ -75,6 +77,7 @@ export class UnifiedMessagingWriteOrchestrator {
       channelSource: channelToColumn(channel),
       parentMessageId: input.parentMessageId,
       clientMessageId: input.clientMessageId,
+      sentAt: channel === "WORKSPACE" ? new Date() : undefined,
     });
 
     const mode = this.writeMode;
@@ -251,7 +254,7 @@ export class UnifiedMessagingWriteOrchestrator {
 
   private async persistUnifiedMessage(data: {
     conversationId: string;
-    authorUserId: string;
+    authorUserId: string | null;
     body: string;
     messageType: string;
     visibility: string;
@@ -264,6 +267,7 @@ export class UnifiedMessagingWriteOrchestrator {
     legacyId?: string;
     externalMessageId?: string;
     systemEventKey?: string;
+    sentAt?: Date;
   }) {
     if (data.clientMessageId) {
       const existing = await this.repo.findMessageByClientId(

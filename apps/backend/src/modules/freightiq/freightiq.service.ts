@@ -1,6 +1,5 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
-import type { FreightAction } from "@dmx/contracts/freightiq";
-import type { FreightSummary } from "@dmx/contracts/freightiq";
+import type { FreightAction, FreightPortfolio, FreightSummary } from "@dmx/contracts/freightiq";
 import {
   CreateFreightRequestPayload,
   SubmitFreightOfferPayload,
@@ -9,6 +8,11 @@ import {
   SelectFreightOfferPayload,
   CancelFreightRequestPayload,
 } from "@dmx/contracts/freightiq.zod";
+import {
+  deriveFreightIqExecutionState,
+  nextFreightIqExecutionAction,
+  type FreightIqExecutionSummary,
+} from "@dmx/contracts/freightiq-execution";
 import { SocketEvents } from "@dmx/contracts/socket-events";
 import { socketBus } from "../../realtime/socket-bus.js";
 import { AppError } from "../../utils/httpErrors.js";
@@ -22,6 +26,7 @@ import { notifyFreightEvent } from "./freightiq.notifications.js";
 import { FreightCommercialService } from "./commercial/freight-commercial.service.js";
 import { displayPriceForOffer } from "./commercial/freight-commercial.util.js";
 import { spawnShipmentFromOrder, enrichFromFreightOffer } from "../shipment/shipment.spawn.js";
+import { ShipmentWorkspaceOps } from "../shipment/shipment-workspace.ops.js";
 
 const TERMINAL = ["CANCELLED", "EXPIRED", "CONVERTED_TO_SHIPMENT"] as const;
 
@@ -58,13 +63,16 @@ export class FreightIqService {
       o.status === "ACTIVE" || o.status === "REVISED" || o.status === "SELECTED",
     );
     const hints = this.comparisonHints(comparable);
-    return {
+    const selection = request.selection ? mapSelection(request.selection) : null;
+    const base: FreightSummary = {
       orderId,
       request: mapRequest(request, request.order.externalRef),
       offers: displayOffers.map(mapOffer),
-      selection: request.selection ? mapSelection(request.selection) : null,
+      selection,
       comparisonHints: hints,
     };
+    base.execution = await this.buildExecution(base);
+    return base;
   }
 
   async applyFreightAction(
@@ -102,26 +110,91 @@ export class FreightIqService {
       case "cancel_request":
         await this.cancelRequest(orderId, actor, CancelFreightRequestPayload.parse(payload), ctx);
         break;
+      case "proceed_to_booking":
+        await this.proceedToBooking(orderId, actor, ctx);
+        break;
       default:
         throw new AppError(400, "UNKNOWN_ACTION");
     }
     return this.getSummary(orderId);
   }
 
+  /**
+   * Account-scoped freight hub: freight requests + offers for orders the actor participates in.
+   */
+  async getMyPortfolio(actor: AuthUser): Promise<FreightPortfolio> {
+    const memberships = await this.db.workspaceParticipant.findMany({
+      where: { userId: actor.id, workspace: { type: "ORDER" } },
+      select: { workspaceId: true },
+      take: 500,
+    });
+    const orderIds = memberships.map((m) => m.workspaceId);
+    if (orderIds.length === 0) return { items: [] };
+
+    // Hub only lists freight requests that already have at least one offer.
+    const requests = await this.db.freightRequest.findMany({
+      where: {
+        orderId: { in: orderIds },
+        status: { in: ["QUOTED", "SELECTED", "CONVERTED_TO_SHIPMENT"] },
+        offers: { some: { status: { in: ["ACTIVE", "REVISED", "SELECTED"] } } },
+      },
+      include: {
+        offers: {
+          where: { status: { in: ["ACTIVE", "REVISED", "SELECTED"] } },
+          orderBy: { price: "asc" },
+        },
+        selection: true,
+        order: { select: { externalRef: true, state: true } },
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 100,
+    });
+
+    const items = await Promise.all(
+      requests
+        .filter((r) => r.offers.length > 0)
+        .map(async (r) => {
+          const comparable = r.offers.filter((o) => o.status === "ACTIVE" || o.status === "REVISED");
+          const item = {
+            orderId: r.orderId,
+            orderRef: r.order.externalRef,
+            orderState: r.order.state,
+            request: mapRequest(r, r.order.externalRef),
+            offers: r.offers.map(mapOffer),
+            selection: r.selection ? mapSelection(r.selection) : null,
+            comparisonHints: this.comparisonHints(comparable),
+            execution: null as FreightIqExecutionSummary | null,
+          };
+          item.execution = await this.buildExecution(item);
+          return item;
+        }),
+    );
+    return { items };
+  }
+
   async getOpsOverview() {
     const openRequests = await this.db.freightRequest.findMany({
       where: { status: { in: ["REQUESTED", "QUOTING", "QUOTED"] } },
-      include: { offers: { where: { status: { in: ["ACTIVE", "REVISED"] } } } },
+      include: {
+        offers: { where: { status: { in: ["ACTIVE", "REVISED"] } } },
+        order: { select: { externalRef: true } },
+      },
       orderBy: { createdAt: "desc" },
       take: 50,
     });
     const pendingOffers = await this.db.freightOffer.findMany({
       where: { status: { in: ["ACTIVE", "REVISED"] }, validUntil: { gt: new Date() } },
+      include: {
+        freightRequest: { include: { order: { select: { externalRef: true, id: true } } } },
+      },
       orderBy: { createdAt: "desc" },
       take: 50,
     });
     const expiredOffers = await this.db.freightOffer.findMany({
       where: { status: "EXPIRED" },
+      include: {
+        freightRequest: { include: { order: { select: { externalRef: true, id: true } } } },
+      },
       orderBy: { validUntil: "desc" },
       take: 50,
     });
@@ -130,19 +203,81 @@ export class FreightIqService {
       include: { selection: true, order: { select: { externalRef: true } } },
       take: 50,
     });
+
+    const selectedWithShip = selected.filter((r) => r.selection?.shipmentWorkspaceId);
+    const shipIds = selectedWithShip
+      .map((r) => r.selection!.shipmentWorkspaceId!)
+      .filter(Boolean);
+    const shipRows = shipIds.length
+      ? await this.db.shipmentWorkspace.findMany({
+          where: { workspaceId: { in: shipIds } },
+          include: {
+            containers: { select: { id: true } },
+            workspace: { select: { state: true } },
+          },
+        })
+      : [];
+    const shipById = new Map(shipRows.map((s) => [s.workspaceId, s]));
+
+    type QueueRow = {
+      orderId: string;
+      orderRef: string | null;
+      shipmentWorkspaceId: string | null;
+      bookingStatus: string | null;
+    };
+    const offerSelectedAwaitingBooking: QueueRow[] = [];
+    const bookingAwaitingConfirmation: QueueRow[] = [];
+    const confirmedAwaitingContainer: QueueRow[] = [];
+    const shipmentAwaitingTracking: QueueRow[] = [];
+
+    for (const r of selectedWithShip) {
+      const sid = r.selection!.shipmentWorkspaceId!;
+      const sw = shipById.get(sid);
+      const row = {
+        orderId: r.orderId,
+        orderRef: r.order.externalRef,
+        shipmentWorkspaceId: sid,
+        bookingStatus: sw?.bookingStatus ?? null,
+      };
+      const booking = sw?.bookingStatus ?? null;
+      if (!booking || booking === "DRAFT" || booking === "REQUESTED") {
+        if (!booking || booking === "DRAFT") offerSelectedAwaitingBooking.push(row);
+        else bookingAwaitingConfirmation.push(row);
+      } else if (booking === "PENDING") {
+        bookingAwaitingConfirmation.push(row);
+      } else if (booking === "CONFIRMED" || booking === "AMENDED") {
+        if ((sw?.containers.length ?? 0) === 0) confirmedAwaitingContainer.push(row);
+        if (!sw?.trackingLinkedAt) shipmentAwaitingTracking.push(row);
+      }
+    }
+
     return {
       openRequests: openRequests.map((r) => ({
-        ...mapRequest(r, null),
+        ...mapRequest(r, r.order.externalRef),
         offerCount: r.offers.length,
       })),
-      pendingOffers: pendingOffers.map(mapOffer),
-      expiredOffers: expiredOffers.map(mapOffer),
+      pendingOffers: pendingOffers.map((o) => ({
+        ...mapOffer(o),
+        orderId: o.freightRequest.order.id,
+        orderRef: o.freightRequest.order.externalRef,
+      })),
+      expiredOffers: expiredOffers.map((o) => ({
+        ...mapOffer(o),
+        orderId: o.freightRequest.order.id,
+        orderRef: o.freightRequest.order.externalRef,
+      })),
       selectedFreight: selected
         .filter((r) => r.selection)
         .map((r) => ({
           ...mapRequest(r, r.order.externalRef),
           selection: mapSelection(r.selection!),
         })),
+      executionQueues: {
+        offerSelectedAwaitingBooking,
+        bookingAwaitingConfirmation,
+        confirmedAwaitingContainer,
+        shipmentAwaitingTracking,
+      },
     };
   }
 
@@ -185,9 +320,14 @@ export class FreightIqService {
     if (!buyer || !supplier) throw new AppError(409, "ORDER_PARTICIPANTS_INCOMPLETE");
 
     await this.db.$transaction(async (tx) => {
+      const orgId = await import("../mixed-container/mc-organization-sync.service.js").then((m) =>
+        m.resolveOrganizationWorkspaceId(tx, { orderId }),
+      );
+
       const req = await tx.freightRequest.create({
         data: {
           orderId,
+          organizationWorkspaceId: orgId,
           buyerId: buyer.userId,
           supplierId: supplier.userId,
           mode: input.mode,
@@ -201,6 +341,21 @@ export class FreightIqService {
       });
       await this.recordAudit(tx, orderId, actor, "freight.request.created", {}, ctx);
       await this.recordTimeline(tx, orderId, actor.id, "freight.request.created", { requestId: req.id });
+      if (orgId) {
+        const { bridgeModuleEventToOrganization, bindOrganizationToFreightRequest } = await import(
+          "../mixed-container/mc-organization-sync.service.js"
+        );
+        await bindOrganizationToFreightRequest(tx, req.id, orgId);
+        await bridgeModuleEventToOrganization(tx, {
+          organizationWorkspaceId: orgId,
+          orderId,
+          sourceModule: "FREIGHTIQ",
+          sourceEventType: "freight.request.created",
+          sourceEntityId: req.id,
+          actorUserId: actor.id,
+          payload: { requestId: req.id },
+        });
+      }
       const notifyIds = ws.participants.map((p) => p.userId).filter((id) => id !== actor.id);
       await notifyFreightEvent(tx, {
         orderId,
@@ -346,8 +501,22 @@ export class FreightIqService {
     input: SelectFreightOfferPayload,
     ctx?: { ip?: string; userAgent?: string },
   ) {
+    // Allow idempotent re-select of the same offer after conversion (retries / double-click).
+    const existingConverted = await this.db.freightRequest.findFirst({
+      where: { orderId, status: { in: ["SELECTED", "CONVERTED_TO_SHIPMENT"] } },
+      orderBy: { createdAt: "desc" },
+      include: { selection: true },
+    });
+    if (existingConverted?.selection) {
+      if (existingConverted.selection.offerId === input.offerId) return; // idempotent
+      throw new AppError(409, "ALREADY_SELECTED");
+    }
+
     const fr = await this.requireOpenRequest(orderId);
-    if (fr.selection) throw new AppError(409, "ALREADY_SELECTED");
+    if (fr.selection) {
+      if (fr.selection.offerId === input.offerId) return;
+      throw new AppError(409, "ALREADY_SELECTED");
+    }
 
     const offer = await this.db.freightOffer.findUnique({
       where: { id: input.offerId },
@@ -422,6 +591,23 @@ export class FreightIqService {
         shipmentWorkspaceId,
         ledgerId,
       });
+      const orgId = await import("../mixed-container/mc-organization-sync.service.js").then((m) =>
+        m.resolveOrganizationWorkspaceId(tx, { orderId }),
+      );
+      if (orgId) {
+        const { bridgeModuleEventToOrganization } = await import(
+          "../mixed-container/mc-organization-sync.service.js"
+        );
+        await bridgeModuleEventToOrganization(tx, {
+          organizationWorkspaceId: orgId,
+          orderId,
+          sourceModule: "FREIGHTIQ",
+          sourceEventType: "freight.offer.selected",
+          sourceEntityId: offer.id,
+          actorUserId: actor.id,
+          payload: { offerId: offer.id, shipmentWorkspaceId },
+        });
+      }
       const notifyIds = ws.participants.map((p) => p.userId).filter((id) => id !== actor.id);
       await notifyFreightEvent(tx, {
         orderId,
@@ -456,6 +642,163 @@ export class FreightIqService {
       await this.recordAudit(tx, orderId, actor, "freight.request.cancelled", { reason: input.reason }, ctx);
       await this.recordTimeline(tx, orderId, actor.id, "freight.request.cancelled", { reason: input.reason });
     });
+  }
+
+  /**
+   * Sprint 33 — Selected Offer → Booking (Sprint 32 lifecycle). Idempotent.
+   * Ensures shipment booking is at least REQUESTED; does not create a second booking/shipment.
+   */
+  private async proceedToBooking(
+    orderId: string,
+    actor: AuthUser,
+    ctx?: { ip?: string; userAgent?: string },
+  ) {
+    const fr = await this.db.freightRequest.findFirst({
+      where: { orderId },
+      orderBy: { createdAt: "desc" },
+      include: {
+        selection: true,
+        offers: { where: { status: "SELECTED" }, take: 1 },
+      },
+    });
+    if (!fr) throw new AppError(404, "FREIGHT_REQUEST_NOT_FOUND");
+    if (!fr.selection) throw new AppError(409, "NO_SELECTION");
+    const shipmentWorkspaceId = fr.selection.shipmentWorkspaceId;
+    if (!shipmentWorkspaceId) throw new AppError(409, "SHIPMENT_NOT_LINKED");
+
+    const sw = await this.db.shipmentWorkspace.findUnique({
+      where: { workspaceId: shipmentWorkspaceId },
+      select: {
+        bookingStatus: true,
+        freightOfferId: true,
+        freightRequestId: true,
+        bookingRef: true,
+        carrierName: true,
+      },
+    });
+    if (!sw) throw new AppError(404, "SHIPMENT_NOT_FOUND");
+
+    // Soft-link offer/request if missing (historical-safe, non-destructive)
+    if (!sw.freightOfferId || !sw.freightRequestId) {
+      await this.db.shipmentWorkspace.update({
+        where: { workspaceId: shipmentWorkspaceId },
+        data: {
+          freightOfferId: sw.freightOfferId ?? fr.selection.offerId,
+          freightRequestId: sw.freightRequestId ?? fr.id,
+        },
+      });
+    }
+
+    const status = sw.bookingStatus;
+    if (!status || status === "DRAFT") {
+      const ops = new ShipmentWorkspaceOps(this.db);
+      const role =
+        actor.role === "SYSTEM" || actor.role === "SUPER_ADMIN" || actor.role === "SALES_CONTROL"
+          ? ("ADMIN" as const)
+          : (actor.role as import("@prisma/client").Role);
+      await ops.transitionBooking(
+        shipmentWorkspaceId,
+        { id: actor.id, email: actor.email, role },
+        { toStatus: "REQUESTED", reason: "FreightIQ proceed_to_booking" },
+      );
+    }
+    // REQUESTED / PENDING / CONFIRMED / AMENDED / CANCELLED → no duplicate initiation
+
+    await this.db.$transaction(async (tx) => {
+      await this.recordAudit(tx, orderId, actor, "freight.booking.proceeded", {
+        shipmentWorkspaceId,
+        bookingStatusBefore: status,
+        offerId: fr.selection!.offerId,
+      }, ctx);
+      await this.recordTimeline(tx, orderId, actor.id, "BOOKING_REQUESTED", {
+        shipmentWorkspaceId,
+        source: "freightiq.proceed_to_booking",
+      });
+    });
+  }
+
+  private async buildExecution(summary: {
+    orderId: string;
+    request: FreightSummary["request"];
+    offers: FreightSummary["offers"];
+    selection: FreightSummary["selection"];
+  }): Promise<FreightIqExecutionSummary | null> {
+    if (!summary.request) return null;
+
+    const shipmentWorkspaceId = summary.selection?.shipmentWorkspaceId ?? null;
+    let bookingStatus: string | null = null;
+    let bookingReference: string | null = null;
+    let bookingEtd: string | null = null;
+    let bookingEta: string | null = null;
+    let maritimeEta: string | null = null;
+    let trackingLinked = false;
+    let trackingStatus: string | null = null;
+    let shipmentState: string | null = null;
+    let shipmentRef: string | null = null;
+    let containerCount = 0;
+
+    if (shipmentWorkspaceId) {
+      const sw = await this.db.shipmentWorkspace.findUnique({
+        where: { workspaceId: shipmentWorkspaceId },
+        include: {
+          workspace: { select: { state: true, externalRef: true } },
+          containers: { select: { id: true } },
+        },
+      });
+      if (sw) {
+        bookingStatus = sw.bookingStatus;
+        bookingReference = sw.bookingRef ?? sw.bookingNumber;
+        bookingEtd = sw.etd?.toISOString() ?? null;
+        bookingEta = sw.eta?.toISOString() ?? null;
+        trackingLinked = !!sw.trackingLinkedAt;
+        shipmentState = sw.workspace.state;
+        shipmentRef = sw.workspace.externalRef;
+        containerCount = sw.containers.length;
+      }
+      const snap = await this.db.shipmentTrackingSnapshot.findFirst({
+        where: { shipmentId: shipmentWorkspaceId },
+        orderBy: { syncedAt: "desc" },
+        select: { eta: true, trackingStatus: true },
+      });
+      maritimeEta = snap?.eta?.toISOString() ?? null;
+      trackingStatus = snap?.trackingStatus ?? null;
+    }
+
+    const selectedOffer = summary.selection
+      ? summary.offers.find((o) => o.id === summary.selection!.offerId) ?? null
+      : null;
+    const hasActiveOffers = summary.offers.some((o) => o.status === "ACTIVE" || o.status === "REVISED");
+    const state = deriveFreightIqExecutionState({
+      freightRequestStatus: summary.request.status,
+      hasActiveOffers,
+      hasSelection: !!summary.selection,
+      bookingStatus,
+      shipmentState,
+      trackingLinked,
+      containerCount,
+    });
+    const next = nextFreightIqExecutionAction(state, shipmentWorkspaceId);
+
+    return {
+      state,
+      freightRequestId: summary.request.id,
+      selectedOfferId: summary.selection?.offerId ?? null,
+      selectedOfferPrice: selectedOffer?.price ?? null,
+      selectedOfferCurrency: selectedOffer?.currency ?? null,
+      selectedCarrier: selectedOffer?.carrierName ?? null,
+      shipmentWorkspaceId,
+      shipmentRef,
+      shipmentState,
+      bookingStatus,
+      bookingReference,
+      bookingEtd,
+      bookingEta,
+      maritimeEta,
+      trackingLinked,
+      trackingStatus,
+      containerCount,
+      ...next,
+    };
   }
 
   private async requireOpenRequest(orderId: string) {

@@ -1,0 +1,59 @@
+{
+  "base": "https://workspace.demaxtore.com",
+  "at": "2026-08-14T15:24:31.314Z",
+  "checks": [
+    {
+      "name": "login_page",
+      "ok": true
+    },
+    {
+      "name": "BUYER_login",
+      "ok": true,
+      "url": "https://workspace.demaxtore.com/buyer/control-tower"
+    },
+    {
+      "name": "BUYER_logout",
+      "ok": true
+    },
+    {
+      "name": "ADMIN_login",
+      "ok": true,
+      "url": "https://workspace.demaxtore.com/admin/dashboard"
+    },
+    {
+      "name": "ADMIN_logout",
+      "ok": true
+    },
+    {
+      "name": "CUSTOMS_BROKER_login",
+      "ok": true,
+      "url": "https://workspace.demaxtore.com/"
+    },
+    {
+      "name": "CUSTOMS_BROKER_logout",
+      "ok": true
+    },
+    {
+      "name": "TRUCKER_login",
+      "ok": true,
+      "url": "https://workspace.demaxtore.com/"
+    },
+    {
+      "name": "TRUCKER_logout",
+      "ok": true
+    },
+    {
+      "name": "browser_stability_5s",
+      "ok": true
+    }
+  ],
+  "screenshots": [
+    "/var/www/demaxtore/DemaxtoreSolitions-main/.r4-ui-fixtures/env-smoke/00-login-page.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/.r4-ui-fixtures/env-smoke/buyer-dashboard.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/.r4-ui-fixtures/env-smoke/admin-dashboard.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/.r4-ui-fixtures/env-smoke/customs_broker-dashboard.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/.r4-ui-fixtures/env-smoke/trucker-dashboard.png",
+    "/var/www/demaxtore/DemaxtoreSolitions-main/.r4-ui-fixtures/env-smoke/99-buyer-multi-nav.png"
+  ],
+  "ok": true
+}

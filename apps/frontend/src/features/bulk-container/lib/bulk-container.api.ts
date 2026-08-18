@@ -72,6 +72,9 @@ export const bulkContainerApi = {
   create: (data?: { destinationMarket?: string; currency?: string }) =>
     api.post<BulkContainerDTO>("/bulk-containers", data ?? {}).then((r) => r.data),
 
+  ensureActive: () =>
+    api.post<BulkContainerDTO>("/bulk-containers/actions/ensure-active").then((r) => r.data),
+
   get: (id: string) =>
     api.get<BulkContainerDTO>(`/bulk-containers/${id}`).then((r) => r.data),
 

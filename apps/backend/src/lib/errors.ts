@@ -28,4 +28,4 @@ export const Conflict       = (msg: string, details?: Record<string, unknown>) =
 export const InvalidCredentials = () =>
   new HttpError(401, ErrorCodes.UNAUTHENTICATED, "Invalid email or password");
 export const TooManyRequests = (msg = "Too many requests") =>
-  new HttpError(429, ErrorCodes.PRECONDITION_FAILED, msg);
+  new HttpError(429, ErrorCodes.RATE_LIMITED, msg);

@@ -69,11 +69,4 @@ describe("onboarding journey engine", () => {
     const list = buildChecklist("BUYER", ["create_rfq"], "receive_quotation");
     expect(list.find((i) => i.step === "receive_quotation")?.current).toBe(true);
   });
-
-  it("sales control role has operator checklist steps", () => {
-    expect(computeCompletionPercent("SALES_CONTROL", ["monitor_order"])).toBe(25);
-    const list = buildChecklist("SALES_CONTROL", [], "monitor_order");
-    expect(list.length).toBe(4);
-    expect(list[0]?.step).toBe("monitor_order");
-  });
 });

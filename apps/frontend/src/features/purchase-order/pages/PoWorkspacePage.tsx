@@ -2,7 +2,20 @@ import { useCallback, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { FileDown, FileText } from "lucide-react";
+import {
+  canonicalizePurchaseOrderStatus,
+  PO_ACKNOWLEDGE_ALLOWED_FROM,
+  PO_AMENDMENT_ALLOWED_FROM,
+  PO_CLOSE_ALLOWED_FROM,
+} from "@dmx/contracts/purchase-order";
 import { purchaseOrderApi } from "../lib/purchase-order.api";
+import { purchaseOrderStatusLabel } from "../lib/purchase-order.labels";
+import {
+  emptyValue,
+  formatPoMoney,
+  formatPoQuantity,
+  summarizeLinePricing,
+} from "../lib/purchase-order.formatters";
 import { downloadPurchaseOrderPdf, openPurchaseOrderPdf } from "../lib/poPdf";
 import { useAuth } from "@/store/auth.store";
 import { toast } from "@/store/toast.store";
@@ -72,18 +85,25 @@ export default function PoWorkspacePage() {
   }
 
   const po = data.purchaseOrder;
+  const poStatus = canonicalizePurchaseOrderStatus(po.status);
   const openAmendment = data.amendments.find((a) => a.status === "OPEN");
   const isSupplier = user.role === "SUPPLIER";
   const isBuyer = user.role === "BUYER" || user.role === "ADMIN";
+  const canAcknowledge = (PO_ACKNOWLEDGE_ALLOWED_FROM as readonly string[]).includes(poStatus);
+  const canAmend = (PO_AMENDMENT_ALLOWED_FROM as readonly string[]).includes(poStatus);
+  const canClose = (PO_CLOSE_ALLOWED_FROM as readonly string[]).includes(poStatus);
+  const pricing = summarizeLinePricing(data.lines);
 
   return (
     <div data-testid="po-workspace" className="max-w-5xl mx-auto space-y-6 p-4">
       <header data-testid="po-header" className="space-y-1">
         <span className="text-xs uppercase text-zinc-500">Purchase order</span>
         <h1 className="text-3xl font-semibold" data-testid="po-number">{po.poNumber}</h1>
-        <p data-testid="po-status" className="text-sm text-zinc-600">Status: {po.status}</p>
+        <p data-testid="po-status" className="text-sm text-zinc-600">
+          Status: {purchaseOrderStatusLabel(po.status)}
+        </p>
         <p data-testid="po-source" className="text-sm text-zinc-500">
-          {po.source === "manual" ? "Kaynak: Yüklenen belge" : "Kaynak: Sistem üretimi"}
+          {po.source === "DIRECT" ? "Source: uploaded document" : "Source: system generated"}
         </p>
         <div className="flex gap-4 text-sm text-zinc-600">
           <span>Currency: {po.currency}</span>
@@ -94,13 +114,19 @@ export default function PoWorkspacePage() {
           <OnlinePaymentDisabledNotice />
         </div>
         <div className="flex flex-wrap items-center gap-3 pt-2">
-          <Link
-            data-testid="po-linked-order"
-            className="text-sm text-blue-600"
-            to={`/workspace/order/${po.orderId}`}
-          >
-            Linked order {po.orderRef ?? po.orderId.slice(0, 8)}
-          </Link>
+          {po.orderId ? (
+            <Link
+              data-testid="po-linked-order"
+              className="text-sm text-blue-600"
+              to={`/workspace/order/${po.orderId}`}
+            >
+              Linked order {po.orderRef ?? po.orderId.slice(0, 8)}
+            </Link>
+          ) : (
+            <span data-testid="po-order-unavailable" className="text-sm text-zinc-400">
+              Linked order unavailable
+            </span>
+          )}
           <button
             type="button"
             data-testid="po-view-pdf"
@@ -109,7 +135,7 @@ export default function PoWorkspacePage() {
             onClick={() => void runPdf("view")}
           >
             <FileText className="h-4 w-4" />
-            {po.source === "manual" ? "Yüklenen PO" : "View PDF"}
+            {po.source === "DIRECT" ? "Yüklenen PO" : "View PDF"}
           </button>
           <button
             type="button"
@@ -119,7 +145,7 @@ export default function PoWorkspacePage() {
             onClick={() => void runPdf("download")}
           >
             <FileDown className="h-4 w-4" />
-            {po.source === "manual" ? "Belgeyi indir" : "Download PDF"}
+            {po.source === "DIRECT" ? "Belgeyi indir" : "Download PDF"}
           </button>
         </div>
       </header>
@@ -132,7 +158,7 @@ export default function PoWorkspacePage() {
       />
 
       <section data-testid="po-actions" className="dmx-card p-4 flex flex-wrap gap-2">
-        {isSupplier && ["ISSUED", "AMENDED"].includes(po.status) && (
+        {isSupplier && canAcknowledge && (
           <>
             <button
               data-testid="po-action-accept"
@@ -152,7 +178,7 @@ export default function PoWorkspacePage() {
             </button>
           </>
         )}
-        {(isSupplier || isBuyer) && ["ISSUED", "ACKNOWLEDGED", "AMENDED"].includes(po.status) && !openAmendment && (
+        {(isSupplier || isBuyer) && canAmend && !openAmendment && (
           <button
             data-testid="po-action-request-amendment"
             className="dmx-btn-secondary text-sm disabled:opacity-60"
@@ -214,7 +240,7 @@ export default function PoWorkspacePage() {
             </button>
           </>
         )}
-        {isBuyer && ["ACKNOWLEDGED", "AMENDED"].includes(po.status) && (
+        {isBuyer && canClose && (
           <button
             data-testid="po-action-close"
             className="dmx-btn-secondary text-sm disabled:opacity-60"
@@ -224,7 +250,7 @@ export default function PoWorkspacePage() {
             Close PO
           </button>
         )}
-        {isBuyer && !["CANCELLED", "CLOSED"].includes(po.status) && (
+        {isBuyer && !["CANCELLED", "CLOSED"].includes(poStatus) && (
           <button
             data-testid="po-action-cancel"
             className="dmx-btn-secondary text-sm text-red-700 disabled:opacity-60"
@@ -242,6 +268,16 @@ export default function PoWorkspacePage() {
 
       <section data-testid="po-lines" className="dmx-card p-4">
         <h2 className="font-medium mb-2">Lines</h2>
+        {pricing.kind === "partial" && (
+          <p data-testid="po-lines-partial-pricing" className="mb-2 text-sm text-amber-700">
+            Some lines have no unit price yet, so no order total is shown.
+          </p>
+        )}
+        {pricing.kind === "none" && data.lines.length > 0 && (
+          <p data-testid="po-lines-unpriced" className="mb-2 text-sm text-zinc-500">
+            This purchase order has no pricing yet.
+          </p>
+        )}
         <table className="w-full text-sm">
           <thead className="text-left text-xs text-zinc-500">
             <tr>
@@ -255,11 +291,11 @@ export default function PoWorkspacePage() {
           <tbody>
             {data.lines.map((l) => (
               <tr key={l.id} data-testid={`po-line-${l.id}`}>
-                <td className="py-1">{l.sku ?? "—"}</td>
+                <td className="py-1">{emptyValue(l.sku)}</td>
                 <td>{l.description}</td>
-                <td>{l.quantity}</td>
-                <td>{l.unitPrice}</td>
-                <td>{l.lineTotal}</td>
+                <td>{formatPoQuantity(l.quantity)}</td>
+                <td>{formatPoMoney(l.unitPrice, po.currency)}</td>
+                <td>{formatPoMoney(l.lineTotal, po.currency)}</td>
               </tr>
             ))}
           </tbody>

@@ -51,6 +51,7 @@ export {
   UploadShipmentDocumentPayload,
 } from "./shipment.zod";
 export * from "./auth";
+export * from "./buyer-operating-model";
 export * from "./sales-control";
 export * from "./notifications";
 export * from "./socket-events";
@@ -116,3 +117,4 @@ export * from "./email-notification-bridge";
 export * from "./unified-messaging";
 export * from "./unified-messaging.zod";
 export * from "./phone-verification";
+export * from "./trade-lineage";

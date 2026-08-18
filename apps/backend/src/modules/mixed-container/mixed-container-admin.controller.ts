@@ -3,6 +3,7 @@ import {
   AdminProcurementQuoteInput,
   CreateContainerOfferInput,
 } from "@dmx/contracts/mixed-container.zod";
+import { McInternalNoteInput, McProcurementInboxFilters } from "@dmx/contracts/mixed-container-procurement";
 import { MixedContainerProcurementService } from "./mixed-container-procurement.service.js";
 import { prisma } from "../../db/prisma.js";
 
@@ -17,8 +18,22 @@ export const mixedContainerAdminController = {
     res.json(await service.kpis());
   },
 
-  inbox: async (_req: Request, res: Response) => {
-    res.json({ items: await service.inbox() });
+  inbox: async (req: Request, res: Response) => {
+    const filters = McProcurementInboxFilters.parse(req.query);
+    res.json({ items: await service.inbox(filters) });
+  },
+
+  procurementManagers: async (_req: Request, res: Response) => {
+    res.json({ items: await service.listProcurementManagers() });
+  },
+
+  procurementRequest: async (req: Request, res: Response) => {
+    res.json(await service.getProcurementRequest(req.params.id, actor(req), true));
+  },
+
+  addInternalNote: async (req: Request, res: Response) => {
+    const input = McInternalNoteInput.parse(req.body);
+    res.json(await service.addInternalNote(req.params.id, input, actor(req)));
   },
 
   get: async (req: Request, res: Response) => {

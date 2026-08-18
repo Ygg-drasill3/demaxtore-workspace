@@ -15,6 +15,8 @@ export const STATE_LIST_LABEL: Record<RfqState, string> = {
   RFQ_OPEN:            "Awaiting quotes",
   QUOTATIONS_CLOSED:   "Quotes closed",
   UNDER_EVALUATION:    "Evaluating",
+  PARTIALLY_AWARDED:   "Partially awarded",
+  FULLY_AWARDED:       "Fully awarded",
   SUPPLIER_SELECTED:   "Supplier selected",
   PROFORMA_REQUESTED:  "Awaiting proforma",
   PROFORMA_RECEIVED:   "Proforma received",
@@ -35,6 +37,8 @@ export const STATE_LABEL: Record<RfqState, string> = {
   RFQ_OPEN:            "Waiting for supplier quotations",
   QUOTATIONS_CLOSED:   "Quotations closed — ready for review",
   UNDER_EVALUATION:    "Reviewing quotations",
+  PARTIALLY_AWARDED:   "Some products awarded — others still open",
+  FULLY_AWARDED:       "All products resolved — issue POs per supplier",
   SUPPLIER_SELECTED:   "Supplier selected",
   PROFORMA_REQUESTED:  "Awaiting proforma",
   PROFORMA_RECEIVED:   "Proforma ready for review",
@@ -55,6 +59,8 @@ export const STATE_TO_STORYLINE_STEP: Record<RfqState, number> = {
   RFQ_OPEN:            3,
   QUOTATIONS_CLOSED:   4,
   UNDER_EVALUATION:    4,
+  PARTIALLY_AWARDED:   5,
+  FULLY_AWARDED:       5,
   SUPPLIER_SELECTED:   5,
   PROFORMA_REQUESTED:  5,
   PROFORMA_RECEIVED:   5,
@@ -93,6 +99,7 @@ export function storylineSubLabel(args: {
       return `${args.quoted} of ${args.invited} quotations submitted`;
     case "QUOTATIONS_CLOSED":
     case "UNDER_EVALUATION":
+    case "PARTIALLY_AWARDED":
       return `${args.quoted} quotations to compare`;
     case "PROFORMA_REQUESTED":
       return args.proformaSlaDaysLeft != null

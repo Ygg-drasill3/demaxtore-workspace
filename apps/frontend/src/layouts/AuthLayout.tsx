@@ -1,6 +1,7 @@
 // apps/frontend/src/layouts/AuthLayout.tsx
 import { Link, Outlet } from "react-router-dom";
 import { LANDING_COPY } from "@/content/launch-copy";
+import { BrandLogo } from "@/layouts/components/BrandLogo";
 
 /**
  * Auth-shell. Used for /login, /forgot-password, /reset-password.
@@ -15,9 +16,8 @@ export default function AuthLayout() {
              style={{ backgroundImage: "radial-gradient(circle at 20% 30%, white 1px, transparent 1px), radial-gradient(circle at 70% 70%, white 1px, transparent 1px)",
                       backgroundSize: "32px 32px, 48px 48px" }} />
         <div className="relative z-10">
-          <Link to="/welcome" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
-            <div className="h-8 w-8 rounded-lg bg-white text-ink-950 grid place-items-center font-bold">D</div>
-            <div className="font-display text-xl font-semibold tracking-tight">DeMaxtore</div>
+          <Link to="/welcome" className="inline-block hover:opacity-90 transition-opacity">
+            <BrandLogo className="h-12 max-w-[220px]" />
           </Link>
         </div>
         <div className="relative z-10 max-w-md space-y-6">

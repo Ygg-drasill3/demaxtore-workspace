@@ -5,12 +5,15 @@ import {
   type MixedContainerAction,
   type MixedContainerState,
 } from "@dmx/contracts/mixed-container.fsm";
-import type {
-  AddContainerLineInput,
-  CreateMixedContainerInput,
-  UpdateContainerLineInput,
-  UpdateMixedContainerInput,
+import {
+  MC_MAX_CONTAINERS_PER_ORDER,
+  type AddContainerLineInput,
+  type CreateMixedContainerInput,
+  type UpdateContainerLineInput,
+  type UpdateMixedContainerInput,
 } from "@dmx/contracts/mixed-container.zod";
+import type { SubmitProcurementRequestInput } from "@dmx/contracts/mixed-container-procurement";
+import { mcStateToProcurementStatus } from "@dmx/contracts/mixed-container-procurement";
 import { AppError } from "../../utils/httpErrors.js";
 import type { AuthUser } from "./mixed-container.policy.js";
 import { assertCanAccessMixedContainer } from "./mixed-container.policy.js";
@@ -18,6 +21,12 @@ import {
   assertLinesHavePackingType,
   assertValidPackingTypeForProduct,
 } from "../packing-type/packing-type.helpers.js";
+import {
+  nextPrRef,
+  notifyAdminsNewProcurementRequest,
+  notifyBuyerProcurementStatus,
+  recordProcurementStatusHistory,
+} from "./mc-procurement.helpers.js";
 
 const WS_INCLUDE = {
   mixedContainerDetails: true,
@@ -29,7 +38,7 @@ const WS_INCLUDE = {
       packingType: true,
     },
   },
-  createdBy: { select: { displayName: true } },
+  createdBy: { select: { displayName: true, organisation: { select: { name: true } } } },
 };
 
 type WsFull = Prisma.WorkspaceGetPayload<{ include: typeof WS_INCLUDE }>;
@@ -94,6 +103,8 @@ export function toMixedContainerDTO(ws: WsFull) {
     productCount: lines.length,
     lines,
     pricingRequestedAt: d.pricingRequestedAt?.toISOString() ?? null,
+    procurementRequestRef: d.procurementRequestRef ?? null,
+    procurementStatus: mcStateToProcurementStatus(ws.state),
     activeOfferId: d.activeOfferId ?? null,
     buyerNotes: d.buyerNotes ?? null,
     createdAt: ws.createdAt.toISOString(),
@@ -111,6 +122,20 @@ async function nextMcRef(prisma: Prisma.TransactionClient | PrismaClient): Promi
   });
   const n = last ? Number(last.externalRef.slice(prefix.length)) : 0;
   return `${prefix}${String(n + 1).padStart(5, "0")}`;
+}
+
+async function assertContainerCapacity(
+  tx: Prisma.TransactionClient,
+  workspaceId: string,
+  nextTotalPallets: number,
+) {
+  const details = await tx.mixedContainerDetails.findUniqueOrThrow({ where: { workspaceId } });
+  if (nextTotalPallets > details.maxPalletCapacity) {
+    throw new AppError(400, "CONTAINER_CAPACITY_FULL", {
+      maxPalletCapacity: details.maxPalletCapacity,
+      requestedPallets: nextTotalPallets,
+    });
+  }
 }
 
 async function recalcDetails(tx: Prisma.TransactionClient, workspaceId: string) {
@@ -171,16 +196,57 @@ async function applyMcTransition(
   return t.to;
 }
 
+async function loadOrderContainerSlots(prisma: PrismaClient | Prisma.TransactionClient, orderGroupId: string) {
+  const rows = await prisma.mixedContainerDetails.findMany({
+    where: { orderGroupId },
+    include: { workspace: { select: { id: true, externalRef: true, state: true } } },
+    orderBy: { containerSequence: "asc" },
+  });
+  return rows.map((r) => ({
+    id: r.workspaceId,
+    externalRef: r.workspace.externalRef,
+    containerSequence: r.containerSequence,
+    state: r.workspace.state,
+    currentPalletCount: r.currentPalletCount,
+    maxPalletCapacity: r.maxPalletCapacity,
+    fillPercent:
+      r.maxPalletCapacity > 0 ? Math.round((r.currentPalletCount / r.maxPalletCapacity) * 100) : 0,
+  }));
+}
+
+function enrichMixedContainerDTO(
+  ws: WsFull,
+  base: ReturnType<typeof toMixedContainerDTO>,
+  orderContainers: Awaited<ReturnType<typeof loadOrderContainerSlots>>,
+) {
+  const d = ws.mixedContainerDetails!;
+  const orderGroupId = d.orderGroupId ?? ws.id;
+  const editable = ["MC_DRAFT", "MC_BUILDING"].includes(ws.state);
+  const isFull = base.currentPalletCount >= base.maxPalletCapacity;
+  return {
+    ...base,
+    orderGroupId,
+    containerSequence: d.containerSequence,
+    orderContainerCount: orderContainers.length,
+    maxOrderContainers: MC_MAX_CONTAINERS_PER_ORDER,
+    canAddContainer: editable && orderContainers.length < MC_MAX_CONTAINERS_PER_ORDER && isFull,
+    orderContainers,
+  };
+}
+
 export class MixedContainerService {
   constructor(public readonly prisma: PrismaClient) {}
 
-  async fetchDTO(id: string): Promise<ReturnType<typeof toMixedContainerDTO>> {
+  async fetchDTO(id: string) {
     const ws = await this.prisma.workspace.findUniqueOrThrow({
       where: { id },
       include: WS_INCLUDE,
     });
     if (ws.type !== "MIXED_CONTAINER") throw new AppError(409, "WRONG_WORKSPACE_TYPE");
-    return toMixedContainerDTO(ws);
+    const base = toMixedContainerDTO(ws);
+    const orderGroupId = ws.mixedContainerDetails!.orderGroupId ?? ws.id;
+    const orderContainers = await loadOrderContainerSlots(this.prisma, orderGroupId);
+    return enrichMixedContainerDTO(ws, base, orderContainers);
   }
 
   async create(input: CreateMixedContainerInput, actor: AuthUser) {
@@ -206,12 +272,88 @@ export class MixedContainerService {
           maxPalletCapacity: cap,
           destinationMarket: input.destinationMarket ?? null,
           currency: input.currency,
+          orderGroupId: ws.id,
+          containerSequence: 1,
         },
       });
       await appendTimeline(tx, ws.id, "mixed_container.created", actor.id, { externalRef });
       return ws.id;
     });
     return this.fetchDTO(id);
+  }
+
+  async addSiblingContainer(sourceId: string, actor: AuthUser) {
+    if (actor.role !== "BUYER") throw new AppError(403, "FORBIDDEN_ROLE");
+    await assertCanAccessMixedContainer(this.prisma, actor, sourceId);
+
+    const source = await this.prisma.workspace.findUniqueOrThrow({
+      where: { id: sourceId },
+      include: {
+        mixedContainerDetails: true,
+        containerLines: { where: { removedAt: null }, select: { palletCount: true } },
+      },
+    });
+    if (source.type !== "MIXED_CONTAINER") throw new AppError(409, "WRONG_WORKSPACE_TYPE");
+    if (!["MC_DRAFT", "MC_BUILDING"].includes(source.state)) {
+      throw new AppError(409, "CONTAINER_NOT_EDITABLE");
+    }
+
+    const sourceDetails = source.mixedContainerDetails!;
+    const orderGroupId = sourceDetails.orderGroupId ?? sourceId;
+    const currentPallets = source.containerLines.reduce((s, l) => s + l.palletCount, 0);
+    if (currentPallets < sourceDetails.maxPalletCapacity) {
+      throw new AppError(400, "CONTAINER_CAPACITY_NOT_FULL", {
+        currentPalletCount: currentPallets,
+        maxPalletCapacity: sourceDetails.maxPalletCapacity,
+      });
+    }
+
+    const siblingCount = await this.prisma.mixedContainerDetails.count({ where: { orderGroupId } });
+    if (siblingCount >= MC_MAX_CONTAINERS_PER_ORDER) {
+      throw new AppError(400, "MAX_ORDER_CONTAINERS_REACHED", { max: MC_MAX_CONTAINERS_PER_ORDER });
+    }
+
+    const cap = MC_CONTAINER_CAPACITIES[sourceDetails.containerType] ?? 24;
+    const maxSeq = await this.prisma.mixedContainerDetails.aggregate({
+      where: { orderGroupId },
+      _max: { containerSequence: true },
+    });
+    const nextSequence = (maxSeq._max.containerSequence ?? 0) + 1;
+
+    const newId = await this.prisma.$transaction(async (tx) => {
+      const externalRef = await nextMcRef(tx);
+      const ws = await tx.workspace.create({
+        data: {
+          externalRef,
+          type: "MIXED_CONTAINER",
+          state: "MC_DRAFT",
+          currency: sourceDetails.currency,
+          createdById: actor.id,
+          participants: { create: [{ userId: actor.id, participantRole: "OWNER" }] },
+        },
+      });
+      await tx.mixedContainerDetails.create({
+        data: {
+          id: ws.id,
+          workspaceId: ws.id,
+          containerType: sourceDetails.containerType,
+          maxPalletCapacity: cap,
+          destinationMarket: sourceDetails.destinationMarket,
+          currency: sourceDetails.currency,
+          orderGroupId,
+          containerSequence: nextSequence,
+        },
+      });
+      await appendTimeline(tx, ws.id, "mixed_container.created", actor.id, {
+        externalRef,
+        orderGroupId,
+        containerSequence: nextSequence,
+        fromContainerId: sourceId,
+      });
+      return ws.id;
+    });
+
+    return this.fetchDTO(newId);
   }
 
   async update(id: string, input: UpdateMixedContainerInput, actor: AuthUser) {
@@ -251,7 +393,9 @@ export class MixedContainerService {
       return rows.map((ws) => ({
         id: ws.id,
         externalRef: ws.externalRef,
+        procurementRequestRef: ws.mixedContainerDetails?.procurementRequestRef ?? null,
         state: ws.state,
+        procurementStatus: mcStateToProcurementStatus(ws.state),
         productCount: ws.containerLines.length,
         currentPalletCount: ws.mixedContainerDetails?.currentPalletCount ?? 0,
         estValueMin: num(ws.mixedContainerDetails?.estValueMin),
@@ -275,7 +419,9 @@ export class MixedContainerService {
     return parts.map((p) => ({
       id: p.workspace.id,
       externalRef: p.workspace.externalRef,
+      procurementRequestRef: p.workspace.mixedContainerDetails?.procurementRequestRef ?? null,
       state: p.workspace.state,
+      procurementStatus: mcStateToProcurementStatus(p.workspace.state),
       productCount: p.workspace.containerLines.length,
       currentPalletCount: p.workspace.mixedContainerDetails?.currentPalletCount ?? 0,
       estValueMin: num(p.workspace.mixedContainerDetails?.estValueMin),
@@ -295,14 +441,36 @@ export class MixedContainerService {
       where: { id: input.catalogProductId, status: "ACTIVE" },
     });
     if (!product) throw new AppError(404, "PRODUCT_NOT_FOUND");
-    if (input.palletCount < product.moqPallets) {
-      throw new AppError(400, "BELOW_MOQ", { moqPallets: product.moqPallets });
+
+    let packingTypeId = input.packingTypeId;
+    let catalogPackagingId: string | null = null;
+    let moqPallets = product.moqPallets;
+
+    if (input.packagingId) {
+      const packaging = await this.prisma.catalogPackaging.findFirst({
+        where: { id: input.packagingId, productId: input.catalogProductId, status: "ACTIVE" },
+        include: { packingType: true },
+      });
+      if (!packaging) throw new AppError(400, "INVALID_PACKAGING_FOR_PRODUCT");
+      catalogPackagingId = packaging.id;
+      moqPallets = packaging.moqPallets;
+      if (packaging.packingTypeId && packaging.packingType?.isActive) {
+        packingTypeId = packaging.packingTypeId;
+      }
+    }
+
+    if (!packingTypeId) {
+      throw new AppError(400, "PACKING_TYPE_REQUIRED");
+    }
+
+    if (input.palletCount < moqPallets) {
+      throw new AppError(400, "BELOW_MOQ", { moqPallets });
     }
     const packingLink = await assertValidPackingTypeForProduct(
       this.prisma,
       "MIXED_CONTAINER",
       input.catalogProductId,
-      input.packingTypeId,
+      packingTypeId,
     );
 
     await this.prisma.$transaction(async (tx) => {
@@ -310,19 +478,30 @@ export class MixedContainerService {
         where: {
           workspaceId: id,
           catalogProductId: input.catalogProductId,
-          packingTypeId: input.packingTypeId,
+          packingTypeId,
           removedAt: null,
         },
       });
+      const lines = await tx.containerLine.findMany({
+        where: { workspaceId: id, removedAt: null },
+        select: { palletCount: true },
+      });
+      const currentTotal = lines.reduce((s, l) => s + l.palletCount, 0);
+      const nextTotal = currentTotal + input.palletCount;
+      await assertContainerCapacity(tx, id, nextTotal);
+
       if (existing) {
         await tx.containerLine.update({
           where: { id: existing.id },
-          data: { palletCount: existing.palletCount + input.palletCount },
+          data: {
+            palletCount: existing.palletCount + input.palletCount,
+            ...(catalogPackagingId ? { catalogPackagingId } : {}),
+          },
         });
         await applyMcTransition(tx, id, "update_product_quantity", actor, "packing_type_updated", {
           lineId: existing.id,
           palletCount: existing.palletCount + input.palletCount,
-          packingTypeId: input.packingTypeId,
+          packingTypeId,
         });
       } else {
         const count = await tx.containerLine.count({ where: { workspaceId: id, removedAt: null } });
@@ -330,7 +509,8 @@ export class MixedContainerService {
           data: {
             workspaceId: id,
             catalogProductId: input.catalogProductId,
-            packingTypeId: input.packingTypeId,
+            catalogPackagingId,
+            packingTypeId,
             palletCount: input.palletCount,
             sortOrder: count + 1,
             indicativeUnitLow: product.indicativeLow,
@@ -340,7 +520,7 @@ export class MixedContainerService {
         });
         await applyMcTransition(tx, id, "add_product", actor, "packing_type_selected", {
           catalogProductId: input.catalogProductId,
-          packingTypeId: input.packingTypeId,
+          packingTypeId,
           packingTypeCode: packingLink.packingType.code,
         });
       }
@@ -360,6 +540,14 @@ export class MixedContainerService {
       throw new AppError(400, "BELOW_MOQ");
     }
     await this.prisma.$transaction(async (tx) => {
+      const lines = await tx.containerLine.findMany({
+        where: { workspaceId: id, removedAt: null },
+        select: { id: true, palletCount: true },
+      });
+      const currentTotal = lines.reduce((s, l) => s + l.palletCount, 0);
+      const nextTotal = currentTotal - line.palletCount + input.palletCount;
+      await assertContainerCapacity(tx, id, nextTotal);
+
       await tx.containerLine.update({ where: { id: lineId }, data: { palletCount: input.palletCount } });
       await applyMcTransition(tx, id, "update_product_quantity", actor, "mixed_container.quantity_updated", {
         lineId,
@@ -388,23 +576,58 @@ export class MixedContainerService {
     return this.fetchDTO(id);
   }
 
-  async requestPricing(id: string, actor: AuthUser) {
+  async requestPricing(id: string, actor: AuthUser, input: SubmitProcurementRequestInput = {}) {
     await assertCanAccessMixedContainer(this.prisma, actor, id);
     const ws = await this.prisma.workspace.findUniqueOrThrow({
       where: { id },
-      include: { containerLines: { where: { removedAt: null }, include: { packingType: true } } },
+      include: {
+        containerLines: { where: { removedAt: null }, include: { packingType: true } },
+        mixedContainerDetails: true,
+        createdBy: { select: { displayName: true } },
+      },
     });
     if (ws.containerLines.length === 0) throw new AppError(400, "EMPTY_CONTAINER");
     await assertLinesHavePackingType(ws.containerLines);
     if (!["MC_DRAFT", "MC_BUILDING"].includes(ws.state)) {
       throw new AppError(409, "ALREADY_SUBMITTED");
     }
+    const fromState = ws.state;
+    let prRef = ws.mixedContainerDetails?.procurementRequestRef ?? null;
+
     await this.prisma.$transaction(async (tx) => {
+      if (!prRef) {
+        prRef = await nextPrRef(tx);
+      }
       await tx.mixedContainerDetails.update({
         where: { workspaceId: id },
-        data: { pricingRequestedAt: new Date() },
+        data: {
+          pricingRequestedAt: new Date(),
+          procurementRequestRef: prRef,
+          ...(input.buyerNotes !== undefined ? { buyerNotes: input.buyerNotes } : {}),
+          ...(input.destinationMarket !== undefined ? { destinationMarket: input.destinationMarket } : {}),
+        },
       });
-      await applyMcTransition(tx, id, "request_live_pricing", actor, "mixed_container.pricing_requested");
+      const toState = await applyMcTransition(tx, id, "request_live_pricing", actor, "mixed_container.pricing_requested", {
+        procurementRequestRef: prRef,
+      });
+      await recordProcurementStatusHistory(tx, {
+        workspaceId: id,
+        fromState,
+        toState,
+        actorUserId: actor.id,
+        note: "Procurement request submitted",
+      });
+      await notifyBuyerProcurementStatus(tx, {
+        workspaceId: id,
+        buyerUserId: ws.createdById,
+        procurementRequestRef: prRef!,
+        status: "SUBMITTED",
+      });
+      await notifyAdminsNewProcurementRequest(tx, {
+        workspaceId: id,
+        procurementRequestRef: prRef!,
+        buyerName: ws.createdBy.displayName,
+      });
     });
     return this.fetchDTO(id);
   }

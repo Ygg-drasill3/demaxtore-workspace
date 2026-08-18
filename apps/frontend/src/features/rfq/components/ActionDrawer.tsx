@@ -15,7 +15,8 @@ import { useApplyRfqAction } from "../hooks";
 import { useTelemetry } from "@/features/telemetry/useTelemetry";
 import type { RfqState, ActorRole } from "@dmx/contracts/rfq.fsm";
 import {
-  PICKER_ACTIONS, AssignSuppliersPicker, SelectSupplierPicker, SubmitProformaPicker, IssuePoPicker,
+  PICKER_ACTIONS, AssignSuppliersPicker, SelectSupplierPicker, SubmitProformaPicker, IssuePoPicker, IssueSupplierPoPicker,
+  ReopenQuotationsPicker,
 } from "./ActionPickers";
 import { toWorkspaceScriptRole } from "@dmx/contracts/workspace-scripts";
 import { focusRfqCommunication } from "../lib/focus-communication";
@@ -25,8 +26,10 @@ import { useT } from "@/i18n/useT";
 
 interface Props {
   workspaceId:    string;
-  open:           boolean;
-  onClose:        () => void;
+  open?:          boolean;
+  onClose?:       () => void;
+  /** When true, renders actions inline instead of inside a drawer. */
+  inline?:        boolean;
   state:          RfqState;
   actor:          { id: string; role: ActorRole };
   isOwner:        boolean;
@@ -43,7 +46,7 @@ const FOCUS_COMMUNICATION_ACTIONS: ReadonlySet<RfqAction> = new Set(["post_clari
 
 export function ActionDrawer(props: Props) {
   const { t } = useT();
-  const { workspaceId, open, onClose, state, actor, isOwner, isCounterparty,
+  const { workspaceId, open = false, onClose = () => {}, inline = false, state, actor, isOwner, isCounterparty,
           isSelectedSupplier, hasQuotationFromUser, helperText, onFocusCommunication } = props;
   const apply = useApplyRfqAction(workspaceId);
   const { track } = useTelemetry();
@@ -85,8 +88,9 @@ export function ActionDrawer(props: Props) {
 
   const confirmPicker = (payload: Record<string, unknown>) => {
     if (!pickerAction) return;
+    const reasonText = typeof payload.reason === "string" ? payload.reason : undefined;
     apply.mutate(
-      { action: pickerAction.action, payload },
+      { action: pickerAction.action, payload, reason: reasonText },
       {
         onSuccess: () => {
           if (pickerAction?.action === "submit_proforma") {
@@ -114,33 +118,59 @@ export function ActionDrawer(props: Props) {
 
   return (
     <>
-      <Drawer open={open} onClose={onClose} title={t("rfq.drawer.title")} width="md" testId="action-drawer">
-        <div className="px-5 py-4 space-y-5">
-          {otherActions.length === 0 && (
-            <p className="text-sm text-zinc-500" data-testid="action-drawer-empty">
-              {t("rfq.drawer.emptyState")}
-            </p>
-          )}
+      {inline ? (
+        otherActions.length > 0 && (
+          <section data-testid="rfq-next-actions" className="dmx-card p-4 sm:p-5 animate-fade-in">
+            <div className="dmx-eyebrow text-zinc-500">{t("rfq.actions.title")}</div>
+            <div className="mt-3 space-y-4">
+              {secondary.length > 0 && (
+                <div className="space-y-2">
+                  {secondary.map((a) => (
+                    <ActionTile key={a.action} action={a} helper={helperText?.[a.action]} onClick={() => run(a)}
+                                loading={apply.isPending && apply.variables?.action === a.action} />
+                  ))}
+                </div>
+              )}
+              {critical.length > 0 && (
+                <div className="space-y-2 pt-1 border-t border-paper-200">
+                  {critical.map((a) => (
+                    <ActionTile key={a.action} action={a} helper={helperText?.[a.action]} onClick={() => run(a)}
+                                loading={apply.isPending && apply.variables?.action === a.action} critical />
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        )
+      ) : (
+        <Drawer open={open} onClose={onClose} title={t("rfq.drawer.title")} width="md" testId="action-drawer">
+          <div className="px-5 py-4 space-y-5">
+            {otherActions.length === 0 && (
+              <p className="text-sm text-zinc-500" data-testid="action-drawer-empty">
+                {t("rfq.drawer.emptyState")}
+              </p>
+            )}
 
-          {secondary.length > 0 && (
-            <Section title={t("rfq.drawer.secondary")}>
-              {secondary.map((a) => (
-                <ActionTile key={a.action} action={a} helper={helperText?.[a.action]} onClick={() => run(a)}
-                            loading={apply.isPending && apply.variables?.action === a.action} />
-              ))}
-            </Section>
-          )}
+            {secondary.length > 0 && (
+              <Section title={t("rfq.drawer.secondary")}>
+                {secondary.map((a) => (
+                  <ActionTile key={a.action} action={a} helper={helperText?.[a.action]} onClick={() => run(a)}
+                              loading={apply.isPending && apply.variables?.action === a.action} />
+                ))}
+              </Section>
+            )}
 
-          {critical.length > 0 && (
-            <Section title={t("rfq.drawer.critical")} tone="danger">
-              {critical.map((a) => (
-                <ActionTile key={a.action} action={a} helper={helperText?.[a.action]} onClick={() => run(a)}
-                            loading={apply.isPending && apply.variables?.action === a.action} critical />
-              ))}
-            </Section>
-          )}
-        </div>
-      </Drawer>
+            {critical.length > 0 && (
+              <Section title={t("rfq.drawer.critical")} tone="danger">
+                {critical.map((a) => (
+                  <ActionTile key={a.action} action={a} helper={helperText?.[a.action]} onClick={() => run(a)}
+                              loading={apply.isPending && apply.variables?.action === a.action} critical />
+                ))}
+              </Section>
+            )}
+          </div>
+        </Drawer>
+      )}
 
       <Modal
         open={!!pending}
@@ -191,9 +221,12 @@ export function ActionDrawer(props: Props) {
       {/* Sprint 2.6 — payload pickers for actions that need structured input. */}
       <AssignSuppliersPicker
         workspaceId={workspaceId}
+        pickerAction={pickerAction?.action}
         open={
           !!pickerAction &&
-          (pickerAction.action === "assign_suppliers" || pickerAction.action === "add_more_suppliers")
+          (pickerAction.action === "assign_suppliers" ||
+            pickerAction.action === "add_more_suppliers" ||
+            pickerAction.action === "update_supplier_scopes")
         }
         onClose={() => setPickerAction(null)}
         onConfirm={confirmPicker}
@@ -216,6 +249,20 @@ export function ActionDrawer(props: Props) {
       <IssuePoPicker
         workspaceId={workspaceId}
         open={!!pickerAction && pickerAction.action === "issue_po"}
+        onClose={() => setPickerAction(null)}
+        onConfirm={confirmPicker}
+        isPending={apply.isPending}
+      />
+      <IssueSupplierPoPicker
+        workspaceId={workspaceId}
+        open={!!pickerAction && pickerAction.action === "issue_supplier_po"}
+        onClose={() => setPickerAction(null)}
+        onConfirm={confirmPicker}
+        isPending={apply.isPending}
+      />
+      <ReopenQuotationsPicker
+        workspaceId={workspaceId}
+        open={!!pickerAction && pickerAction.action === "reopen_quotations"}
         onClose={() => setPickerAction(null)}
         onConfirm={confirmPicker}
         isPending={apply.isPending}

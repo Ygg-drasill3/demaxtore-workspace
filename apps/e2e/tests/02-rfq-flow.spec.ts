@@ -115,14 +115,14 @@ test.describe.serial("RFQ-to-PO flow (Buyer + Admin + Supplier in real browser)"
     await page.getByTestId("quote-line-0-unit-price").fill("42.50");
     await page.getByTestId("quote-lead-time").fill("28");
     await page.getByTestId("quote-payment-terms").fill("30% TT, 70% BL");
-    await expect(page.getByTestId("quote-grand-total")).toContainText("4250");
+    await expect(page.getByTestId("quote-line-0-total")).toContainText("4250");
     await page.getByTestId("quote-submit").click();
     await expect(page.getByTestId("quote-status-badge")).toHaveText("SUBMITTED", { timeout: 10_000 });
     await expect(page.getByTestId("quote-revise")).toBeVisible();
 
     // Supplier revises the price in the UI.
     await page.getByTestId("quote-line-0-unit-price").fill("39.90");
-    await expect(page.getByTestId("quote-grand-total")).toContainText("3990");
+    await expect(page.getByTestId("quote-line-0-total")).toContainText("3990");
     await page.getByTestId("quote-revise").click();
     await expect(page.getByTestId("quote-status-badge")).toHaveText("REVISED", { timeout: 10_000 });
 

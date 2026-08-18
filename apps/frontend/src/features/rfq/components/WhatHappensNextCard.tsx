@@ -10,15 +10,21 @@ import { CheckCircle2, ArrowRight } from "lucide-react";
 import type { RfqState, RfqAction } from "@dmx/contracts/rfq.fsm";
 import { focusRfqCommunication } from "../lib/focus-communication";
 import { computeRfqNextActions, type NextAction } from "@dmx/contracts/rfq.next-actions";
-import { rfqScriptFor, formatScript, type RfqScript, type ScriptMood } from "../lib/rfq.scripts";
+import { rfqScriptFor, formatScript, resolveScriptHref, type RfqScript, type ScriptMood } from "../lib/rfq.scripts";
 import { Button } from "@/components/ui/Button";
+import { Modal } from "@/components/ui/Modal";
 import { cn } from "@/lib/utils";
 import { useApplyRfqAction } from "../hooks";
 import { toast } from "@/store/toast.store";
 import { useTelemetry } from "@/features/telemetry/useTelemetry";
+import { showPoIssuedSuccess } from "@/features/workspace-academy";
+import { rfqApi } from "../lib/rfq.api";
+import { rfqWorkspacePath } from "../lib/rfq-path";
 import {
-  PICKER_ACTIONS, AssignSuppliersPicker, SelectSupplierPicker, SubmitProformaPicker, IssuePoPicker,
+  PICKER_ACTIONS, AssignSuppliersPicker, SelectSupplierPicker, SubmitProformaPicker, IssuePoPicker, IssueSupplierPoPicker,
+  ReopenQuotationsPicker,
 } from "./ActionPickers";
+import { Textarea } from "@/components/ui/Input";
 
 export interface WhatHappensNextCardProps {
   workspaceId:    string;
@@ -54,13 +60,16 @@ export function WhatHappensNextCard(props: WhatHappensNextCardProps) {
   const fallbackHref = useMemo(() => {
     const href = script?.fallbackPrimary?.href;
     if (!href) return null;
-    const resolved = formatScript(href, vars).trim();
-    return resolved.startsWith("/") ? resolved : null;
+    return resolveScriptHref(href, vars);
   }, [script, vars]);
+  const showFallbackPrimary = !!script?.fallbackPrimary && (!!script.fallbackPrimary.action || !!fallbackHref);
   const mood = MOOD_STYLES[script?.mood ?? "waiting"];
   const { track } = useTelemetry();
   const apply = useApplyRfqAction(workspaceId);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [promotedPicker, setPromotedPicker] = useState<NextAction | null>(null);
+  const [pendingPromoted, setPendingPromoted] = useState<NextAction | null>(null);
+  const [promotedReason, setPromotedReason] = useState("");
 
   // Resolve primary action descriptor (with FSM permission check).
   const primaryNextAction = useMemo<NextAction | null>(() => {
@@ -110,7 +119,18 @@ export function WhatHappensNextCard(props: WhatHappensNextCardProps) {
       setPickerOpen(true);
       return;
     }
+    if (primaryNextAction?.requiresReason) {
+      setPendingPromoted(primaryNextAction);
+      setPromotedReason("");
+      return;
+    }
+    if (primaryNextAction?.requiresConfirmation) {
+      const ok = window.confirm(`${primaryNextAction.label}\n\n${primaryNextAction.description || "This cannot be undone."}`);
+      if (!ok) return;
+    }
     if (primaryNextAction && !primaryNextAction.requiresReason && !primaryNextAction.requiresConfirmation) {
+      apply.mutate({ action: primaryNextAction.action });
+    } else if (primaryNextAction) {
       apply.mutate({ action: primaryNextAction.action });
     }
     onPrimaryClick?.(primaryNextAction);
@@ -118,13 +138,37 @@ export function WhatHappensNextCard(props: WhatHappensNextCardProps) {
 
   const handlePromoted = (action: NextAction) => {
     track("next_action.clicked", { workspaceId, targetId: action.action });
+    if (PICKER_ACTIONS.has(action.action)) {
+      setPromotedPicker(action);
+      return;
+    }
+    if (action.requiresReason) {
+      setPendingPromoted(action);
+      setPromotedReason("");
+      return;
+    }
     if (action.requiresConfirmation) {
       const ok = window.confirm(`${action.label}\n\n${action.description || "This cannot be undone."}`);
       if (!ok) return;
     }
-    if (!action.requiresReason) {
-      apply.mutate({ action: action.action });
-    }
+    apply.mutate({ action: action.action });
+  };
+
+  const confirmPromotedReason = () => {
+    if (!pendingPromoted) return;
+    apply.mutate(
+      { action: pendingPromoted.action, reason: promotedReason },
+      { onSuccess: () => setPendingPromoted(null) },
+    );
+  };
+
+  const confirmPromotedPicker = (payload: Record<string, unknown>) => {
+    if (!promotedPicker) return;
+    const reasonText = typeof payload.reason === "string" ? payload.reason : undefined;
+    apply.mutate(
+      { action: promotedPicker.action, payload, reason: reasonText },
+      { onSuccess: () => setPromotedPicker(null) },
+    );
   };
 
   const confirmPicker = (payload: Record<string, unknown>) => {
@@ -132,9 +176,24 @@ export function WhatHappensNextCard(props: WhatHappensNextCardProps) {
     apply.mutate(
       { action: primaryNextAction.action, payload },
       {
-        onSuccess: () => {
+        onSuccess: async () => {
           if (primaryNextAction?.action === "submit_proforma") {
             toast.success("Proforma submitted", "The buyer can now review your invoice.");
+          }
+          if (primaryNextAction?.action === "issue_po") {
+            try {
+              const spawned = await rfqApi.spawnedOrders(workspaceId) as Array<{ id: string }>;
+              const orderId = spawned?.[0]?.id ?? null;
+              // PO workspace id is not always returned here; Order is the primary next step.
+              showPoIssuedSuccess({
+                orderWorkspaceId: orderId,
+                rfqWorkspacePath: rfqWorkspacePath({ id: workspaceId }),
+              });
+            } catch {
+              showPoIssuedSuccess({
+                rfqWorkspacePath: rfqWorkspacePath({ id: workspaceId }),
+              });
+            }
           }
           setPickerOpen(false);
         },
@@ -146,7 +205,7 @@ export function WhatHappensNextCard(props: WhatHappensNextCardProps) {
 
   return (
     <section
-      data-testid="what-happens-next"
+      data-testid="what-happens-next" data-guide="proforma-panel"
       data-state={state}
       data-mood={script.mood}
       className={cn("rounded-2xl border p-6 sm:p-7 animate-fade-in", mood.bg, mood.border)}
@@ -169,10 +228,11 @@ export function WhatHappensNextCard(props: WhatHappensNextCardProps) {
         <Stat label={statR.label} value={statR.value} testId="whn-stat-right" />
       </div>
 
-      {(primaryNextAction || script.fallbackPrimary || promotedNextActions.length > 0) && (
+      {(primaryNextAction || showFallbackPrimary || promotedNextActions.length > 0) && (
         <div className="mt-5 space-y-2">
           {primaryNextAction ? (
             <Button
+              data-guide="proforma-review"
               data-testid={primaryNextAction ? `whn-primary-cta-${primaryNextAction.action}` : "whn-primary-cta"}
               size="lg"
               className="w-full"
@@ -182,7 +242,7 @@ export function WhatHappensNextCard(props: WhatHappensNextCardProps) {
             >
               {script.primaryLabel ?? primaryNextAction.label}
             </Button>
-          ) : script.fallbackPrimary ? (
+          ) : showFallbackPrimary ? (
             <Button
               data-testid="whn-fallback-cta"
               size="lg"
@@ -191,6 +251,20 @@ export function WhatHappensNextCard(props: WhatHappensNextCardProps) {
               onClick={() => {
                 onPrimaryClick?.(null);
                 if (fallbackHref) navigate(fallbackHref);
+              }}
+            >
+              {script.fallbackPrimary?.label}
+            </Button>
+          ) : null}
+          {primaryNextAction && showFallbackPrimary && fallbackHref ? (
+            <Button
+              data-testid="whn-fallback-cta"
+              size="lg"
+              className="w-full"
+              variant={script.fallbackPrimary?.tone === "ghost" ? "ghost" : "secondary"}
+              onClick={() => {
+                onPrimaryClick?.(null);
+                navigate(fallbackHref);
               }}
             >
               {script.fallbackPrimary?.label}
@@ -216,7 +290,13 @@ export function WhatHappensNextCard(props: WhatHappensNextCardProps) {
           requires a structured payload (assign_suppliers / select_supplier / issue_po). */}
       <AssignSuppliersPicker
         workspaceId={workspaceId}
-        open={pickerOpen && (pickerAction === "assign_suppliers" || pickerAction === "add_more_suppliers")}
+        pickerAction={pickerAction ?? undefined}
+        open={
+          pickerOpen &&
+          (pickerAction === "assign_suppliers" ||
+            pickerAction === "add_more_suppliers" ||
+            pickerAction === "update_supplier_scopes")
+        }
         onClose={() => setPickerOpen(false)}
         onConfirm={confirmPicker}
         isPending={apply.isPending}
@@ -242,6 +322,51 @@ export function WhatHappensNextCard(props: WhatHappensNextCardProps) {
         onConfirm={confirmPicker}
         isPending={apply.isPending}
       />
+      <IssueSupplierPoPicker
+        workspaceId={workspaceId}
+        open={pickerOpen && pickerAction === "issue_supplier_po"}
+        onClose={() => setPickerOpen(false)}
+        onConfirm={confirmPicker}
+        isPending={apply.isPending}
+      />
+      <ReopenQuotationsPicker
+        workspaceId={workspaceId}
+        open={!!promotedPicker && promotedPicker.action === "reopen_quotations"}
+        onClose={() => setPromotedPicker(null)}
+        onConfirm={confirmPromotedPicker}
+        isPending={apply.isPending}
+      />
+
+      <Modal
+        open={!!pendingPromoted}
+        onClose={() => setPendingPromoted(null)}
+        title={pendingPromoted?.label ?? ""}
+        description="Please provide a reason for this workflow change (at least 15 characters)."
+        size="md"
+        testId="whn-promoted-reason-modal"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setPendingPromoted(null)}>Cancel</Button>
+            <Button
+              data-testid="whn-promoted-reason-confirm"
+              variant={pendingPromoted?.variant === "destructive" ? "destructive" : "primary"}
+              onClick={confirmPromotedReason}
+              disabled={promotedReason.trim().length < 15}
+              loading={apply.isPending}
+            >
+              Confirm
+            </Button>
+          </>
+        }
+      >
+        <Textarea
+          data-testid="whn-promoted-reason-textarea"
+          value={promotedReason}
+          onChange={(e) => setPromotedReason(e.target.value)}
+          placeholder="Explain why you are changing the RFQ stage…"
+          rows={4}
+        />
+      </Modal>
     </section>
   );
 }

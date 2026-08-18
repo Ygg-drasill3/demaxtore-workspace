@@ -44,7 +44,9 @@ export interface ChannelSendInput {
   conversationId: string;
   messageId: string;
   body: string;
+  senderName?: string | null;
   phoneE164?: string | null;
+  whatsappCredentials?: import("../whatsapp-business/whatsapp-business.types.js").WhatsAppTenantCredentials;
 }
 
 export interface ChannelSendResult {

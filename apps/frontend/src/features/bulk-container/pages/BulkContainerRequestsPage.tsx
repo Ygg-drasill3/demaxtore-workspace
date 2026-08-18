@@ -15,7 +15,7 @@ export default function BulkContainerRequestsPage() {
   });
 
   return (
-    <div data-testid="bc-requests-page" className="max-w-[1200px] mx-auto space-y-6 animate-fade-in">
+    <div data-testid="bc-requests-page" data-guide="bc-requests" className="max-w-[1200px] mx-auto space-y-6 animate-fade-in">
       <header className="flex items-end justify-between flex-wrap gap-3">
         <div>
           <Link to="/buyer/bulk-container" className="text-xs text-zinc-500 hover:underline">← BulkContainer</Link>

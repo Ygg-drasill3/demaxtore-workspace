@@ -50,6 +50,8 @@ export const QuotationRowDTO = z.object({
   id:            z.string().uuid(),
   supplierId:    z.string().uuid(),
   supplierName:  z.string(),
+  supplierLogoUrl: z.string().nullable().optional(),
+  supplierCatalogUrl: z.string().nullable().optional(),
   total:         z.number(),
   currency:      z.string().length(3),
   unitPriceAvg:  z.number().nullable(),
@@ -69,6 +71,9 @@ export const QuotationRowDTO = z.object({
     quantity:      z.number(),
     unitPrice:     z.number(),
     total:         z.number(),
+    packing:       z.string().nullable().optional(),
+    priceUnit:     z.string().nullable().optional(),
+    moq:           z.number().int().min(0).nullable().optional(),
   })).optional(),
 });
 export type QuotationRowDTO = z.infer<typeof QuotationRowDTO>;

@@ -15,6 +15,7 @@ const DOC_LABELS: Record<TradeDocumentType, string> = {
   INSPECTION_REPORT: "Inspection Report",
   INSURANCE_CERTIFICATE: "Insurance Certificate",
   EXPORT_DECLARATION: "Export Declaration",
+  PROOF_OF_DELIVERY: "Proof of Delivery",
   OTHER: "Other",
 };
 

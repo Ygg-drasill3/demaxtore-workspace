@@ -1,0 +1,61 @@
+{
+  "marker": "MVP-UI17-R4-20260814-X4J7",
+  "sku": "FLOUR-UI17R4-X4J7",
+  "startedAt": "2026-08-14T15:33:45.807Z",
+  "stages": [
+    {
+      "name": "BUYER_LOGIN",
+      "result": "PASS",
+      "note": "https://workspace.demaxtore.com/buyer/control-tower",
+      "at": "2026-08-14T15:33:47.268Z"
+    },
+    {
+      "name": "PRODUCT_CREATION",
+      "result": "PASS",
+      "note": "FLOUR-UI17R4-X4J7",
+      "at": "2026-08-14T15:33:53.438Z"
+    },
+    {
+      "name": "DIRECT_PO",
+      "result": "PASS",
+      "note": "PO-MST3XKJ3-CC428C6D",
+      "at": "2026-08-14T15:33:59.898Z"
+    },
+    {
+      "name": "PRODUCT_TO_PO",
+      "result": "PASS",
+      "note": "https://workspace.demaxtore.com/workspace/order/0c92de2b-576e-41fc-b801-c1a48979b4fa",
+      "at": "2026-08-14T15:34:01.007Z"
+    },
+    {
+      "name": "DEPOSIT_CONFIRMATION",
+      "result": "PASS",
+      "note": "Admin recorded DEPOSIT_PAID",
+      "at": "2026-08-14T15:34:04.583Z"
+    },
+    {
+      "name": "R4_ABORT",
+      "result": "ENVIRONMENT BLOCKED",
+      "note": "locator.count: Target page, context or browser has been closed",
+      "at": "2026-08-14T15:34:20.738Z"
+    }
+  ],
+  "entities": {
+    "productSku": "FLOUR-UI17R4-X4J7",
+    "poNumber": "PO-MST3XKJ3-CC428C6D",
+    "orderUrl": "https://workspace.demaxtore.com/workspace/order/0c92de2b-576e-41fc-b801-c1a48979b4fa",
+    "orderId": "0c92de2b-576e-41fc-b801-c1a48979b4fa"
+  },
+  "errors": [],
+  "network5xx": 0,
+  "blocker": {
+    "stage": "UNHANDLED",
+    "note": "locator.count: Target page, context or browser has been closed",
+    "kind": "ENVIRONMENT"
+  },
+  "completedAt": "2026-08-14T15:34:20.739Z",
+  "verdict": {
+    "controlledPaidPilot": "PENDING",
+    "selfService": "PENDING"
+  }
+}

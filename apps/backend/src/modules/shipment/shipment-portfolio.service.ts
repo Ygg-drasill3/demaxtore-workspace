@@ -186,7 +186,9 @@ export class ShipmentPortfolioService {
     const orderMap = new Map(orders.map((o) => [o.id, o]));
     const owMap = new Map(orderWorkspaces.map((o) => [o.workspaceId, o]));
 
-    const parentIds = [...new Set(orderWorkspaces.map((o) => o.parentWorkspaceId))];
+    const parentIds = [...new Set(
+      orderWorkspaces.map((o) => o.parentWorkspaceId).filter((id): id is string => !!id),
+    )];
     const parents = parentIds.length
       ? await this.db.workspace.findMany({
           where: { id: { in: parentIds } },
@@ -226,7 +228,7 @@ export class ShipmentPortfolioService {
       const snap = ws.trackingSnapshots[0];
       const order = ws.spawnedFromId ? orderMap.get(ws.spawnedFromId) : undefined;
       const ow = ws.spawnedFromId ? owMap.get(ws.spawnedFromId) : undefined;
-      const parent = ow ? parentMap.get(ow.parentWorkspaceId) : undefined;
+      const parent = ow?.parentWorkspaceId ? parentMap.get(ow.parentWorkspaceId) : undefined;
       const tradeRootId = parent?.id ?? ow?.parentWorkspaceId ?? ws.spawnedFromId ?? ws.id;
       const tradeRef = parent
         ? tradeRefFromRoot(parent as Parameters<typeof tradeRefFromRoot>[0])
@@ -311,6 +313,9 @@ export class ShipmentPortfolioService {
         relatedEntityType: "SHIPMENT",
         relatedEntityId: r.shipmentId,
         relatedEntityRef: r.shipmentNumber,
+        poNumber: null,
+        poOrderId: null,
+        orderWorkspaceUrl: null,
         buyerName: r.buyerName,
         supplierName: r.supplierName,
         shipmentRef: r.shipmentNumber,

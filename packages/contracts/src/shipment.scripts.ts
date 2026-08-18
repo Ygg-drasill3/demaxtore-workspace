@@ -85,7 +85,8 @@ export const SHIPMENT_SCRIPTS: Partial<Record<ShipmentState, WorkspaceScript>> =
   },
 };
 
-export function shipmentScriptFor(state: ShipmentState, _role?: WorkspaceScriptRole): WorkspaceScript | undefined {
+export function shipmentScriptFor(state: ShipmentState, role: WorkspaceScriptRole): WorkspaceScript | undefined {
+  void role;
   return SHIPMENT_SCRIPTS[state];
 }
 

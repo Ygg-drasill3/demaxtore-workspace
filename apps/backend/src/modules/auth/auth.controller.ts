@@ -1,6 +1,6 @@
 // apps/backend/src/modules/auth/auth.controller.ts
 import type { Request, Response } from "express";
-import { LoginInput, ForgotPasswordInput, ResetPasswordInput, RegisterInput } from "@dmx/contracts";
+import { LoginInput, ForgotPasswordInput, ResetPasswordInput, RegisterInput, UpdateProfileInput } from "@dmx/contracts";
 import { asyncHandler } from "../../middleware/asyncHandler.js";
 import { validateBody } from "../../middleware/validate.js";
 import { requireAuth } from "../../middleware/auth.js";
@@ -41,6 +41,7 @@ export const loginValidator = validateBody(LoginInput);
 export const registerValidator = validateBody(RegisterInput);
 export const forgotValidator = validateBody(ForgotPasswordInput);
 export const resetValidator = validateBody(ResetPasswordInput);
+export const updateProfileValidator = validateBody(UpdateProfileInput);
 
 export const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body as { email: string; password: string };
@@ -83,6 +84,16 @@ export const me = [
   requireAuth,
   asyncHandler(async (req, res) => {
     const user = await authService.getCurrentUser(req.user!.id);
+    res.json(user);
+  }),
+];
+
+export const updateProfile = [
+  requireAuth,
+  updateProfileValidator,
+  asyncHandler(async (req, res) => {
+    const body = req.body as UpdateProfileInput;
+    const user = await authService.updateProfile(req.user!.id, body);
     res.json(user);
   }),
 ];

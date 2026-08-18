@@ -98,7 +98,7 @@ export default function TradeWorkspacePage() {
   const { header, summary } = data;
 
   return (
-    <div data-testid="trade-workspace" className="max-w-[1600px] mx-auto space-y-6 animate-fade-in pb-10">
+    <div data-testid="trade-workspace" data-guide="trade-workspace" className="max-w-[1600px] mx-auto space-y-6 animate-fade-in pb-10">
       {/* Header */}
       <header
         data-testid="trade-workspace-header"
@@ -120,11 +120,11 @@ export default function TradeWorkspacePage() {
                 All documents →
               </Link>
               <Link
-                to="/exceptions"
+                to="/alerts"
                 data-testid="trade-workspace-exceptions-link"
                 className="rounded-full bg-white/10 px-3 py-1 hover:bg-white/20 transition-colors"
               >
-                Exception hub →
+                Alerts →
               </Link>
             </div>
           </div>

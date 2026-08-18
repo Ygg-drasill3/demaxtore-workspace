@@ -82,6 +82,9 @@ const ShipmentWorkspacePage = lazy(() => import("@/features/shipment/pages/Shipm
 const OperationsPage = lazy(() => import("@/features/control-tower/pages/OperationsPage"));
 const PoWorkspacePage = lazy(() => import("@/features/purchase-order/pages/PoWorkspacePage"));
 const PoListPage = lazy(() => import("@/features/purchase-order/pages/PoListPage"));
+const ProductListPage = lazy(() => import("@/features/product-master/pages/ProductListPage"));
+const ProductDetailPage = lazy(() => import("@/features/product-master/pages/ProductDetailPage"));
+const CreatePurchaseOrderPage = lazy(() => import("@/features/purchase-order/pages/CreatePurchaseOrderPage"));
 const ShipmentsListPage = lazy(() => import("@/features/shipment/pages/ShipmentsListPage"));
 const ShipmentPortfolioPage = lazy(() => import("@/features/shipment/pages/ShipmentPortfolioPage"));
 const TradeDocumentsListPage = lazy(() => import("@/features/trade-documents/pages/TradeDocumentsListPage"));
@@ -109,6 +112,20 @@ const SalesControlDashboardPage = lazy(() => import("@/features/sales-control/pa
 const ControlTowerDashboardPage = lazy(() => import("@/features/import-control-tower/pages/ControlTowerDashboard"));
 const ForwarderDashboardPage = lazy(() => import("@/features/forwarder/pages/ForwarderDashboardPage"));
 const ForwarderShipmentPage = lazy(() => import("@/features/forwarder/pages/ForwarderShipmentPage"));
+const PartnerHomePage = lazy(() => import("@/features/partner-workspace/pages/PartnerHomePage"));
+const PartnerTransactionsPage = lazy(() => import("@/features/partner-workspace/pages/PartnerTransactionsPage"));
+const PartnerTransactionDetailPage = lazy(() => import("@/features/partner-workspace/pages/PartnerTransactionDetailPage"));
+const PartnerCustomsCasesPage = lazy(() => import("@/features/partner-workspace/pages/PartnerCustomsCasesPage"));
+const PartnerInlandDeliveriesPage = lazy(() => import("@/features/partner-workspace/pages/PartnerInlandDeliveriesPage"));
+const CustomsListPage = lazy(() => import("@/features/customs/pages/CustomsListPage"));
+const CustomsCasePage = lazy(() => import("@/features/customs/pages/CustomsCasePage"));
+const InlandListPage = lazy(() => import("@/features/inland/pages/InlandListPage"));
+const InlandDeliveryPage = lazy(() => import("@/features/inland/pages/InlandDeliveryPage"));
+const LandedCostListPage = lazy(() => import("@/features/landed-cost/pages/LandedCostListPage"));
+const LandedCostDetailPage = lazy(() => import("@/features/landed-cost/pages/LandedCostDetailPage"));
+const StartImportPage = lazy(() => import("@/features/import-ops/pages/StartImportPage"));
+const FreightQuoteRequestPage = lazy(() => import("@/features/import-ops/pages/FreightQuoteRequestPage"));
+const ActiveImportsPage = lazy(() => import("@/features/import-ops/pages/ActiveImportsPage"));
 const PasswordlessConversationPage = lazy(() =>
   import("@/features/passwordless-access/pages/PasswordlessConversationPage"),
 );
@@ -182,6 +199,7 @@ export function AppRoutes() {
           <Route path="/" element={<RootRedirect />} />
 
           {/* Legacy / mistyped paths (BUG-011, BUG-012, BUG-015) */}
+          <Route path="/workspace" element={<RootRedirect />} />
           <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="/admin/users" element={<Navigate to="/sales/dashboard" replace />} />
           <Route path="/admin/shipments" element={<Navigate to="/shipments/portfolio" replace />} />
@@ -215,6 +233,9 @@ export function AppRoutes() {
           {/* Buyer */}
           <Route element={<RequireRole allow={["BUYER"]} />}>
             <Route path="/buyer/dashboard"          element={<LazyPage><BuyerDashboardPage /></LazyPage>} />
+            <Route path="/buyer/imports"            element={<LazyPage><ActiveImportsPage /></LazyPage>} />
+            <Route path="/buyer/imports/new"        element={<LazyPage><StartImportPage /></LazyPage>} />
+            <Route path="/buyer/freightiq/request"  element={<LazyPage><FreightQuoteRequestPage /></LazyPage>} />
             <Route path="/buyer/control-tower"       element={<LazyPage><ControlTowerDashboardPage /></LazyPage>} />
             <Route path="/buyer/rfq"                element={<LazyPage><RfqListPage /></LazyPage>} />
             <Route path="/buyer/rfq/new"            element={<LazyPage><RfqCreatePage /></LazyPage>} />
@@ -222,6 +243,9 @@ export function AppRoutes() {
             <Route path="/buyer/commoditybid/panel" element={<LazyPage><CommodityBidEmbedPage /></LazyPage>} />
             <Route path="/buyer/orders"             element={<LazyPage><OrdersListPage /></LazyPage>} />
             <Route path="/buyer/purchase-orders"    element={<LazyPage><PoListPage /></LazyPage>} />
+            <Route path="/buyer/purchase-orders/create" element={<LazyPage><CreatePurchaseOrderPage /></LazyPage>} />
+            <Route path="/buyer/products"           element={<LazyPage><ProductListPage /></LazyPage>} />
+            <Route path="/buyer/products/:id"       element={<LazyPage><ProductDetailPage /></LazyPage>} />
             <Route path="/buyer/shipments"          element={<LazyPage><ShipmentsListPage /></LazyPage>} />
             <Route path="/buyer/trade-documents"    element={<LazyPage><TradeDocumentsListPage /></LazyPage>} />
             <Route path="/buyer/mixed-container" element={<LazyPage><MixedContainerHomePage /></LazyPage>} />
@@ -245,6 +269,12 @@ export function AppRoutes() {
             <Route path="/buyer/bulk-container/offers/:id" element={<LazyPage><BulkContainerOfferPage /></LazyPage>} />
             <Route path="/buyer/bulk-container/coordination/:id" element={<LazyPage><BulkContainerCoordinationPage /></LazyPage>} />
             <Route path="/buyer/bulk-container/execution/:id" element={<LazyPage><BulkContainerExecutionPage /></LazyPage>} />
+            <Route path="/buyer/customs" element={<LazyPage><CustomsListPage /></LazyPage>} />
+            <Route path="/buyer/customs/:id" element={<LazyPage><CustomsCasePage /></LazyPage>} />
+            <Route path="/buyer/inland" element={<LazyPage><InlandListPage /></LazyPage>} />
+            <Route path="/buyer/inland/:id" element={<LazyPage><InlandDeliveryPage /></LazyPage>} />
+            <Route path="/buyer/landed-cost" element={<LazyPage><LandedCostListPage /></LazyPage>} />
+            <Route path="/buyer/landed-cost/:id" element={<LazyPage><LandedCostDetailPage /></LazyPage>} />
           </Route>
 
           {/* Supplier */}
@@ -257,6 +287,35 @@ export function AppRoutes() {
             <Route path="/supplier/orders"          element={<LazyPage><OrdersListPage /></LazyPage>} />
             <Route path="/supplier/shipments"       element={<LazyPage><ShipmentsListPage /></LazyPage>} />
             <Route path="/supplier/trade-documents" element={<LazyPage><TradeDocumentsListPage /></LazyPage>} />
+          </Route>
+
+          {/* Partner workspace (supplier / broker / trucker) */}
+          <Route
+            element={
+              <RequireRole
+                allow={["SUPPLIER", "ORIGIN_AGENT", "CUSTOMS_BROKER", "TRUCKER", "ADMIN", "SUPER_ADMIN", "OPS_MANAGER"]}
+              />
+            }
+          >
+            <Route path="/partner" element={<LazyPage><PartnerHomePage /></LazyPage>} />
+            <Route path="/partner/transactions" element={<LazyPage><PartnerTransactionsPage /></LazyPage>} />
+            <Route path="/partner/transactions/:workspaceId" element={<LazyPage><PartnerTransactionDetailPage /></LazyPage>} />
+          </Route>
+
+          <Route element={<RequireRole allow={["CUSTOMS_BROKER"]} />}>
+            <Route path="/partner/customs" element={<LazyPage><PartnerCustomsCasesPage /></LazyPage>} />
+          </Route>
+
+          <Route element={<RequireRole allow={["CUSTOMS_BROKER", "ADMIN", "SUPER_ADMIN"]} />}>
+            <Route path="/partner/customs/:id" element={<LazyPage><CustomsCasePage /></LazyPage>} />
+          </Route>
+
+          <Route element={<RequireRole allow={["TRUCKER"]} />}>
+            <Route path="/partner/inland" element={<LazyPage><PartnerInlandDeliveriesPage /></LazyPage>} />
+          </Route>
+
+          <Route element={<RequireRole allow={["TRUCKER", "ADMIN", "SUPER_ADMIN", "OPS_MANAGER"]} />}>
+            <Route path="/partner/inland/:id" element={<LazyPage><InlandDeliveryPage /></LazyPage>} />
           </Route>
 
           {/* Forwarder portal */}

@@ -1,6 +1,6 @@
 const FREIGHT_ERROR_MESSAGES: Record<string, string> = {
   FREIGHT_REQUEST_ALREADY_OPEN: "This order already has an open freight request.",
-  ORDER_NOT_READY_FOR_FREIGHT: "This order is not ready for freight yet. Admin intake works once the order is spawned; buyers need production complete.",
+  ORDER_NOT_READY_FOR_FREIGHT: "This order is not ready for a freight quote yet. Start a new import with a purchase order, or open an active order workspace.",
   ORDER_PARTICIPANTS_INCOMPLETE: "Buyer and supplier must both be linked before creating freight.",
 };
 

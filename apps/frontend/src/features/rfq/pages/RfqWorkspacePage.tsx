@@ -100,7 +100,11 @@ export default function RfqWorkspacePage() {
       api.post(`/rfq/${id}/supplier-activity/view`).then(() => {
         qc.invalidateQueries({ queryKey: supplierActivityKeys.summary(id) });
         qc.invalidateQueries({ queryKey: supplierActivityKeys.detail(id) });
-      }).catch(() => {});
+      }).catch((err) => {
+        // Recording the view must not block the workspace, but a failure should not
+        // vanish either — buyers rely on this for supplier engagement signals.
+        console.warn("[rfq] failed to record supplier view", err);
+      });
     }
   }, [id, track, user?.id, user?.role, rfq, qc]);
 

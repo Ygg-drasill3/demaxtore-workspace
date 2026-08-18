@@ -35,6 +35,22 @@ export function notFoundHandler(_req: Request, res: Response): void {
   res.status(404).json({ error: { code: ErrorCodes.NOT_FOUND, message: "Route not found" } });
 }
 
+/**
+ * A non-UUID path param reaches Prisma as P2023 "Error creating UUID". That is a
+ * client-side miss, not a server fault, so it must not surface as 500. Matched on
+ * the create-UUID text only — P2023 also covers genuine column corruption
+ * ("Error converting field ..."), which must stay a 500.
+ */
+function isMalformedIdError(err: unknown): boolean {
+  if (typeof err !== "object" || err === null) return false;
+  const e = err as { code?: unknown; message?: unknown };
+  return (
+    e.code === "P2023" &&
+    typeof e.message === "string" &&
+    e.message.includes("Error creating UUID")
+  );
+}
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function errorHandler(err: unknown, req: Request, res: Response, next: NextFunction): void {
   if (res.headersSent) {
@@ -77,6 +93,12 @@ export function errorHandler(err: unknown, req: Request, res: Response, next: Ne
       res.status(upload.status).json({ error: { code: upload.code, message: upload.message } });
       return;
     }
+  }
+
+  if (isMalformedIdError(err)) {
+    logger.warn({ path: req.originalUrl }, "Malformed identifier in request path");
+    res.status(404).json({ error: { code: ErrorCodes.NOT_FOUND, message: "Not found" } });
+    return;
   }
 
   const id = req.headers["x-request-id"] ?? "—";

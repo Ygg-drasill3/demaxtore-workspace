@@ -2,9 +2,11 @@
 import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard, FileText, Package, Bell, Workflow, Mail, Radar, GraduationCap, Route,
-  ClipboardList, Ship, FileCheck, MessageSquare, Plus, Gavel, Inbox, Activity, AlertTriangle, Container, Scale, UserPlus, Users, Phone,
+  ClipboardList, Ship, FileCheck, MessageSquare, Plus, Gavel, Inbox, Activity, AlertTriangle, Container, Scale, UserPlus, Users, Phone, Boxes,
+  ShieldCheck, Truck, Receipt, PackageSearch,
 } from "lucide-react";
 import type { Role } from "@dmx/contracts/auth";
+import { isTurkeyImporterOperatingModel } from "@dmx/contracts/buyer-operating-model";
 
 export interface NavItem {
   to:      string;
@@ -33,14 +35,85 @@ function flat(groups: NavGroup[]): NavItem[] {
   return groups.flatMap((g) => g.items);
 }
 
-// ─── Buyer — Trade Operating System IA ───────────────────────────────────────
+// ─── Buyer — Import Operations first (Sprint 43 Turkey GTM) ─────────────────
 
 export const BUYER_NAV_GROUPS: NavGroup[] = [
   {
     id: "home", label: "Home", testId: "nav-group-home",
     items: [
-      { to: "/messages", label: "Workspace Inbox", icon: Inbox, testId: "buyer-inbox", end: true },
-      { to: "/buyer/dashboard", label: "Dashboard", icon: LayoutDashboard, testId: "buyer-dashboard" },
+      { to: "/buyer/dashboard", label: "Dashboard", icon: LayoutDashboard, testId: "buyer-dashboard", end: true },
+      { to: "/messages", label: "Workspace Inbox", icon: Inbox, testId: "buyer-inbox" },
+    ],
+  },
+  {
+    id: "import-ops", label: "Import Operations", testId: "nav-group-import-ops",
+    items: [
+      { to: "/buyer/imports", label: "My Imports", icon: PackageSearch, testId: "buyer-imports" },
+      { to: "/buyer/freightiq", label: "Freight", icon: Route, testId: "buyer-freightiq" },
+      { to: "/buyer/shipments", label: "Shipments", icon: Ship, testId: "buyer-shipments" },
+      { to: "/buyer/customs", label: "Customs", icon: ShieldCheck, testId: "buyer-customs" },
+      { to: "/buyer/inland", label: "Deliveries", icon: Truck, testId: "buyer-inland" },
+      { to: "/buyer/landed-cost", label: "Landed Cost", icon: Receipt, testId: "buyer-landed-cost" },
+      { to: "/buyer/purchase-orders", label: "Purchase Orders", icon: ClipboardList, testId: "buyer-purchase-orders" },
+      { to: "/buyer/products", label: "Products", icon: Boxes, testId: "buyer-products" },
+      { to: "/buyer/control-tower", label: "Import Control Tower", icon: Radar, testId: "buyer-control-tower" },
+      { to: "/exceptions", label: "Exceptions", icon: AlertTriangle, testId: "buyer-exceptions" },
+    ],
+  },
+  {
+    id: "sourcing", label: "Sourcing", testId: "nav-group-sourcing",
+    items: [
+      { to: "/buyer/rfq",          label: "RFQs",           icon: FileText, testId: "buyer-rfq" },
+      { to: "/buyer/commoditybid", label: "Commodity Bids", icon: Workflow, testId: "buyer-commoditybid" },
+      { to: "/buyer/commoditybid/list", label: "CB Workspaces", icon: Gavel, testId: "buyer-commoditybid-list" },
+      { to: "/buyer/mixed-container", label: "Mixed Container", icon: Container, testId: "buyer-mixed-container" },
+      { to: "/buyer/bulk-container", label: "Bulk Container", icon: Scale, testId: "buyer-bulk-container" },
+    ],
+  },
+  {
+    id: "execution-legacy", label: "Orders", testId: "nav-group-execution-legacy",
+    items: [
+      { to: "/buyer/orders", label: "Orders", icon: Package, testId: "buyer-orders" },
+    ],
+  },
+  {
+    id: "collaboration", label: "Collaboration", testId: "nav-group-collaboration",
+    items: [
+      { to: "/messages",  label: "Messages",      icon: MessageSquare, testId: "buyer-messages" },
+      { to: "/notifications",   label: "Notifications", icon: Bell,          testId: "buyer-notifications" },
+    ],
+  },
+  {
+    id: "documents", label: "Documents", testId: "nav-group-documents",
+    items: [
+      { to: "/documents",            label: "Documents",       icon: FileCheck, testId: "buyer-documents" },
+      { to: "/buyer/trade-documents", label: "Compliance",      icon: FileCheck, testId: "buyer-trade-documents" },
+    ],
+  },
+  {
+    id: "knowledge", label: "Knowledge", testId: "nav-group-knowledge",
+    items: [
+      { to: "/learning", label: "Learning Center", icon: GraduationCap, testId: "buyer-learning" },
+    ],
+  },
+];
+
+export const BUYER_QUICK_ACTIONS: QuickAction[] = [
+  { label: "Get Freight Quote", to: "/buyer/freightiq/request", testId: "qa-freight-quote", icon: Route },
+  { label: "Start Import",      to: "/buyer/imports/new",       testId: "qa-start-import",  icon: Plus },
+  { label: "My Shipments",      to: "/buyer/shipments",         testId: "qa-view-shipments", icon: Ship },
+  { label: "Customs",           to: "/buyer/customs",           testId: "qa-customs",         icon: ShieldCheck },
+  { label: "Landed Cost",       to: "/buyer/landed-cost",       testId: "qa-landed-cost",     icon: Receipt },
+  { label: "New RFQ",           to: "/buyer/rfq/new",           testId: "qa-new-rfq",         icon: FileText },
+];
+
+/** Pre-Sprint-43 International Buyer navigation — sourcing-first. */
+export const BUYER_NAV_GROUPS_INTERNATIONAL: NavGroup[] = [
+  {
+    id: "home", label: "Home", testId: "nav-group-home",
+    items: [
+      { to: "/buyer/dashboard", label: "Dashboard", icon: LayoutDashboard, testId: "buyer-dashboard", end: true },
+      { to: "/messages", label: "Workspace Inbox", icon: Inbox, testId: "buyer-inbox" },
     ],
   },
   {
@@ -57,6 +130,7 @@ export const BUYER_NAV_GROUPS: NavGroup[] = [
     id: "execution", label: "Execution", testId: "nav-group-execution",
     items: [
       { to: "/buyer/purchase-orders", label: "Purchase Orders", icon: ClipboardList, testId: "buyer-purchase-orders" },
+      { to: "/buyer/products", label: "Products", icon: Boxes, testId: "buyer-products" },
       { to: "/buyer/orders",          label: "Orders",          icon: Package,       testId: "buyer-orders" },
       { to: "/buyer/freightiq",       label: "FreightIQ",       icon: Route,         testId: "buyer-freightiq" },
       { to: "/buyer/shipments",      label: "My Shipments",    icon: Ship,          testId: "buyer-shipments" },
@@ -86,7 +160,7 @@ export const BUYER_NAV_GROUPS: NavGroup[] = [
   },
 ];
 
-export const BUYER_QUICK_ACTIONS: QuickAction[] = [
+export const BUYER_QUICK_ACTIONS_INTERNATIONAL: QuickAction[] = [
   { label: "Create Bid",         to: "/buyer/commoditybid/new",   testId: "qa-create-cb",        icon: Gavel },
   { label: "New RFQ",            to: "/buyer/rfq/new",           testId: "qa-new-rfq",          icon: Plus },
   { label: "Mixed Container",    to: "/buyer/mixed-container",   testId: "qa-mixed-container",  icon: Container },
@@ -94,6 +168,26 @@ export const BUYER_QUICK_ACTIONS: QuickAction[] = [
   { label: "My Shipments",       to: "/shipments/portfolio",       testId: "qa-view-shipments",   icon: Ship },
   { label: "Open Documents",     to: "/documents",                 testId: "qa-open-documents",   icon: FileCheck },
 ];
+
+export function navGroupsForRole(
+  role: Role,
+  buyerOperatingModel?: string | null,
+): NavGroup[] {
+  if (role !== "BUYER") return NAV_GROUPS_BY_ROLE[role] ?? [];
+  return isTurkeyImporterOperatingModel(buyerOperatingModel)
+    ? BUYER_NAV_GROUPS
+    : BUYER_NAV_GROUPS_INTERNATIONAL;
+}
+
+export function quickActionsForRole(
+  role: Role,
+  buyerOperatingModel?: string | null,
+): QuickAction[] {
+  if (role !== "BUYER") return QUICK_ACTIONS_BY_ROLE[role] ?? [];
+  return isTurkeyImporterOperatingModel(buyerOperatingModel)
+    ? BUYER_QUICK_ACTIONS
+    : BUYER_QUICK_ACTIONS_INTERNATIONAL;
+}
 
 // ─── Supplier — Trade OS navigation (Sprint 10B) ───────────────────────────
 
@@ -230,7 +324,7 @@ export const SALES_CONTROL_NAV_GROUPS: NavGroup[] = [
 ];
 
 export const NAV_GROUPS_BY_ROLE: Record<Role, NavGroup[]> = {
-  BUYER:              BUYER_NAV_GROUPS,
+  BUYER:              BUYER_NAV_GROUPS_INTERNATIONAL,
   SUPPLIER:           SUPPLIER_NAV_GROUPS,
   ADMIN:              ADMIN_NAV_GROUPS,
   SALES_CONTROL:      SALES_CONTROL_NAV_GROUPS,
@@ -239,6 +333,17 @@ export const NAV_GROUPS_BY_ROLE: Record<Role, NavGroup[]> = {
   LOGISTICS_OPERATOR: ADMIN_NAV_GROUPS,
   FINANCE_OPERATOR:   ADMIN_NAV_GROUPS,
   DOCUMENT_CONTROLLER: ADMIN_NAV_GROUPS,
+  ORIGIN_AGENT:        [{ id: "partner", label: "Shipments", testId: "nav-group-origin-agent", items: [
+    { to: "/partner", label: "My Shipments", icon: Ship, testId: "nav-partner-shipments" },
+  ]}],
+  TRUCKER:            [{ id: "partner", label: "Deliveries", testId: "nav-group-trucker", items: [
+    { to: "/partner", label: "My Work", icon: LayoutDashboard, testId: "nav-partner-home", end: true },
+    { to: "/partner/inland", label: "My Deliveries", icon: Route, testId: "nav-partner-deliveries" },
+  ]}],
+  CUSTOMS_BROKER:     [{ id: "partner", label: "Customs", testId: "nav-group-broker", items: [
+    { to: "/partner", label: "My Work", icon: LayoutDashboard, testId: "nav-partner-home", end: true },
+    { to: "/partner/customs", label: "My Customs Cases", icon: FileCheck, testId: "nav-partner-customs" },
+  ]}],
   FORWARDER:          [{ id: "forwarder", label: "Portal", testId: "nav-group-forwarder", items: [
     { to: "/forwarder/dashboard", label: "Shipments", icon: Ship, testId: "forwarder-shipments" },
     { to: "/notifications", label: "Notifications", icon: Bell, testId: "forwarder-notifications" },
@@ -262,7 +367,7 @@ export const ADMIN_QUICK_ACTIONS: QuickAction[] = [
 ];
 
 export const QUICK_ACTIONS_BY_ROLE: Partial<Record<Role, QuickAction[]>> = {
-  BUYER:         BUYER_QUICK_ACTIONS,
+  BUYER:         BUYER_QUICK_ACTIONS_INTERNATIONAL,
   SUPPLIER:      SUPPLIER_QUICK_ACTIONS,
   ADMIN:         ADMIN_QUICK_ACTIONS,
   SALES_CONTROL: SALES_CONTROL_QUICK_ACTIONS,
@@ -270,7 +375,7 @@ export const QUICK_ACTIONS_BY_ROLE: Partial<Record<Role, QuickAction[]>> = {
 
 /** Flat nav for backward-compatible consumers (E2E, tests). */
 export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
-  BUYER:              flat(BUYER_NAV_GROUPS),
+  BUYER:              flat(BUYER_NAV_GROUPS_INTERNATIONAL),
   SUPPLIER:           flat(SUPPLIER_NAV_GROUPS),
   ADMIN:              flat(ADMIN_NAV_GROUPS),
   SALES_CONTROL:      flat(SALES_CONTROL_NAV_GROUPS),
@@ -279,5 +384,8 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
   LOGISTICS_OPERATOR: flat(ADMIN_NAV_GROUPS),
   FINANCE_OPERATOR:   flat(ADMIN_NAV_GROUPS),
   DOCUMENT_CONTROLLER: flat(ADMIN_NAV_GROUPS),
+  ORIGIN_AGENT:       flat(NAV_GROUPS_BY_ROLE.ORIGIN_AGENT),
+  TRUCKER:            flat(NAV_GROUPS_BY_ROLE.TRUCKER),
+  CUSTOMS_BROKER:     flat(NAV_GROUPS_BY_ROLE.CUSTOMS_BROKER),
   FORWARDER:          flat(NAV_GROUPS_BY_ROLE.FORWARDER),
 };

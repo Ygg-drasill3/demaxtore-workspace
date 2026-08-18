@@ -128,8 +128,10 @@ test.describe("Enterprise readiness (Sprint 8A)", () => {
     const req = await newRequest();
     const res = await req.get(`${API_BASE}/api/healthz`);
     expect(res.ok()).toBeTruthy();
-    const body = await res.json() as { status: string; db: string };
+    const body = await res.json() as { status: string; checks?: { db?: string } };
     expect(body.status).toBe("ok");
-    expect(body.db).toBe("up");
+    const ready = await req.get(`${API_BASE}/api/healthz/ready`);
+    const readyBody = await ready.json() as { checks: { db: string } };
+    expect(readyBody.checks.db).toBe("up");
   });
 });

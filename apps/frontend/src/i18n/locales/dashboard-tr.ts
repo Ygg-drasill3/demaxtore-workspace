@@ -127,6 +127,15 @@ const dashboardTr: TranslationDict = {
   "dash.opportunity.title": "Fırsat Merkezi",
   "dash.teamWorkload.title": "Ekip İş Yükü",
   "dash.shipmentCenter.title": "Sevkiyat Komuta Merkezi",
+
+  "s43.hero.eyebrow": "İthalat İşletim Sistemi",
+  "s43.hero.ctaFreight": "Navlun teklifi al",
+  "s43.hero.ctaStartImport": "İthalatı başlat",
+  "s43.hero.pill.actions": "aksiyon gerekli",
+  "s43.hero.pill.inTransit": "yolda",
+  "s43.hero.subtitle.firstTrade": "Navlun, gümrük ve ithalat sürecinizi tek yerden yönetin.",
+  "s43.hero.subtitle.standard": "Navlun, gümrük ve ithalat sürecinizi tek yerden yönetin.",
+  "s43.hero.subtitle.power": "Navlun, gümrük ve ithalat sürecinizi tek yerden yönetin.",
 };
 
 export default dashboardTr;

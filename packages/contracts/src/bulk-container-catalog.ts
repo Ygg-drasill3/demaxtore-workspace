@@ -25,6 +25,17 @@ export const BulkSpecTemplateSchema = z.object({
 
 export type BulkSpecTemplate = z.infer<typeof BulkSpecTemplateSchema>;
 
+/** Bulk container lines always source from Turkey — buyers cannot pick another origin. */
+export const BULK_CONTAINER_FIXED_ORIGIN = "Turkey";
+
+export function applyBulkContainerFixedOrigin(
+  specValues: Record<string, string | number>,
+  parameters: BulkSpecTemplate["parameters"],
+): Record<string, string | number> {
+  if (!parameters.some((p) => p.key === "origin")) return specValues;
+  return { ...specValues, origin: BULK_CONTAINER_FIXED_ORIGIN };
+}
+
 export const BulkCatalogListQuery = z.object({
   category: z.string().optional(),
   q: z.string().optional(),

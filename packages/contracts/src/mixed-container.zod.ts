@@ -17,8 +17,11 @@ export type UpdateMixedContainerInput = z.infer<typeof UpdateMixedContainerInput
 
 export const AddContainerLineInput = z.object({
   catalogProductId: z.string().uuid(),
-  packingTypeId: z.string().uuid(),
+  packagingId: z.string().uuid().optional(),
+  packingTypeId: z.string().uuid().optional(),
   palletCount: z.number().int().min(1).default(1),
+}).refine((d) => d.packagingId || d.packingTypeId, {
+  message: "packagingId or packingTypeId required",
 });
 export type AddContainerLineInput = z.infer<typeof AddContainerLineInput>;
 
@@ -47,6 +50,19 @@ export const ContainerLineDTO = z.object({
 });
 export type ContainerLineDTO = z.infer<typeof ContainerLineDTO>;
 
+export const MC_MAX_CONTAINERS_PER_ORDER = 5;
+
+export const MixedContainerOrderSlotDTO = z.object({
+  id: z.string().uuid(),
+  externalRef: z.string(),
+  containerSequence: z.number().int(),
+  state: z.string(),
+  currentPalletCount: z.number().int(),
+  maxPalletCapacity: z.number().int(),
+  fillPercent: z.number().int(),
+});
+export type MixedContainerOrderSlotDTO = z.infer<typeof MixedContainerOrderSlotDTO>;
+
 export const MixedContainerDTO = z.object({
   id: z.string().uuid(),
   externalRef: z.string(),
@@ -64,7 +80,15 @@ export const MixedContainerDTO = z.object({
   ownerName: z.string(),
   productCount: z.number().int(),
   lines: z.array(ContainerLineDTO),
+  orderGroupId: z.string().uuid(),
+  containerSequence: z.number().int(),
+  orderContainerCount: z.number().int(),
+  maxOrderContainers: z.number().int(),
+  canAddContainer: z.boolean(),
+  orderContainers: z.array(MixedContainerOrderSlotDTO),
   pricingRequestedAt: z.string().datetime().nullable().optional(),
+  procurementRequestRef: z.string().nullable().optional(),
+  procurementStatus: z.string().optional(),
   activeOfferId: z.string().uuid().nullable().optional(),
   buyerNotes: z.string().nullable().optional(),
   createdAt: z.string().datetime(),
@@ -75,7 +99,9 @@ export type MixedContainerDTO = z.infer<typeof MixedContainerDTO>;
 export const MixedContainerListItem = z.object({
   id: z.string().uuid(),
   externalRef: z.string(),
+  procurementRequestRef: z.string().nullable().optional(),
   state: z.string(),
+  procurementStatus: z.string().optional(),
   productCount: z.number().int(),
   currentPalletCount: z.number().int(),
   estValueMin: z.number().nullable(),
@@ -107,6 +133,7 @@ export const MC_STATE_LABELS: Record<string, string> = {
 export const AdminProcurementQuoteInput = z.object({
   containerLineId: z.string().uuid(),
   supplierCode: z.string().min(1).max(64),
+  brand: z.string().min(1).max(128).optional(),
   exwPrice: z.number().positive(),
   currency: z.string().length(3).default("USD"),
   priceUnit: z.enum(["PALLET", "UNIT"]).default("PALLET"),
@@ -116,6 +143,7 @@ export const AdminProcurementQuoteInput = z.object({
 export type AdminProcurementQuoteInput = z.infer<typeof AdminProcurementQuoteInput>;
 
 export const CreateContainerOfferInput = z.object({
+  logisticsCost: z.number().min(0).optional(),
   exportExecutionFee: z.number().min(0).default(0),
   estimatedFreight: z.number().min(0).default(0),
   offerNotes: z.string().max(4000).optional(),
@@ -135,33 +163,59 @@ export const ContainerOfferLineDTO = z.object({
   containerLineId: z.string().uuid(),
   productRef: z.string(),
   productName: z.string(),
+  brand: z.string().nullable(),
   packaging: z.string(),
-  originCountry: z.string().nullable(),
-  palletCount: z.number().int(),
+  quantity: z.number().int(),
   unitPrice: z.number(),
   lineTotal: z.number(),
 });
 export type ContainerOfferLineDTO = z.infer<typeof ContainerOfferLineDTO>;
 
+export const CommercialProposalVersionDTO = z.object({
+  id: z.string().uuid(),
+  version: z.number().int(),
+  status: z.string(),
+  proposalDate: z.string().datetime().nullable(),
+  sentAt: z.string().datetime().nullable(),
+  approvedAt: z.string().datetime().nullable(),
+  isActive: z.boolean(),
+});
+export type CommercialProposalVersionDTO = z.infer<typeof CommercialProposalVersionDTO>;
+
+export const McBuyerRevisionNoteDTO = z.object({
+  id: z.string().uuid(),
+  offerId: z.string().uuid(),
+  offerVersion: z.number().int(),
+  revisionType: z.string(),
+  comment: z.string().nullable(),
+  createdAt: z.string().datetime(),
+});
+export type McBuyerRevisionNoteDTO = z.infer<typeof McBuyerRevisionNoteDTO>;
+
 export const ContainerOfferDTO = z.object({
   id: z.string().uuid(),
   workspaceId: z.string().uuid(),
+  procurementRequestRef: z.string().nullable(),
+  proposalRef: z.string().nullable(),
   externalRef: z.string(),
   state: z.string(),
+  procurementStatus: z.string(),
   version: z.number().int(),
   status: z.string(),
   currency: z.string(),
   lines: z.array(ContainerOfferLineDTO),
   productSubtotal: z.number(),
-  exportExecutionFee: z.number(),
-  estimatedFreight: z.number(),
-  offerTotal: z.number(),
+  logisticsCost: z.number(),
+  estimatedTotalCost: z.number(),
   validityDate: z.string().datetime().nullable(),
   expiresInSeconds: z.number().nullable(),
   offerNotes: z.string().nullable(),
+  proposalDate: z.string().datetime().nullable(),
   sentAt: z.string().datetime().nullable(),
   viewedAt: z.string().datetime().nullable(),
   approvedAt: z.string().datetime().nullable(),
+  versions: z.array(CommercialProposalVersionDTO).optional(),
+  buyerRevisionNotes: z.array(McBuyerRevisionNoteDTO).optional(),
 });
 export type ContainerOfferDTO = z.infer<typeof ContainerOfferDTO>;
 
@@ -171,6 +225,7 @@ export const AdminProcurementQuoteDTO = z.object({
   productRef: z.string(),
   productName: z.string(),
   supplierCode: z.string(),
+  brand: z.string().nullable(),
   exwPrice: z.number(),
   currency: z.string(),
   priceUnit: z.string(),
@@ -182,15 +237,20 @@ export type AdminProcurementQuoteDTO = z.infer<typeof AdminProcurementQuoteDTO>;
 export const AdminMixedContainerInboxItem = z.object({
   id: z.string().uuid(),
   externalRef: z.string(),
+  procurementRequestRef: z.string().nullable().optional(),
   state: z.string(),
+  procurementStatus: z.string().optional(),
   buyerName: z.string(),
   buyerOrgName: z.string().nullable(),
+  destinationPort: z.string().nullable().optional(),
   productCount: z.number().int(),
   currentPalletCount: z.number().int(),
   estValueMin: z.number().nullable(),
   estValueMax: z.number().nullable(),
   priority: z.string(),
+  assignedManagerId: z.string().uuid().nullable().optional(),
   assignedManagerName: z.string().nullable(),
+  submissionDate: z.string().datetime().nullable().optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
@@ -212,6 +272,12 @@ export const McOpsKpiDTO = z.object({
   freightActive: z.number().int(),
   shipmentActive: z.number().int(),
   executionComplete: z.number().int(),
+  dashboard: z.object({
+    newRequests: z.number().int(),
+    assignedRequests: z.number().int(),
+    waitingForReview: z.number().int(),
+    proposalPreparationQueue: z.number().int(),
+  }).optional(),
 });
 export type McOpsKpiDTO = z.infer<typeof McOpsKpiDTO>;
 
@@ -437,6 +503,7 @@ export const McAllocationInboxItem = z.object({
 export type McAllocationInboxItem = z.infer<typeof McAllocationInboxItem>;
 
 export const AdminCatalogCategoryInput = z.object({
+  industryId: z.string().uuid(),
   slug: z.string().min(2).max(64),
   name: z.string().min(2).max(128),
   sortOrder: z.number().int().default(0),

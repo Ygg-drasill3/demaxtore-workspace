@@ -1,27 +1,40 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { Locale } from "./types";
+import { RTL_LOCALES, type Locale } from "./types";
 import en from "./locales/en";
 import tr from "./locales/tr";
 import fr from "./locales/fr";
+import ar from "./locales/ar";
 
 const STORAGE_KEY = "demax_locale";
 
-const CATALOG = { en, tr, fr } as const;
+const CATALOG = { en, tr, fr, ar } as const;
+
+const isLocale = (v: unknown): v is Locale =>
+  v === "en" || v === "tr" || v === "fr" || v === "ar";
 
 function detectLocale(): Locale {
-  if (typeof window === "undefined") return "tr";
-  const saved = localStorage.getItem(STORAGE_KEY);
-  if (saved === "tr" || saved === "en" || saved === "fr") return saved;
-  const lang = (navigator.language || "tr").toLowerCase();
-  if (lang.startsWith("en")) return "en";
-  if (lang.startsWith("fr")) return "fr";
-  return "tr";
+  // Default is always English — do not infer from browser language.
+  if (typeof window === "undefined") return "en";
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return "en";
+    // Legacy plain value
+    if (isLocale(raw)) return raw;
+    // Zustand persist payload
+    const parsed = JSON.parse(raw) as { state?: { locale?: string } };
+    const saved = parsed?.state?.locale;
+    if (isLocale(saved)) return saved;
+  } catch {
+    /* ignore */
+  }
+  return "en";
 }
 
 function applyHtmlLang(locale: Locale) {
   if (typeof document !== "undefined") {
     document.documentElement.lang = locale;
+    document.documentElement.dir = RTL_LOCALES.includes(locale) ? "rtl" : "ltr";
   }
 }
 

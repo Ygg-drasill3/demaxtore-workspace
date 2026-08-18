@@ -17,7 +17,11 @@ export function canUserSendMessages(user: Pick<User, "role" | "phoneVerification
   return user.phoneVerificationStatus === PHONE_VERIFIED && Boolean(user.phoneNumber?.trim());
 }
 
-export function assertCanSendMessages(user: Pick<User, "role" | "phoneVerificationStatus" | "phoneNumber">): void {
+export function assertCanSendMessages(
+  user: Pick<User, "role" | "phoneVerificationStatus" | "phoneNumber">,
+  opts?: { channel?: "WORKSPACE" | "WHATSAPP" },
+): void {
+  if (opts?.channel === "WORKSPACE") return;
   if (canUserSendMessages(user)) return;
   if (!user.phoneNumber?.trim()) {
     throw Forbidden("PHONE_NUMBER_REQUIRED: Add and verify your phone number before messaging.");
@@ -40,6 +44,9 @@ export async function loadUserMessagingGate(db: PrismaClient, userId: string) {
 }
 
 export function normalizePhoneInput(raw: string): string {
+  if (typeof raw !== "string") {
+    throw Validation("Phone number is required — use E.164 format e.g. +905551234567");
+  }
   const normalized = normalizePhone(raw.trim());
   if (!normalized) throw Validation("Invalid phone number — use E.164 format e.g. +905551234567");
   return normalized;

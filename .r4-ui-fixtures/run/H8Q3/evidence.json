@@ -1,0 +1,150 @@
+{
+  "marker": "MVP-UI17-R4-20260814-H8Q3",
+  "sku": "FLOUR-UI17R4-H8Q3",
+  "startedAt": "2026-08-14T15:38:47.808Z",
+  "stages": [
+    {
+      "name": "BUYER_LOGIN",
+      "result": "PASS",
+      "note": "https://workspace.demaxtore.com/buyer/control-tower",
+      "at": "2026-08-14T15:38:49.322Z"
+    },
+    {
+      "name": "PRODUCT_CREATION",
+      "result": "PASS",
+      "note": "FLOUR-UI17R4-H8Q3",
+      "at": "2026-08-14T15:38:56.358Z"
+    },
+    {
+      "name": "DIRECT_PO",
+      "result": "PASS",
+      "note": "PO-MST4438L-538A1079",
+      "at": "2026-08-14T15:39:04.291Z"
+    },
+    {
+      "name": "PRODUCT_TO_PO",
+      "result": "PASS",
+      "note": "https://workspace.demaxtore.com/workspace/order/d1827fb6-906f-4b14-8d1c-eb2074709625",
+      "at": "2026-08-14T15:39:05.783Z"
+    },
+    {
+      "name": "DEPOSIT_CONFIRMATION",
+      "result": "PASS",
+      "note": "Admin recorded DEPOSIT_PAID",
+      "at": "2026-08-14T15:39:09.365Z"
+    },
+    {
+      "name": "FREIGHT_REQUEST",
+      "result": "PASS",
+      "note": "Admin created freight request",
+      "at": "2026-08-14T15:39:43.072Z"
+    },
+    {
+      "name": "FREIGHT_OFFER",
+      "result": "PASS",
+      "note": "2100 USD offer published",
+      "at": "2026-08-14T15:40:18.479Z"
+    },
+    {
+      "name": "OFFER_SELECTION",
+      "result": "PASS",
+      "note": "",
+      "at": "2026-08-14T15:40:27.454Z"
+    },
+    {
+      "name": "OFFER_TO_BOOKING",
+      "result": "PASS",
+      "note": "",
+      "at": "2026-08-14T15:40:29.594Z"
+    },
+    {
+      "name": "BOOKING_TO_SHIPMENT",
+      "result": "PASS",
+      "note": "https://workspace.demaxtore.com/workspace/shipment/88ca7476-78ce-4de5-94e4-2501a014d8ea",
+      "at": "2026-08-14T15:40:32.028Z"
+    },
+    {
+      "name": "BOOKING_LIFECYCLE",
+      "result": "PASS",
+      "note": "MSCBK-R4-H8Q3",
+      "at": "2026-08-14T15:40:37.582Z"
+    },
+    {
+      "name": "LINE_ALLOCATION",
+      "result": "PASS",
+      "note": "90 PCS",
+      "at": "2026-08-14T15:40:39.309Z"
+    },
+    {
+      "name": "CONTAINER",
+      "result": "PASS",
+      "note": "MSKU17R4H8Q3",
+      "at": "2026-08-14T15:40:41.306Z"
+    },
+    {
+      "name": "TRACKING",
+      "result": "PASS",
+      "note": "",
+      "at": "2026-08-14T15:40:41.311Z"
+    },
+    {
+      "name": "SHIPMENT_TO_CUSTOMS",
+      "result": "PASS",
+      "note": "",
+      "at": "2026-08-14T15:40:44.893Z"
+    },
+    {
+      "name": "BROKER_ASSIGNMENT",
+      "result": "PASS",
+      "note": "",
+      "at": "2026-08-14T15:40:48.852Z"
+    },
+    {
+      "name": "DOCUMENT_READINESS",
+      "result": "PASS",
+      "note": "Trade docs uploaded via UI",
+      "at": "2026-08-14T15:40:53.875Z"
+    },
+    {
+      "name": "BROKER_CASE_DISCOVERY",
+      "result": "PASS",
+      "note": "",
+      "at": "2026-08-14T15:40:56.327Z"
+    },
+    {
+      "name": "BROKER_EXECUTION",
+      "result": "PASS",
+      "note": "Start review",
+      "at": "2026-08-14T15:40:58.844Z"
+    },
+    {
+      "name": "R4_ABORT",
+      "result": "DEAD END",
+      "note": "locator.selectOption: options[0].label: expected string, got object",
+      "at": "2026-08-14T15:40:58.860Z"
+    }
+  ],
+  "entities": {
+    "productSku": "FLOUR-UI17R4-H8Q3",
+    "poNumber": "PO-MST4438L-538A1079",
+    "orderUrl": "https://workspace.demaxtore.com/workspace/order/d1827fb6-906f-4b14-8d1c-eb2074709625",
+    "orderId": "d1827fb6-906f-4b14-8d1c-eb2074709625",
+    "shipmentUrl": "https://workspace.demaxtore.com/workspace/shipment/88ca7476-78ce-4de5-94e4-2501a014d8ea",
+    "shipmentRef": "SHP-ORD-DIR-PO-MST4438L-538A1079-538A1079Shipment ORD-DIR-PO-MST4438L-538A1079-538A1079Status: SHIPMENT_CREATEDCNSHA → TRISTContract: PO-MST4438L-538A1079Order: ORD-DIR-PO-MST4438L-538A1079-538A1079",
+    "shipmentId": "88ca7476-78ce-4de5-94e4-2501a014d8ea",
+    "bookingRef": "MSCBK-R4-H8Q3",
+    "containerRef": "MSKU17R4H8Q3"
+  },
+  "errors": [],
+  "network5xx": 0,
+  "blocker": {
+    "stage": "UNHANDLED",
+    "note": "locator.selectOption: options[0].label: expected string, got object",
+    "kind": "PRODUCT"
+  },
+  "completedAt": "2026-08-14T15:40:58.862Z",
+  "verdict": {
+    "controlledPaidPilot": "PENDING",
+    "selfService": "PENDING"
+  }
+}

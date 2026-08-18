@@ -253,6 +253,11 @@ export class TradeChatService {
     return created.map((c) => mapConversationRow(c));
   }
 
+  async enableRfqWhatsAppBridge(rfqWorkspaceId: string) {
+    const { enableRfqWhatsApp } = await import("../rfq/rfq-whatsapp-enable.service.js");
+    await enableRfqWhatsApp(this.db, rfqWorkspaceId);
+  }
+
   async ensureOrderFreightConversation(
     orderWorkspaceId: string,
     forwarderContactId: string,

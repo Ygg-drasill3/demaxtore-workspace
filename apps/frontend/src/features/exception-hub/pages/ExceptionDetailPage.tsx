@@ -62,9 +62,9 @@ export default function ExceptionDetailPage() {
   const canResolve = isOpen && (user?.role === "ADMIN" || !data.ownerId || data.ownerId === user?.id);
 
   return (
-    <div data-testid="exception-detail" className="max-w-6xl mx-auto space-y-6 pb-10 animate-fade-in">
+    <div data-testid="exception-detail" data-guide="alert-detail" className="max-w-6xl mx-auto space-y-6 pb-10 animate-fade-in">
       <div>
-        <Link to="/exceptions" className="text-xs text-zinc-500 hover:underline">← Exception Hub</Link>
+        <Link to="/alerts" className="text-xs text-zinc-500 hover:underline">← Alerts</Link>
         <div className="flex items-start justify-between gap-4 mt-2">
           <div>
             <div className="flex items-center gap-2">

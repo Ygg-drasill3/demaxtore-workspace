@@ -1,21 +1,164 @@
-import { Router } from "express";
-import { requireAuth, requireRole } from "../../middleware/auth.js";
+import { Router, type RequestHandler } from "express";
+import { requireAuth, requireFullAccess, requireRole } from "../../middleware/auth.js";
 import { asyncHandler } from "../../middleware/asyncHandler.js";
-import { purchaseOrderController } from "./purchase-order.controller.js";
+import { validateBody, validateQuery } from "../../middleware/validate.js";
+import {
+  CreateDirectPurchaseOrderPublicSchema,
+  CreateMinimalSupplierSchema,
+  PurchaseOrderListQuerySchema,
+} from "@dmx/contracts/purchase-order.zod";
+import {
+  purchaseOrderController,
+  directPoUploadMiddleware,
+} from "./purchase-order.controller.js";
+import { tradeLineageController } from "../trade-lineage/trade-lineage.controller.js";
+
+const directPoUpload = directPoUploadMiddleware as unknown as RequestHandler;
 
 export const purchaseOrderRouter = Router();
 
 purchaseOrderRouter.get(
+  "/",
+  requireAuth,
+  validateQuery(PurchaseOrderListQuerySchema),
+  asyncHandler(purchaseOrderController.list),
+);
+
+purchaseOrderRouter.get(
   "/dashboard",
   requireAuth,
-  requireRole("ADMIN"),
+  requireRole("BUYER", "ADMIN", "SUPER_ADMIN", "SUPPLIER"),
   asyncHandler(purchaseOrderController.dashboard),
+);
+
+purchaseOrderRouter.get(
+  "/suppliers",
+  requireAuth,
+  requireFullAccess,
+  requireRole("BUYER", "ADMIN", "SUPER_ADMIN"),
+  asyncHandler(purchaseOrderController.searchSuppliers),
+);
+
+purchaseOrderRouter.post(
+  "/suppliers",
+  requireAuth,
+  requireFullAccess,
+  requireRole("BUYER", "ADMIN", "SUPER_ADMIN"),
+  validateBody(CreateMinimalSupplierSchema),
+  asyncHandler(purchaseOrderController.createMinimalSupplier),
+);
+
+purchaseOrderRouter.post(
+  "/direct/documents",
+  requireAuth,
+  requireFullAccess,
+  requireRole("BUYER", "ADMIN", "SUPER_ADMIN"),
+  directPoUpload,
+  asyncHandler(purchaseOrderController.uploadDirectDocument),
+);
+
+purchaseOrderRouter.get(
+  "/direct/documents/:uploadId",
+  requireAuth,
+  requireFullAccess,
+  requireRole("BUYER", "ADMIN", "SUPER_ADMIN"),
+  asyncHandler(purchaseOrderController.downloadDirectDocument),
+);
+
+purchaseOrderRouter.post(
+  "/direct",
+  requireAuth,
+  requireFullAccess,
+  requireRole("BUYER", "ADMIN", "SUPER_ADMIN"),
+  validateBody(CreateDirectPurchaseOrderPublicSchema),
+  asyncHandler(purchaseOrderController.createDirect),
 );
 
 purchaseOrderRouter.get(
   "/:id",
   requireAuth,
   asyncHandler(purchaseOrderController.get),
+);
+
+/** Sprint 31 — PO → bookings / shipments / containers lineage */
+purchaseOrderRouter.get(
+  "/:id/related-entities",
+  requireAuth,
+  asyncHandler(tradeLineageController.poRelated),
+);
+
+purchaseOrderRouter.patch(
+  "/:id",
+  requireAuth,
+  asyncHandler(purchaseOrderController.updateDraft),
+);
+
+purchaseOrderRouter.delete(
+  "/:id",
+  requireAuth,
+  asyncHandler(purchaseOrderController.deleteDraft),
+);
+
+purchaseOrderRouter.get(
+  "/:id/revisions",
+  requireAuth,
+  asyncHandler(purchaseOrderController.listRevisions),
+);
+
+purchaseOrderRouter.get(
+  "/:id/revisions/:revisionId",
+  requireAuth,
+  asyncHandler(purchaseOrderController.getRevision),
+);
+
+purchaseOrderRouter.get(
+  "/:id/documents",
+  requireAuth,
+  asyncHandler(purchaseOrderController.listDocuments),
+);
+
+purchaseOrderRouter.post(
+  "/:id/documents",
+  requireAuth,
+  directPoUpload,
+  asyncHandler(purchaseOrderController.uploadDocument),
+);
+
+purchaseOrderRouter.get(
+  "/:id/documents/:documentId",
+  requireAuth,
+  asyncHandler(purchaseOrderController.getDocument),
+);
+
+purchaseOrderRouter.post(
+  "/:id/documents/:documentId/replace",
+  requireAuth,
+  directPoUpload,
+  asyncHandler(purchaseOrderController.replaceDocument),
+);
+
+purchaseOrderRouter.delete(
+  "/:id/documents/:documentId",
+  requireAuth,
+  asyncHandler(purchaseOrderController.deleteDocument),
+);
+
+purchaseOrderRouter.get(
+  "/:id/documents/:documentId/preview",
+  requireAuth,
+  asyncHandler(purchaseOrderController.previewDocument),
+);
+
+purchaseOrderRouter.get(
+  "/:id/documents/:documentId/download",
+  requireAuth,
+  asyncHandler(purchaseOrderController.downloadDocument),
+);
+
+purchaseOrderRouter.get(
+  "/:id/timeline",
+  requireAuth,
+  asyncHandler(purchaseOrderController.listTimeline),
 );
 
 purchaseOrderRouter.post(

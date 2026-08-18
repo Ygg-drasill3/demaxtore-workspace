@@ -2,6 +2,8 @@ import { useState } from "react";
 import type { BulkCatalogProductCardDTO } from "../lib/bulk-container.api";
 import type { BulkSpecTemplate } from "@dmx/contracts/bulk-container-catalog";
 
+const FIXED_ORIGIN = "Turkey";
+
 type BulkSpecParameter = BulkSpecTemplate["parameters"][number];
 import { Button } from "@/components/ui/Button";
 import { Field, Input, Select } from "@/components/ui/Input";
@@ -18,6 +20,13 @@ function SpecField({
   const label = param.unit ? `${param.label} (${param.unit})` : param.label;
 
   if (param.type === "enum" && param.options) {
+    if (param.key === "origin") {
+      return (
+        <Field label={label} hint="Fixed for all bulk container lines">
+          <Input value={FIXED_ORIGIN} readOnly data-testid={`bc-spec-${param.key}`} />
+        </Field>
+      );
+    }
     return (
       <Field label={label} hint={param.helpText}>
         <Select value={value} onChange={(e) => onChange(e.target.value)} data-testid={`bc-spec-${param.key}`}>
@@ -70,7 +79,7 @@ export function AddBulkLineModal({
   const [specValues, setSpecValues] = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {};
     for (const p of product.specTemplate.schema.parameters) {
-      init[p.key] = "";
+      init[p.key] = p.key === "origin" ? FIXED_ORIGIN : "";
     }
     return init;
   });
@@ -82,7 +91,7 @@ export function AddBulkLineModal({
   const buildSpecPayload = (): Record<string, string | number> => {
     const out: Record<string, string | number> = {};
     for (const p of product.specTemplate.schema.parameters) {
-      const raw = specValues[p.key];
+      const raw = p.key === "origin" ? FIXED_ORIGIN : specValues[p.key];
       if (raw === "") continue;
       out[p.key] = p.type === "text" || p.type === "enum" ? raw : Number(raw);
     }

@@ -1,0 +1,40 @@
+{
+  "marker": "MVP-UI17-R4-20260814-T7N4",
+  "sku": "FLOUR-UI17R4-T7N4",
+  "startedAt": "2026-08-14T15:26:41.683Z",
+  "stages": [
+    {
+      "name": "BUYER_LOGIN",
+      "result": "PASS",
+      "note": "https://workspace.demaxtore.com/buyer/control-tower",
+      "at": "2026-08-14T15:26:43.181Z"
+    },
+    {
+      "name": "PRODUCT_CREATION",
+      "result": "PASS",
+      "note": "FLOUR-UI17R4-T7N4",
+      "at": "2026-08-14T15:26:49.462Z"
+    },
+    {
+      "name": "R4_ABORT",
+      "result": "ENVIRONMENT BLOCKED",
+      "note": "page.waitForSelector: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator('[data-testid=\"direct-po-products-step\"]') to be visible\n",
+      "at": "2026-08-14T15:27:23.053Z"
+    }
+  ],
+  "entities": {
+    "productSku": "FLOUR-UI17R4-T7N4"
+  },
+  "errors": [],
+  "network5xx": 0,
+  "blocker": {
+    "stage": "UNHANDLED",
+    "note": "page.waitForSelector: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator('[data-testid=\"direct-po-products-step\"]') to be visible\n",
+    "kind": "ENVIRONMENT"
+  },
+  "completedAt": "2026-08-14T15:27:23.054Z",
+  "verdict": {
+    "controlledPaidPilot": "PENDING",
+    "selfService": "PENDING"
+  }
+}

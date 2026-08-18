@@ -27,6 +27,10 @@ enum Role {
   FINANCE_OPERATOR
   DOCUMENT_CONTROLLER
   FORWARDER
+  /// Sprint 35 — Partner Workspace roles (external execution)
+  ORIGIN_AGENT
+  CUSTOMS_BROKER
+  TRUCKER
 }
 
 enum WorkspaceType {
@@ -71,6 +75,37 @@ enum SupplierStage {
   DECLINED
 }
 
+enum WhatsAppBusinessConnectionStatus {
+  PENDING
+  CONNECTED
+  EXPIRED
+  REVOKED
+  DISCONNECTED
+  ERROR
+}
+
+/// Sprint 27 — how the commercial Purchase Order document was created.
+enum PurchaseOrderSource {
+  RFQ
+  DIRECT
+  REORDER
+  API
+  LEGACY
+  /// Sprint 36A — CommodityBid award → PO
+  COMMODITY_BID
+}
+
+/// Sprint 27 — how the operational Order Workspace was started.
+enum OrderWorkspaceOrigin {
+  RFQ
+  DIRECT_PO
+  REORDER
+  API
+  LEGACY
+  /// Sprint 36A — spawned from CommodityBid
+  COMMODITY_BID
+}
+
 // ── Identity & sessions ─────────────────────────────────────────────────────
 model Organisation {
   id            String    @id @default(uuid()) @db.Uuid
@@ -79,10 +114,24 @@ model Organisation {
   location      String?
   verifiedSince DateTime? @map("verified_since")
   pastPoCount   Int       @default(0) @map("past_po_count")
+  logoStorageKey    String? @map("logo_storage_key")
+  logoMimeType      String? @map("logo_mime_type")
+  catalogStorageKey String? @map("catalog_storage_key")
+  catalogMimeType   String? @map("catalog_mime_type")
+  catalogExternalUrl String? @map("catalog_external_url")
+  /// Free-text product interest labels (supplier / admin typed).
+  interestAreas String[] @default([]) @map("interest_areas")
+  /// Buyer commercial product profile. INTERNATIONAL | TURKEY_IMPORTER.
+  /// Presentation segmentation only — not authorization. Default preserves
+  /// pre-Sprint-43 International Buyer experience for existing organisations.
+  buyerOperatingModel String @default("INTERNATIONAL") @map("buyer_operating_model")
   createdAt     DateTime  @default(now()) @map("created_at")
 
   users            User[]
   accountOwnership AccountOwnership?
+  categoryInterests OrganisationCategoryInterest[]
+  /// Sprint 36B — tenant Product Master (not MC/BC catalog)
+  products         Product[]
 
   @@map("organisations")
 }
@@ -118,6 +167,11 @@ model User {
   backupVerifications BackupVerificationRecord[]
   onboardingProgress  UserOnboardingProgress?
   phoneVerificationRequests PhoneVerificationRequest[]
+  whatsappBusinessConnection WhatsAppBusinessConnection?
+  academyProfile      WorkspaceAcademyProfile?
+  academyGuideProgress WorkspaceAcademyGuideProgress[]
+  academyTaskProgress WorkspaceAcademyTaskProgress[]
+  academyArticleViews WorkspaceAcademyArticleView[]
 
   @@index([role])
   @@index([phoneVerificationStatus])
@@ -236,6 +290,8 @@ model PasswordlessAccessLog {
 model Workspace {
   id          String        @id @default(uuid()) @db.Uuid
   externalRef String        @unique @map("external_ref")
+  /// Optional public URL slug for RFQ workspaces (e.g. /workspace/rfq/rawabifood).
+  slug        String?       @unique
   type        WorkspaceType
   state       String
   currency    String?
@@ -262,6 +318,8 @@ model Workspace {
   timelineEvents          TimelineEvent[]
   rfqDetails              RfqDetails?
   rfqLineItems            RfqLineItem[]
+  rfqLineAwards           RfqLineAward[]
+  rfqSupplierPoSpawns     RfqSupplierPoSpawn[]
   supplierLineScopes      SupplierLineScope[]
   rfqAttachments          RfqAttachment[]
   supplierAssignments     SupplierAssignment[]
@@ -402,15 +460,73 @@ model RfqLineItem {
   uom         String
   targetPrice Decimal? @map("target_price") @db.Decimal(18, 4)
   notes       String?
+  /// OPEN | AWARDED | NO_AWARD | CANCELLED
+  awardStatus String   @default("OPEN") @map("award_status")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   supplierLineScopes SupplierLineScope[]
+  lineAward RfqLineAward?
+  purchaseOrderLines PurchaseOrderLine[]
 
   @@unique([workspaceId, position])
   @@index([workspaceId])
+  @@index([workspaceId, awardStatus])
   @@map("rfq_line_items")
+}
+
+/// One winning quotation per RFQ line item (whole offer package incl. variations).
+model RfqLineAward {
+  id               String    @id @default(uuid()) @db.Uuid
+  workspaceId      String    @map("workspace_id") @db.Uuid
+  rfqLineItemId    String    @unique @map("rfq_line_item_id") @db.Uuid
+  quotationId      String    @map("quotation_id") @db.Uuid
+  supplierUserId   String    @map("supplier_user_id") @db.Uuid
+  awardedById      String    @map("awarded_by_id") @db.Uuid
+  awardedAt        DateTime  @default(now()) @map("awarded_at")
+  rationale        String?   @db.Text
+  /// ACTIVE | REVERTED
+  status           String    @default("ACTIVE")
+  revertedAt       DateTime? @map("reverted_at")
+  revertedById     String?   @map("reverted_by_id") @db.Uuid
+  revertReason     String?   @map("revert_reason") @db.Text
+  supplierPoSpawnId String?  @map("supplier_po_spawn_id") @db.Uuid
+  orderWorkspaceId String?   @map("order_workspace_id") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  workspace       Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  rfqLineItem     RfqLineItem        @relation(fields: [rfqLineItemId], references: [id], onDelete: Cascade)
+  quotation       Quotation          @relation(fields: [quotationId], references: [id])
+  supplierPoSpawn RfqSupplierPoSpawn? @relation(fields: [supplierPoSpawnId], references: [id])
+
+  @@index([workspaceId])
+  @@index([workspaceId, supplierUserId])
+  @@index([supplierPoSpawnId])
+  @@map("rfq_line_awards")
+}
+
+/// One PO / order workspace per supplier per RFQ (groups multiple line awards).
+model RfqSupplierPoSpawn {
+  id               String   @id @default(uuid()) @db.Uuid
+  workspaceId      String   @map("workspace_id") @db.Uuid
+  supplierUserId   String   @map("supplier_user_id") @db.Uuid
+  poNumber         String   @unique @map("po_number")
+  orderWorkspaceId String   @unique @map("order_workspace_id") @db.Uuid
+  issuedById       String   @map("issued_by_id") @db.Uuid
+  issuedAt         DateTime @default(now()) @map("issued_at")
+  mode             String   @default("auto")
+  poFileUrl        String?  @map("po_file_url")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  workspace  Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  lineAwards RfqLineAward[]
+
+  @@unique([workspaceId, supplierUserId])
+  @@index([workspaceId])
+  @@map("rfq_supplier_po_spawns")
 }
 
 model SupplierLineScope {
@@ -485,6 +601,7 @@ model Quotation {
 
   workspace Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   lineItems QuotationLineItem[]
+  lineAwards RfqLineAward[]
 
   @@unique([workspaceId, supplierUserId])
   @@index([workspaceId])
@@ -500,8 +617,12 @@ model QuotationLineItem {
   quantity      Decimal @db.Decimal(18, 4)
   unitPrice     Decimal @map("unit_price") @db.Decimal(18, 4)
   total         Decimal @db.Decimal(18, 4)
+  packing       String?
+  priceUnit     String? @map("price_unit")
+  moq           Int?
 
   quotation Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  purchaseOrderLines PurchaseOrderLine[]
 
   @@index([quotationId])
   @@map("quotation_line_items")
@@ -846,8 +967,11 @@ model OrderWorkspace {
   destinationPort       String    @map("destination_port")
   supplierUserId        String    @map("supplier_user_id") @db.Uuid
   buyerUserId           String    @map("buyer_user_id") @db.Uuid
-  parentWorkspaceId     String    @map("parent_workspace_id") @db.Uuid
-  parentWorkspaceType   String    @map("parent_workspace_type")
+  /// Nullable for DIRECT_PO dual-entry workspaces (no parent RFQ/CB/MC/BC).
+  parentWorkspaceId     String?   @map("parent_workspace_id") @db.Uuid
+  parentWorkspaceType   String?   @map("parent_workspace_type")
+  /// Sprint 27 — dual-entry origin (independent of PurchaseOrder.source).
+  origin                OrderWorkspaceOrigin @default(RFQ)
   supplierConfirmedAt   DateTime? @map("supplier_confirmed_at")
   confirmSlaDeadlineAt  DateTime? @map("confirm_sla_deadline_at")
   productionStartedAt   DateTime? @map("production_started_at")
@@ -877,6 +1001,7 @@ model OrderWorkspace {
 
   @@index([contractRef])
   @@index([parentWorkspaceId])
+  @@index([origin])
   @@map("order_workspaces")
 }
 
@@ -918,6 +1043,414 @@ model OrderStatusUpdate {
   @@map("order_status_updates")
 }
 
+/// SPR-30-02 — Inspection operational cockpit (extends Order inspection fields; no parallel QA FSM)
+model InspectionWorkspace {
+  id                  String    @id @default(uuid()) @db.Uuid
+  orderWorkspaceId    String    @map("order_workspace_id") @db.Uuid
+  inspectionNumber    String    @unique @map("inspection_number")
+  inspectionType      String    @default("FINAL_RANDOM") @map("inspection_type")
+  status              String    @default("DRAFT")
+  factoryName         String?   @map("factory_name")
+  supplierName        String?   @map("supplier_name")
+  inspectorName       String?   @map("inspector_name")
+  inspectorOrg        String?   @map("inspector_org")
+  inspectorContact    String?   @map("inspector_contact")
+  assignedAt          DateTime? @map("assigned_at")
+  plannedDate         DateTime? @map("planned_date")
+  actualStartAt       DateTime? @map("actual_start_at")
+  actualFinishAt      DateTime? @map("actual_finish_at")
+  decision            String?
+  decisionNotes       String?   @map("decision_notes") @db.Text
+  decisionAt          DateTime? @map("decision_at")
+  decisionLocked      Boolean   @default(false) @map("decision_locked")
+  purchaseOrderId     String?   @map("purchase_order_id") @db.Uuid
+  shipmentWorkspaceId String?   @map("shipment_workspace_id") @db.Uuid
+  requestedByUserId   String?   @map("requested_by_user_id") @db.Uuid
+  requestedAt         DateTime? @map("requested_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  findings InspectionFinding[]
+  defects  InspectionDefect[]
+  ncrs     InspectionNcr[]
+
+  @@index([orderWorkspaceId])
+  @@index([status])
+  @@index([shipmentWorkspaceId])
+  @@map("inspection_workspaces")
+}
+
+model InspectionFinding {
+  id                    String   @id @default(uuid()) @db.Uuid
+  inspectionWorkspaceId String   @map("inspection_workspace_id") @db.Uuid
+  category              String
+  severity              String
+  description           String   @db.Text
+  quantity              Int?
+  status                String   @default("OPEN")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  inspection InspectionWorkspace @relation(fields: [inspectionWorkspaceId], references: [id], onDelete: Cascade)
+
+  @@index([inspectionWorkspaceId])
+  @@map("inspection_findings")
+}
+
+model InspectionDefect {
+  id                    String   @id @default(uuid()) @db.Uuid
+  inspectionWorkspaceId String   @map("inspection_workspace_id") @db.Uuid
+  code                  String?
+  description           String   @db.Text
+  severity              String
+  quantity              Int      @default(1)
+  resolution            String?
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  inspection InspectionWorkspace @relation(fields: [inspectionWorkspaceId], references: [id], onDelete: Cascade)
+
+  @@index([inspectionWorkspaceId])
+  @@map("inspection_defects")
+}
+
+model InspectionNcr {
+  id                    String    @id @default(uuid()) @db.Uuid
+  inspectionWorkspaceId String    @map("inspection_workspace_id") @db.Uuid
+  ncrNumber             String    @map("ncr_number")
+  reason                String    @db.Text
+  status                String    @default("OPEN")
+  ownerName             String?   @map("owner_name")
+  dueDate               DateTime? @map("due_date")
+  closedAt              DateTime? @map("closed_at")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  inspection InspectionWorkspace @relation(fields: [inspectionWorkspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([inspectionWorkspaceId, ncrNumber])
+  @@index([inspectionWorkspaceId])
+  @@map("inspection_ncrs")
+}
+
+/// SPR-30-03 — Lightweight operational tasks (coordinate human work; never replace FSM)
+model OperationalTask {
+  id                String    @id @default(uuid()) @db.Uuid
+  orderId           String    @map("order_id") @db.Uuid
+  purchaseOrderId   String?   @map("purchase_order_id") @db.Uuid
+  title             String
+  description       String?   @db.Text
+  status            String    @default("OPEN")
+  priority          String    @default("MEDIUM")
+  dueDate           DateTime? @map("due_date")
+  assignedToId      String?   @map("assigned_to_id") @db.Uuid
+  createdById       String    @map("created_by_id") @db.Uuid
+  completedAt       DateTime? @map("completed_at")
+  completedById     String?   @map("completed_by_id") @db.Uuid
+  relatedEntityType String?   @map("related_entity_type")
+  relatedEntityId   String?   @map("related_entity_id") @db.Uuid
+  automationKey     String?   @map("automation_key")
+  deletedAt         DateTime? @map("deleted_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  comments OperationalTaskComment[]
+
+  @@index([orderId, status])
+  @@index([assignedToId, status])
+  @@index([dueDate])
+  @@index([purchaseOrderId])
+  @@unique([orderId, automationKey])
+  @@map("operational_tasks")
+}
+
+/// SPR-30-05 — Operational Issues (business exceptions; independent of FSM / Tasks)
+model OperationalIssue {
+  id                     String    @id @default(uuid()) @db.Uuid
+  orderId                String    @map("order_id") @db.Uuid
+  relatedEntityType      String?   @map("related_entity_type")
+  relatedEntityId        String?   @map("related_entity_id") @db.Uuid
+  category               String
+  severity               String    @default("MEDIUM")
+  status                 String    @default("OPEN")
+  title                  String
+  description            String?   @db.Text
+  assignedTaskId         String?   @map("assigned_task_id") @db.Uuid
+  reportedById           String    @map("reported_by_id") @db.Uuid
+  resolvedById           String?   @map("resolved_by_id") @db.Uuid
+  resolvedAt             DateTime? @map("resolved_at")
+  closedById             String?   @map("closed_by_id") @db.Uuid
+  closedAt               DateTime? @map("closed_at")
+  resolutionNote         String?   @map("resolution_note") @db.Text
+  resolutionSuggestedAt  DateTime? @map("resolution_suggested_at")
+  automationKey          String?   @map("automation_key")
+  /// Sprint 34 — Exception Intelligence metadata (nullable = historical)
+  impactType             String?   @map("impact_type")
+  ownerRole              String?   @map("owner_role")
+  recommendedAction      String?   @map("recommended_action") @db.Text
+  sourceEventType        String?   @map("source_event_type")
+  sourceRuleId           String?   @map("source_rule_id")
+  sourceAlertId          String?   @map("source_alert_id") @db.Uuid
+  deletedAt              DateTime? @map("deleted_at")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+
+  @@index([orderId, status])
+  @@index([status])
+  @@index([severity])
+  @@index([category])
+  @@index([relatedEntityType, relatedEntityId])
+  @@index([assignedTaskId])
+  @@index([impactType])
+  @@index([ownerRole])
+  @@unique([orderId, automationKey])
+  @@map("operational_issues")
+}
+
+/// Sprint 35 — Partner Workspace assignment (user + role ↔ ORDER/SHIPMENT workspace).
+/// Soft-revoke via revokedAt. Does not replace WorkspaceParticipant for suppliers.
+model PartnerAssignment {
+  id             String    @id @default(uuid()) @db.Uuid
+  workspaceId    String    @map("workspace_id") @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  partnerRole    String    @map("partner_role")
+  organisationId String?   @map("organisation_id") @db.Uuid
+  assignedById   String?   @map("assigned_by_id") @db.Uuid
+  notes          String?   @db.Text
+  revokedAt      DateTime? @map("revoked_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, userId, partnerRole])
+  @@index([userId, partnerRole])
+  @@index([workspaceId])
+  @@index([revokedAt])
+  @@map("partner_assignments")
+}
+
+/// Sprint 41 — Turkey inland execution lifecycle (after Customs CLEARED).
+/// MVP: one active record per shipment. DeliveryRecord remains completion evidence.
+model InlandDelivery {
+  id                    String    @id @default(uuid()) @db.Uuid
+  organisationId        String    @map("organisation_id") @db.Uuid
+  shipmentWorkspaceId   String    @map("shipment_workspace_id") @db.Uuid
+  orderWorkspaceId      String    @map("order_workspace_id") @db.Uuid
+  customsCaseId         String?   @map("customs_case_id") @db.Uuid
+  status                String    @default("DRAFT")
+  statusSource          String    @default("SYSTEM") @map("status_source")
+  deliveryName          String?   @map("delivery_name")
+  deliveryAddress       String?   @map("delivery_address") @db.Text
+  deliveryCity          String?   @map("delivery_city")
+  deliveryPostalCode    String?   @map("delivery_postal_code")
+  deliveryContactName   String?   @map("delivery_contact_name")
+  deliveryContactPhone  String?   @map("delivery_contact_phone")
+  pickupLocation        String?   @map("pickup_location") @db.Text
+  pickupAt              DateTime? @map("pickup_at")
+  pickupWindow          String?   @map("pickup_window")
+  appointmentRef        String?   @map("appointment_ref")
+  instructions          String?   @db.Text
+  truckerUserId         String?   @map("trucker_user_id") @db.Uuid
+  truckerAssignmentId   String?   @map("trucker_assignment_id") @db.Uuid
+  driverName            String?   @map("driver_name")
+  driverPhone           String?   @map("driver_phone")
+  vehiclePlate          String?   @map("vehicle_plate")
+  releaseReference      String?   @map("release_reference")
+  pickedUpAt            DateTime? @map("picked_up_at")
+  gateOutAt             DateTime? @map("gate_out_at")
+  inTransitAt           DateTime? @map("in_transit_at")
+  deliveredAt           DateTime? @map("delivered_at")
+  podStatus             String    @default("PENDING") @map("pod_status")
+  podTradeDocumentId    String?   @map("pod_trade_document_id") @db.Uuid
+  inlandCostAmount      Decimal?  @map("inland_cost_amount") @db.Decimal(18, 4)
+  inlandCostCurrency    String?   @map("inland_cost_currency")
+  inlandCostKind        String?   @map("inland_cost_kind")
+  inlandCostSource      String?   @map("inland_cost_source")
+  cancelledAt           DateTime? @map("cancelled_at")
+  cancelReason          String?   @map("cancel_reason") @db.Text
+  createdById           String    @map("created_by_id") @db.Uuid
+  updatedById           String?   @map("updated_by_id") @db.Uuid
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  shipmentWorkspace ShipmentWorkspace   @relation(fields: [shipmentWorkspaceId], references: [workspaceId], onDelete: Cascade)
+  events            InlandDeliveryEvent[]
+
+  @@unique([shipmentWorkspaceId])
+  @@index([organisationId, status])
+  @@index([orderWorkspaceId])
+  @@index([truckerUserId, status])
+  @@index([customsCaseId])
+  @@map("inland_deliveries")
+}
+
+model InlandDeliveryEvent {
+  id               String   @id @default(uuid()) @db.Uuid
+  inlandDeliveryId String   @map("inland_delivery_id") @db.Uuid
+  actorUserId      String?  @map("actor_user_id") @db.Uuid
+  source           String
+  fromStatus       String?  @map("from_status")
+  toStatus         String   @map("to_status")
+  reason           String?  @db.Text
+  payload          Json     @default("{}")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  inlandDelivery InlandDelivery @relation(fields: [inlandDeliveryId], references: [id], onDelete: Cascade)
+
+  @@index([inlandDeliveryId, createdAt])
+  @@map("inland_delivery_events")
+}
+
+/// Sprint 42 — manual / structured customer transaction costs for Landed Cost.
+model TransactionCost {
+  id                  String    @id @default(uuid()) @db.Uuid
+  organisationId      String    @map("organisation_id") @db.Uuid
+  shipmentWorkspaceId String    @map("shipment_workspace_id") @db.Uuid
+  orderWorkspaceId    String?   @map("order_workspace_id") @db.Uuid
+  customsCaseId       String?   @map("customs_case_id") @db.Uuid
+  inlandDeliveryId    String?   @map("inland_delivery_id") @db.Uuid
+  componentType       String    @map("component_type")
+  amount              Decimal   @db.Decimal(18, 4)
+  currency            String
+  costNature          String    @map("cost_nature")
+  sourceType          String    @map("source_type")
+  description         String    @db.Text
+  documentId          String?   @map("document_id") @db.Uuid
+  incurredAt          DateTime? @map("incurred_at")
+  createdById         String    @map("created_by_id") @db.Uuid
+  deletedAt           DateTime? @map("deleted_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  shipmentWorkspace ShipmentWorkspace @relation(fields: [shipmentWorkspaceId], references: [workspaceId], onDelete: Cascade)
+
+  @@index([organisationId, shipmentWorkspaceId])
+  @@index([shipmentWorkspaceId, componentType, deletedAt])
+  @@map("transaction_costs")
+}
+
+/// Sprint 42 — versioned True Landed Cost calculation (GLOBAL CORE).
+model LandedCostCalculation {
+  id                     String    @id @default(uuid()) @db.Uuid
+  organisationId         String    @map("organisation_id") @db.Uuid
+  scopeType              String    @map("scope_type")
+  scopeId                String    @map("scope_id") @db.Uuid
+  shipmentWorkspaceId    String?   @map("shipment_workspace_id") @db.Uuid
+  orderWorkspaceId       String?   @map("order_workspace_id") @db.Uuid
+  version                Int
+  status                 String
+  calculationCurrency    String    @map("calculation_currency")
+  exchangeRate           Decimal?  @map("exchange_rate") @db.Decimal(18, 8)
+  exchangeRateSource     String?   @map("exchange_rate_source")
+  exchangeRateDate       DateTime? @map("exchange_rate_date")
+  fxSnapshot             Json      @default("{}") @map("fx_snapshot")
+  goodsCost              Decimal?  @map("goods_cost") @db.Decimal(18, 4)
+  freightCost            Decimal?  @map("freight_cost") @db.Decimal(18, 4)
+  insuranceCost          Decimal?  @map("insurance_cost") @db.Decimal(18, 4)
+  dutyTaxCost            Decimal?  @map("duty_tax_cost") @db.Decimal(18, 4)
+  customsLocalCost       Decimal?  @map("customs_local_cost") @db.Decimal(18, 4)
+  inlandCost             Decimal?  @map("inland_cost") @db.Decimal(18, 4)
+  otherCost              Decimal?  @map("other_cost") @db.Decimal(18, 4)
+  knownSubtotal          Decimal   @map("known_subtotal") @db.Decimal(18, 4)
+  totalLandedCost        Decimal?  @map("total_landed_cost") @db.Decimal(18, 4)
+  estimatedAmount        Decimal   @default(0) @map("estimated_amount") @db.Decimal(18, 4)
+  actualAmount           Decimal   @default(0) @map("actual_amount") @db.Decimal(18, 4)
+  missingComponentCount  Int       @default(0) @map("missing_component_count")
+  completeness           String    @default("INCOMPLETE")
+  diagnostics            Json      @default("[]")
+  inputHash              String    @map("input_hash")
+  calculatedAt           DateTime  @map("calculated_at")
+  createdById            String?   @map("created_by_id") @db.Uuid
+  supersededAt           DateTime? @map("superseded_at")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+
+  shipmentWorkspace ShipmentWorkspace?      @relation(fields: [shipmentWorkspaceId], references: [workspaceId], onDelete: Cascade)
+  components        LandedCostComponent[]
+
+  @@unique([scopeType, scopeId, version])
+  @@index([organisationId, scopeType, scopeId])
+  @@index([shipmentWorkspaceId, status])
+  @@index([inputHash])
+  @@map("landed_cost_calculations")
+}
+
+model LandedCostComponent {
+  id                         String   @id @default(uuid()) @db.Uuid
+  calculationId              String   @map("calculation_id") @db.Uuid
+  componentType              String   @map("component_type")
+  sourceType                 String   @map("source_type")
+  sourceId                   String?  @map("source_id")
+  amountOriginal             Decimal? @map("amount_original") @db.Decimal(18, 4)
+  currencyOriginal           String?  @map("currency_original")
+  fxRate                     Decimal? @map("fx_rate") @db.Decimal(18, 8)
+  amountCalculationCurrency  Decimal? @map("amount_calculation_currency") @db.Decimal(18, 4)
+  costNature                 String   @map("cost_nature")
+  inclusion                  String   @default("INCLUDED")
+  description                String?  @db.Text
+  allocationMethod           String?  @map("allocation_method")
+  provenance                 Json     @default("{}")
+  createdAt                  DateTime @default(now()) @map("created_at")
+
+  calculation LandedCostCalculation @relation(fields: [calculationId], references: [id], onDelete: Cascade)
+
+  @@index([calculationId, componentType])
+  @@index([sourceType, sourceId])
+  @@map("landed_cost_components")
+}
+
+/// SPR-30-06 — Delivery evidence (does not replace Shipment FSM)
+model DeliveryRecord {
+  id              String    @id @default(uuid()) @db.Uuid
+  orderId         String    @map("order_id") @db.Uuid
+  shipmentId      String?   @map("shipment_id") @db.Uuid
+  deliveredAt     DateTime  @map("delivered_at")
+  deliveredBy     String?   @map("delivered_by")
+  receivedBy      String?   @map("received_by")
+  proofDocumentId String?   @map("proof_document_id")
+  remarks         String?   @db.Text
+  recordedById    String    @map("recorded_by_id") @db.Uuid
+  deletedAt       DateTime? @map("deleted_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@index([orderId])
+  @@index([shipmentId])
+  @@map("delivery_records")
+}
+
+/// SPR-30-06 — Operational order completion (independent of Order FSM close)
+model OrderCompletion {
+  id                String    @id @default(uuid()) @db.Uuid
+  orderId           String    @unique @map("order_id") @db.Uuid
+  status            String    @default("OPEN")
+  checklistSnapshot Json      @default("{}") @map("checklist_snapshot")
+  completedAt       DateTime? @map("completed_at")
+  completedById     String?   @map("completed_by_id") @db.Uuid
+  reopenedAt        DateTime? @map("reopened_at")
+  reopenedById      String?   @map("reopened_by_id") @db.Uuid
+  notes             String?   @db.Text
+  deletedAt         DateTime? @map("deleted_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@map("order_completions")
+}
+
+model OperationalTaskComment {
+  id        String    @id @default(uuid()) @db.Uuid
+  taskId    String    @map("task_id") @db.Uuid
+  authorId  String    @map("author_id") @db.Uuid
+  message   String    @db.Text
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  task OperationalTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, createdAt])
+  @@map("operational_task_comments")
+}
+
 // ── Shipment workspace (Sprint 3C) ────────────────────────────────────────────
 model ShipmentWorkspace {
   id                    String    @id @default(uuid()) @db.Uuid
@@ -938,10 +1471,38 @@ model ShipmentWorkspace {
   voyageNumber          String?   @map("voyage_number")
   bookingRef            String?   @map("booking_ref")
   carrierName           String?   @map("carrier_name")
+  /// SPR-30-01 — booking / transport cockpit fields
+  transportMode         String    @default("SEA") @map("transport_mode")
+  forwarderName         String?   @map("forwarder_name")
+  airlineName           String?   @map("airline_name")
+  flightNumber          String?   @map("flight_number")
+  truckReference        String?   @map("truck_reference")
+  trainReference        String?   @map("train_reference")
+  etd                   DateTime?
+  eta                   DateTime?
+  incoterm              String?
+  bookingDate           DateTime? @map("booking_date")
+  totalGrossWeightKg    Decimal?  @map("total_gross_weight_kg") @db.Decimal(14, 3)
+  totalVolumeCbm        Decimal?  @map("total_volume_cbm") @db.Decimal(14, 3)
   trackingLinkedAt      DateTime? @map("tracking_linked_at")
   lastTrackingSyncAt    DateTime? @map("last_tracking_sync_at")
   lastTrackingSyncError String?   @map("last_tracking_sync_error")
   bookingConfirmedAt    DateTime? @map("booking_confirmed_at")
+  /// Sprint 32 — operational booking lifecycle (nullable = legacy / unknown)
+  bookingStatus         String?   @map("booking_status")
+  bookingSource         String?   @map("booking_source")
+  bookingRequestedAt    DateTime? @map("booking_requested_at")
+  bookingCancelledAt    DateTime? @map("booking_cancelled_at")
+  bookingCancelReason   String?   @map("booking_cancel_reason") @db.Text
+  carrierBookingNumber  String?   @map("carrier_booking_number")
+  cargoReadyDate        DateTime? @map("cargo_ready_date")
+  siCutoff              DateTime? @map("si_cutoff")
+  vgmCutoff             DateTime? @map("vgm_cutoff")
+  cyCutoff              DateTime? @map("cy_cutoff")
+  documentCutoff        DateTime? @map("document_cutoff")
+  /// Soft refs to FreightIQ (no FK — preserve independence from planning layer)
+  freightRequestId      String?   @map("freight_request_id") @db.Uuid
+  freightOfferId        String?   @map("freight_offer_id") @db.Uuid
   containerAssignedAt   DateTime? @map("container_assigned_at")
   pickedUpAt            DateTime? @map("picked_up_at")
   loadedAt              DateTime? @map("loaded_at")
@@ -956,11 +1517,314 @@ model ShipmentWorkspace {
 
   workspace         Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   freightSelections FreightSelection[]
+  containers        ShipmentContainer[]
+  milestones        ShipmentMilestone[]
+  /// Sprint 37 — Turkey customs execution (0..1 active case)
+  customsCases      CustomsCase[]
+  /// Sprint 41 — Turkey inland execution (0..1 per shipment MVP)
+  inlandDeliveries  InlandDelivery[]
+  /// Sprint 42 — True Landed Cost (versioned snapshots)
+  landedCostCalculations LandedCostCalculation[]
+  transactionCosts       TransactionCost[]
 
   @@index([orderWorkspaceId])
   @@index([orderRef])
   @@index([trackingLinkedAt])
+  @@index([bookingStatus])
+  @@index([freightRequestId])
+  @@index([freightOfferId])
   @@map("shipment_workspaces")
+}
+
+/// Sprint 37 — Turkey Customs Case (country-specific; not global Shipment FSM).
+/// MVP: one non-cancelled case per shipment. DeMaxtore orchestrates; does not file government declarations.
+enum CustomsCaseStatus {
+  DRAFT
+  PREPARING
+  READY_FOR_BROKER
+  BROKER_REVIEW
+  DECLARATION_PREPARING
+  DECLARATION_FILED
+  CUSTOMS_PROCESSING
+  CLEARANCE_PENDING
+  CLEARED
+  HOLD
+  CANCELLED
+}
+
+enum CustomsStatusSource {
+  BUYER
+  CUSTOMS_BROKER
+  DEMAXTORE_OPERATIONS
+  SYSTEM_DERIVED
+}
+
+enum CustomsHoldCategory {
+  DOCUMENT
+  CLASSIFICATION
+  BROKER_REVIEW
+  CUSTOMS_QUERY
+  PAYMENT
+  OTHER
+}
+
+model CustomsCase {
+  id                    String            @id @default(uuid()) @db.Uuid
+  organisationId        String            @map("organisation_id") @db.Uuid
+  shipmentWorkspaceId   String            @map("shipment_workspace_id") @db.Uuid
+  orderWorkspaceId      String            @map("order_workspace_id") @db.Uuid
+  status                CustomsCaseStatus @default(DRAFT)
+  readinessStatus       String            @default("NOT_READY") @map("readiness_status")
+  destinationCountryCode String?          @map("destination_country_code")
+  brokerUserId          String?           @map("broker_user_id") @db.Uuid
+  brokerAssignmentId    String?           @map("broker_assignment_id") @db.Uuid
+  declarationReference  String?           @map("declaration_reference")
+  declarationDate       DateTime?         @map("declaration_date")
+  customsOffice         String?           @map("customs_office")
+  statusSource          CustomsStatusSource @default(SYSTEM_DERIVED) @map("status_source")
+  holdCategory          CustomsHoldCategory? @map("hold_category")
+  holdReason            String?           @map("hold_reason") @db.Text
+  holdAt                DateTime?         @map("hold_at")
+  previousStatusBeforeHold CustomsCaseStatus? @map("previous_status_before_hold")
+  clearedAt             DateTime?         @map("cleared_at")
+  cancelledAt           DateTime?         @map("cancelled_at")
+  cancelReason          String?           @map("cancel_reason") @db.Text
+  notes                 String?           @db.Text
+  createdById           String            @map("created_by_id") @db.Uuid
+  updatedById           String?           @map("updated_by_id") @db.Uuid
+  createdAt             DateTime          @default(now()) @map("created_at")
+  updatedAt             DateTime          @updatedAt @map("updated_at")
+
+  shipmentWorkspace ShipmentWorkspace  @relation(fields: [shipmentWorkspaceId], references: [workspaceId], onDelete: Cascade)
+  events            CustomsCaseEvent[]
+  dutyTaxCalculations DutyTaxCalculation[]
+
+  @@unique([shipmentWorkspaceId])
+  @@index([organisationId, status])
+  @@index([orderWorkspaceId])
+  @@index([brokerUserId])
+  @@index([readinessStatus])
+  @@map("customs_cases")
+}
+
+model CustomsCaseEvent {
+  id          String   @id @default(uuid()) @db.Uuid
+  customsCaseId String @map("customs_case_id") @db.Uuid
+  actorUserId String?  @map("actor_user_id") @db.Uuid
+  source      CustomsStatusSource
+  fromStatus  String?  @map("from_status")
+  toStatus    String   @map("to_status")
+  reason      String?  @db.Text
+  payload     Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  customsCase CustomsCase @relation(fields: [customsCaseId], references: [id], onDelete: Cascade)
+
+  @@index([customsCaseId, createdAt])
+  @@map("customs_case_events")
+}
+
+/// Sprint 40 — platform-global duty/tax estimation rules (NOT official Turkish Customs liability).
+/// Rates are ADMIN_CONFIGURED / CUSTOMS_BROKER_CONFIGURED test or ops data unless source says otherwise.
+model DutyTaxRule {
+  id                 String   @id @default(uuid()) @db.Uuid
+  componentType      String   @map("component_type")
+  gtipCode           String   @map("gtip_code")
+  originCountryCode  String?  @map("origin_country_code")
+  ratePercent        Decimal  @map("rate_percent") @db.Decimal(10, 6)
+  calculationMethod  String   @default("PERCENT_OF_BASE") @map("calculation_method")
+  baseFormula        String   @map("base_formula")
+  effectiveFrom      DateTime @map("effective_from")
+  effectiveTo        DateTime? @map("effective_to")
+  priority           Int      @default(100)
+  source             String   @default("ADMIN_CONFIGURED")
+  version            Int      @default(1)
+  active             Boolean  @default(true)
+  notes              String?  @db.Text
+  createdById        String?  @map("created_by_id") @db.Uuid
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@index([gtipCode, componentType, active])
+  @@index([effectiveFrom, effectiveTo])
+  @@index([active, priority])
+  @@map("duty_tax_rules")
+}
+
+/// Sprint 40 — transaction-specific estimated duty/tax calculation (versioned snapshot).
+model DutyTaxCalculation {
+  id                       String    @id @default(uuid()) @db.Uuid
+  organisationId           String    @map("organisation_id") @db.Uuid
+  customsCaseId            String    @map("customs_case_id") @db.Uuid
+  version                  Int
+  status                   String
+  calculationDate          DateTime  @map("calculation_date")
+  calculationCurrency      String    @map("calculation_currency")
+  sourceCurrency           String?   @map("source_currency")
+  goodsValueEstimate       Decimal?  @map("goods_value_estimate") @db.Decimal(18, 4)
+  freightAmount            Decimal?  @map("freight_amount") @db.Decimal(18, 4)
+  insuranceAmount          Decimal?  @map("insurance_amount") @db.Decimal(18, 4)
+  customsValueEstimate     Decimal?  @map("customs_value_estimate") @db.Decimal(18, 4)
+  exchangeRate             Decimal?  @map("exchange_rate") @db.Decimal(18, 8)
+  exchangeRateSource       String?   @map("exchange_rate_source")
+  exchangeRateDate         DateTime? @map("exchange_rate_date")
+  freightAllocationMethod  String    @default("VALUE") @map("freight_allocation_method")
+  totalEvaluatedAmount     Decimal?  @map("total_evaluated_amount") @db.Decimal(18, 4)
+  provisional              Boolean   @default(false)
+  completenessLabel        String    @default("LOW") @map("completeness_label")
+  inputHash                String    @map("input_hash")
+  ruleSetFingerprint       String    @map("rule_set_fingerprint")
+  diagnostics              Json      @default("[]")
+  reviewedAt               DateTime? @map("reviewed_at")
+  reviewedById             String?   @map("reviewed_by_id") @db.Uuid
+  createdById              String?   @map("created_by_id") @db.Uuid
+  supersededAt             DateTime? @map("superseded_at")
+  createdAt                DateTime  @default(now()) @map("created_at")
+  updatedAt                DateTime  @updatedAt @map("updated_at")
+
+  customsCase CustomsCase             @relation(fields: [customsCaseId], references: [id], onDelete: Cascade)
+  lines       DutyTaxCalculationLine[]
+
+  @@unique([customsCaseId, version])
+  @@index([organisationId, customsCaseId])
+  @@index([customsCaseId, status])
+  @@index([inputHash])
+  @@map("duty_tax_calculations")
+}
+
+model DutyTaxCalculationLine {
+  id                         String   @id @default(uuid()) @db.Uuid
+  calculationId              String   @map("calculation_id") @db.Uuid
+  purchaseOrderLineId        String?  @map("purchase_order_line_id") @db.Uuid
+  productId                  String?  @map("product_id") @db.Uuid
+  sku                        String?
+  description                String?  @db.Text
+  gtipCode                   String?  @map("gtip_code")
+  classificationStatus       String?  @map("classification_status")
+  classificationSource       String?  @map("classification_source")
+  originCountryCode          String?  @map("origin_country_code")
+  quantity                   Decimal  @db.Decimal(18, 4)
+  uom                        String?
+  goodsValue                 Decimal? @map("goods_value") @db.Decimal(18, 4)
+  allocatedFreight           Decimal? @map("allocated_freight") @db.Decimal(18, 4)
+  customsValue               Decimal? @map("customs_value") @db.Decimal(18, 4)
+  componentType              String   @map("component_type")
+  componentStatus            String   @map("component_status")
+  taxableBase                Decimal? @map("taxable_base") @db.Decimal(18, 4)
+  ratePercent                Decimal? @map("rate_percent") @db.Decimal(10, 6)
+  amount                     Decimal? @db.Decimal(18, 4)
+  ruleId                     String?  @map("rule_id") @db.Uuid
+  ruleVersion                Int?     @map("rule_version")
+  ruleSource                 String?  @map("rule_source")
+  warning                    String?  @db.Text
+  overrideAmount             Decimal? @map("override_amount") @db.Decimal(18, 4)
+  overrideReason             String?  @map("override_reason") @db.Text
+  overrideById               String?  @map("override_by_id") @db.Uuid
+  overrideAt                 DateTime? @map("override_at")
+  inputSources               Json     @default("{}") @map("input_sources")
+  createdAt                  DateTime @default(now()) @map("created_at")
+
+  calculation DutyTaxCalculation @relation(fields: [calculationId], references: [id], onDelete: Cascade)
+
+  @@index([calculationId, componentType])
+  @@index([productId])
+  @@index([purchaseOrderLineId])
+  @@map("duty_tax_calculation_lines")
+}
+
+/// SPR-30-04 — planned / estimated / actual milestone planning (does not replace FSM)
+model ShipmentMilestone {
+  id                  String    @id @default(uuid()) @db.Uuid
+  shipmentWorkspaceId String    @map("shipment_workspace_id") @db.Uuid
+  type                String
+  plannedAt           DateTime? @map("planned_at")
+  estimatedAt         DateTime? @map("estimated_at")
+  actualAt            DateTime? @map("actual_at")
+  status              String    @default("PENDING")
+  delayMinutes        Int?      @map("delay_minutes")
+  sequence            Int
+  createdById         String?   @map("created_by_id") @db.Uuid
+  updatedById         String?   @map("updated_by_id") @db.Uuid
+  deletedAt           DateTime? @map("deleted_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  shipmentWorkspace ShipmentWorkspace @relation(fields: [shipmentWorkspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([shipmentWorkspaceId, type])
+  @@index([shipmentWorkspaceId])
+  @@index([shipmentWorkspaceId, status])
+  @@index([plannedAt])
+  @@index([estimatedAt])
+  @@index([status])
+  @@map("shipment_milestones")
+}
+
+/// SPR-30-01 — multi-container rows under a shipment (FSM still uses primary containerNumber)
+model ShipmentContainer {
+  id                  String   @id @default(uuid()) @db.Uuid
+  shipmentWorkspaceId String   @map("shipment_workspace_id") @db.Uuid
+  containerNumber     String   @map("container_number")
+  containerType       String?  @map("container_type")
+  sealNumber          String?  @map("seal_number")
+  grossWeightKg       Decimal? @map("gross_weight_kg") @db.Decimal(14, 3)
+  netWeightKg         Decimal? @map("net_weight_kg") @db.Decimal(14, 3)
+  volumeCbm           Decimal? @map("volume_cbm") @db.Decimal(14, 3)
+  packageCount        Int?     @map("package_count")
+  status              String   @default("PLANNED")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  shipmentWorkspace ShipmentWorkspace @relation(fields: [shipmentWorkspaceId], references: [id], onDelete: Cascade)
+  lineAllocations   ShipmentLineAllocation[]
+
+  @@index([shipmentWorkspaceId])
+  @@index([containerNumber])
+  @@map("shipment_containers")
+}
+
+/// Sprint 31 — explicit PO ↔ Shipment lineage (supports split / consolidated shipments).
+/// Header link only; line qty lives in ShipmentLineAllocation.
+/// shipmentWorkspaceId stores SHIPMENT Workspace.id (same convention as API paths).
+model TradeShipmentLink {
+  id                  String   @id @default(uuid()) @db.Uuid
+  purchaseOrderId     String   @map("purchase_order_id") @db.Uuid
+  orderWorkspaceId    String   @map("order_workspace_id") @db.Uuid
+  shipmentWorkspaceId String   @map("shipment_workspace_id") @db.Uuid
+  source              String   @default("DISCOVERED") // DISCOVERED | MANUAL | SPAWN
+  createdById         String?  @map("created_by_id") @db.Uuid
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@unique([purchaseOrderId, shipmentWorkspaceId])
+  @@index([shipmentWorkspaceId])
+  @@index([orderWorkspaceId])
+  @@index([purchaseOrderId])
+  @@map("trade_shipment_links")
+}
+
+/// Sprint 31 — PO line quantity allocated to a shipment (optional container).
+model ShipmentLineAllocation {
+  id                    String   @id @default(uuid()) @db.Uuid
+  purchaseOrderLineId   String   @map("purchase_order_line_id") @db.Uuid
+  purchaseOrderId       String   @map("purchase_order_id") @db.Uuid
+  shipmentWorkspaceId   String   @map("shipment_workspace_id") @db.Uuid
+  shipmentContainerId   String?  @map("shipment_container_id") @db.Uuid
+  quantity              Decimal  @db.Decimal(18, 4)
+  unit                  String?
+  createdById           String?  @map("created_by_id") @db.Uuid
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  purchaseOrderLine PurchaseOrderLine  @relation(fields: [purchaseOrderLineId], references: [id], onDelete: Cascade)
+  shipmentContainer ShipmentContainer? @relation(fields: [shipmentContainerId], references: [id], onDelete: SetNull)
+
+  // Uniqueness for nullable container is enforced in TradeLineageService (PG NULL unique semantics).
+  @@index([purchaseOrderId])
+  @@index([shipmentWorkspaceId])
+  @@index([shipmentContainerId])
+  @@index([purchaseOrderLineId, shipmentWorkspaceId])
+  @@map("shipment_line_allocations")
 }
 
 // ── FreightIQ (Sprint 5A — freight coordination) ────────────────────────────
@@ -1554,7 +2418,9 @@ model PurchaseOrder {
   paymentTerms     String?   @map("payment_terms")
   deliveryTerms    String?   @map("delivery_terms")
   status           String
-  source           String    @default("auto")
+  source           PurchaseOrderSource @default(RFQ)
+  /// PRR-01 optimistic lock
+  version          Int       @default(1)
   documentUrl      String?   @map("document_url")
   documentFileName String?   @map("document_file_name")
   issuedAt         DateTime? @map("issued_at")
@@ -1566,13 +2432,19 @@ model PurchaseOrder {
   revisions        PurchaseOrderRevision[]
   acknowledgements PurchaseOrderAcknowledgement[]
   amendments       PurchaseOrderAmendment[]
+  commercialDocuments PurchaseOrderCommercialDocument[]
 
   @@index([organizationWorkspaceId])
   @@index([status])
+  @@index([source])
   @@index([buyerId])
   @@index([supplierId])
   @@index([poNumber])
   @@index([status, createdAt])
+  @@index([organizationWorkspaceId, status])
+  @@index([organizationWorkspaceId, source])
+  @@index([buyerId, createdAt])
+  @@index([supplierId, createdAt])
   @@map("purchase_orders")
 }
 
@@ -1584,12 +2456,121 @@ model PurchaseOrderLine {
   quantity        Decimal  @db.Decimal(18, 4)
   unitPrice       Decimal  @map("unit_price") @db.Decimal(18, 4)
   lineTotal       Decimal  @map("line_total") @db.Decimal(18, 4)
+  /// Sprint 36A — RFQ line → PO line lineage (nullable; never fabricated)
+  rfqLineItemId   String?  @map("rfq_line_item_id") @db.Uuid
+  quotationLineId String?  @map("quotation_line_id") @db.Uuid
+  /// Sprint 36B — optional Product Master reference (transaction snapshot stays on this row)
+  productId       String?  @map("product_id") @db.Uuid
   createdAt       DateTime @default(now()) @map("created_at")
 
-  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  purchaseOrder   PurchaseOrder            @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  rfqLineItem     RfqLineItem?             @relation(fields: [rfqLineItemId], references: [id], onDelete: SetNull)
+  quotationLine   QuotationLineItem?       @relation(fields: [quotationLineId], references: [id], onDelete: SetNull)
+  product         Product?                 @relation(fields: [productId], references: [id], onDelete: SetNull)
+  lineAllocations ShipmentLineAllocation[]
 
   @@index([purchaseOrderId])
+  @@index([rfqLineItemId])
+  @@index([quotationLineId])
+  @@index([productId])
   @@map("purchase_order_lines")
+}
+
+/// Sprint 36B — canonical Import Product Master (GLOBAL CORE identity; tenant-scoped).
+/// Distinct from MC CatalogProduct / BC BulkCatalogProduct channel catalogs.
+enum ProductClassificationStatus {
+  UNCLASSIFIED
+  CANDIDATE
+  VERIFIED
+}
+
+enum ProductClassificationSource {
+  USER_ENTERED
+  SUPPLIER_PROVIDED
+  HISTORICAL_IMPORT
+  CUSTOMS_BROKER_VERIFIED
+  /// Reserved for future assistance — Sprint 36B never auto-suggests GTİP.
+  SYSTEM_SUGGESTED
+}
+
+model Product {
+  id                String   @id @default(uuid()) @db.Uuid
+  organisationId    String   @map("organisation_id") @db.Uuid
+  sku               String
+  name              String
+  description       String?  @db.Text
+  /// Operational/customs-oriented description (manual; never AI-generated)
+  customsDescription String? @map("customs_description") @db.Text
+  manufacturer      String?
+  brand             String?
+  model             String?
+  unitOfMeasure     String   @default("PCS") @map("unit_of_measure")
+  netWeight         Decimal? @map("net_weight") @db.Decimal(18, 4)
+  grossWeight       Decimal? @map("gross_weight") @db.Decimal(18, 4)
+  weightUnit        String?  @default("KG") @map("weight_unit")
+  length            Decimal? @db.Decimal(18, 4)
+  width             Decimal? @db.Decimal(18, 4)
+  height            Decimal? @db.Decimal(18, 4)
+  dimensionUnit     String?  @default("CM") @map("dimension_unit")
+  /// Import metadata — NOT inferred from supplier country
+  countryOfOrigin   String?  @map("country_of_origin")
+  /// GTİP / tariff reference only — not a legal classification decision
+  gtipCode          String?  @map("gtip_code")
+  classificationStatus ProductClassificationStatus @default(UNCLASSIFIED) @map("classification_status")
+  classificationSource ProductClassificationSource? @map("classification_source")
+  classificationNotes  String? @map("classification_notes") @db.Text
+  classificationUpdatedAt DateTime? @map("classification_updated_at")
+  classificationUpdatedById String? @map("classification_updated_by_id") @db.Uuid
+  status            String   @default("ACTIVE")
+  createdById       String   @map("created_by_id") @db.Uuid
+  updatedById       String?  @map("updated_by_id") @db.Uuid
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  organisation       Organisation               @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  supplierReferences ProductSupplierReference[]
+  purchaseOrderLines PurchaseOrderLine[]
+  changeEvents       ProductChangeEvent[]
+
+  @@unique([organisationId, sku])
+  @@index([organisationId, name])
+  @@index([organisationId, countryOfOrigin])
+  @@index([organisationId, classificationStatus])
+  @@index([organisationId, gtipCode])
+  @@map("products")
+}
+
+model ProductSupplierReference {
+  id             String   @id @default(uuid()) @db.Uuid
+  productId      String   @map("product_id") @db.Uuid
+  supplierUserId String   @map("supplier_user_id") @db.Uuid
+  supplierSku    String?  @map("supplier_sku")
+  notes          String?  @db.Text
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, supplierUserId])
+  @@index([supplierUserId])
+  @@map("product_supplier_references")
+}
+
+/// Product-scoped change events for origin/GTİP auditability (not a second platform audit system).
+model ProductChangeEvent {
+  id          String   @id @default(uuid()) @db.Uuid
+  productId   String   @map("product_id") @db.Uuid
+  actorUserId String   @map("actor_user_id") @db.Uuid
+  field       String
+  fromValue   String?  @map("from_value") @db.Text
+  toValue     String?  @map("to_value") @db.Text
+  reason      String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, createdAt])
+  @@map("product_change_events")
 }
 
 model PurchaseOrderRevision {
@@ -1634,6 +2615,50 @@ model PurchaseOrderAmendment {
 
   @@index([purchaseOrderId, status])
   @@map("purchase_order_amendments")
+}
+
+// Sprint 29-02 — PO-scoped commercial document library (additive; aggregation also reads Order/Trade/Shipment).
+model PurchaseOrderCommercialDocument {
+  id               String    @id @default(uuid()) @db.Uuid
+  purchaseOrderId  String    @map("purchase_order_id") @db.Uuid
+  orderId          String?   @map("order_id") @db.Uuid
+  category         String
+  title            String?
+  description      String?   @db.Text
+  referenceNumber  String?   @map("reference_number")
+  documentDate     DateTime? @map("document_date") @db.Date
+  fileName         String    @map("file_name")
+  originalFileName String?   @map("original_file_name")
+  mimeType         String    @map("mime_type")
+  storageKey       String    @map("storage_key")
+  fileSizeBytes    Int       @map("file_size_bytes")
+  uploadedById     String    @map("uploaded_by_id") @db.Uuid
+  uploadedAt       DateTime  @default(now()) @map("uploaded_at")
+  replacedAt       DateTime? @map("replaced_at")
+  deletedAt        DateTime? @map("deleted_at")
+  previousStorageKey String? @map("previous_storage_key")
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  @@index([purchaseOrderId, deletedAt])
+  @@index([purchaseOrderId, category])
+  @@index([storageKey])
+  @@map("purchase_order_commercial_documents")
+}
+
+// Sprint 28 — staging uploads for Direct PO wizard (consumed on submission).
+model DirectPoDocumentUpload {
+  id            String    @id @default(uuid()) @db.Uuid
+  uploadedById  String    @map("uploaded_by_id") @db.Uuid
+  fileName      String    @map("file_name")
+  mimeType      String    @map("mime_type")
+  storageKey    String    @map("storage_key")
+  fileSizeBytes Int       @map("file_size_bytes")
+  consumedAt    DateTime? @map("consumed_at")
+  uploadedAt    DateTime  @default(now()) @map("uploaded_at")
+
+  @@index([uploadedById])
+  @@map("direct_po_document_uploads")
 }
 
 // ── Trade documents (Sprint 5C — compliance runtime) ─────────────────────────
@@ -1981,6 +3006,85 @@ model WhatsAppMessageStatus {
   @@map("whatsapp_message_statuses")
 }
 
+model WhatsAppBusinessConnection {
+  id                   String                           @id @default(uuid()) @db.Uuid
+  buyerId              String                           @unique @map("buyer_id") @db.Uuid
+  metaBusinessId       String?                          @map("meta_business_id")
+  wabaId               String                           @map("waba_id")
+  phoneNumberId        String                           @unique @map("phone_number_id")
+  displayPhoneNumber   String?                          @map("display_phone_number")
+  verifiedName         String?                          @map("verified_name")
+  encryptedAccessToken String                           @map("encrypted_access_token") @db.Text
+  tokenExpiresAt       DateTime?                        @map("token_expires_at")
+  status               WhatsAppBusinessConnectionStatus @default(PENDING)
+  connectedAt          DateTime?                        @map("connected_at")
+  disconnectedAt       DateTime?                        @map("disconnected_at")
+  lastHealthCheckAt    DateTime?                        @map("last_health_check_at")
+  lastErrorCode        String?                          @map("last_error_code")
+  lastErrorMessage     String?                          @map("last_error_message") @db.Text
+  createdAt            DateTime                         @default(now()) @map("created_at")
+  updatedAt            DateTime                         @updatedAt @map("updated_at")
+
+  buyer     User                         @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  templates WhatsAppConnectionTemplate[]
+  auditLogs WhatsAppConnectionAuditLog[]
+
+  @@index([status])
+  @@index([wabaId])
+  @@map("whatsapp_business_connections")
+}
+
+model WhatsAppConnectionTemplate {
+  id           String   @id @default(uuid()) @db.Uuid
+  connectionId String   @map("connection_id") @db.Uuid
+  templateName String   @map("template_name")
+  templateLanguage String @default("en") @map("template_language")
+  purpose      String   @default("RFQ_COLD_OUTREACH")
+  isDefault    Boolean  @default(false) @map("is_default")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  connection WhatsAppBusinessConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@unique([connectionId, templateName, templateLanguage])
+  @@index([connectionId, purpose, isDefault])
+  @@map("whatsapp_connection_templates")
+}
+
+model WhatsAppUnresolvedWebhookEvent {
+  id              String   @id @default(uuid()) @db.Uuid
+  phoneNumberId   String   @map("phone_number_id")
+  buyerId         String?  @map("buyer_id") @db.Uuid
+  supplierWaId    String?  @map("supplier_wa_id")
+  metaMessageId   String?  @unique @map("meta_message_id")
+  reason          String
+  payload         Json     @default("{}")
+  resolvedAt      DateTime? @map("resolved_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([phoneNumberId, createdAt])
+  @@index([buyerId, createdAt])
+  @@index([resolvedAt])
+  @@map("whatsapp_unresolved_webhook_events")
+}
+
+model WhatsAppConnectionAuditLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  connectionId String?  @map("connection_id") @db.Uuid
+  buyerId      String   @map("buyer_id") @db.Uuid
+  actorUserId  String?  @map("actor_user_id") @db.Uuid
+  actorRole    String?  @map("actor_role")
+  action       String
+  detail       Json     @default("{}")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  connection WhatsAppBusinessConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+
+  @@index([buyerId, createdAt])
+  @@index([action, createdAt])
+  @@map("whatsapp_connection_audit_logs")
+}
+
 model WorkspaceMention {
   id              String   @id @default(uuid()) @db.Uuid
   messageId       String   @map("message_id") @db.Uuid
@@ -2174,10 +3278,28 @@ model CatalogCategory {
 
   industry CatalogIndustry @relation(fields: [industryId], references: [id])
   products CatalogProduct[]
+  organisationInterests OrganisationCategoryInterest[]
 
   @@index([industryId, status, sortOrder])
   @@index([status, sortOrder])
   @@map("catalog_categories")
+}
+
+/// Sprint 30-01 — supplier org product interest areas (RFQ matching / invite suggestions).
+model OrganisationCategoryInterest {
+  id                 String   @id @default(uuid()) @db.Uuid
+  organisationId     String   @map("organisation_id") @db.Uuid
+  catalogCategoryId  String   @map("catalog_category_id") @db.Uuid
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  organisation    Organisation    @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  catalogCategory CatalogCategory @relation(fields: [catalogCategoryId], references: [id], onDelete: Cascade)
+
+  @@unique([organisationId, catalogCategoryId])
+  @@index([catalogCategoryId])
+  @@index([organisationId])
+  @@map("organisation_category_interests")
 }
 
 model CatalogProduct {
@@ -2262,6 +3384,8 @@ model MixedContainerDetails {
   assignedManagerId    String?   @map("assigned_manager_id") @db.Uuid
   activeOfferId        String?   @map("active_offer_id") @db.Uuid
   procurementStartedAt DateTime? @map("procurement_started_at")
+  orderGroupId         String?   @map("order_group_id") @db.Uuid
+  containerSequence    Int       @default(1) @map("container_sequence")
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @updatedAt @map("updated_at")
 
@@ -2273,6 +3397,7 @@ model MixedContainerDetails {
   @@index([pricingRequestedAt])
   @@index([organizationStatus])
   @@index([organizationStartedAt])
+  @@index([orderGroupId])
   @@map("mixed_container_details")
 }
 
@@ -2941,4 +4066,172 @@ model MessagingIdempotencyKey {
 
   @@index([expiresAt])
   @@map("messaging_idempotency_keys")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Workspace Academy — onboarding, contextual guides, checklist, help center.
+// Educational layer only: rows never influence commercial workflow state.
+// ═══════════════════════════════════════════════════════════════════════════
+
+model WorkspaceAcademyProfile {
+  id                         String    @id @default(uuid()) @db.Uuid
+  userId                     String    @unique @map("user_id") @db.Uuid
+  welcomeCompletedAt         DateTime? @map("welcome_completed_at")
+  welcomeDismissedAt         DateTime? @map("welcome_dismissed_at")
+  processOverviewCompletedAt DateTime? @map("process_overview_completed_at")
+  checklistDismissedAt       DateTime? @map("checklist_dismissed_at")
+  lastSeenAcademyVersion     Int       @default(1) @map("last_seen_academy_version")
+  lastAutomaticGuideId       String?   @map("last_automatic_guide_id")
+  lastAutomaticGuideAt       DateTime? @map("last_automatic_guide_at")
+  language                   String?
+  createdAt                  DateTime  @default(now()) @map("created_at")
+  updatedAt                  DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("workspace_academy_profiles")
+}
+
+model WorkspaceAcademyGuideProgress {
+  id            String    @id @default(uuid()) @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  guideId       String    @map("guide_id")
+  guideVersion  Int       @default(1) @map("guide_version")
+  status        String    @default("NOT_STARTED")
+  startedAt     DateTime? @map("started_at")
+  completedAt   DateTime? @map("completed_at")
+  dismissedAt   DateTime? @map("dismissed_at")
+  lastStepIndex Int       @default(0) @map("last_step_index")
+  displayCount  Int       @default(0) @map("display_count")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, guideId])
+  @@index([userId, status])
+  @@map("workspace_academy_guide_progress")
+}
+
+model WorkspaceAcademyTaskProgress {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  taskId           String    @map("task_id")
+  status           String    @default("AVAILABLE")
+  completedAt      DateTime? @map("completed_at")
+  completedByEvent String?   @map("completed_by_event")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, taskId])
+  @@index([userId, status])
+  @@map("workspace_academy_task_progress")
+}
+
+model WorkspaceAcademyArticleView {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  articleId     String   @map("article_id")
+  firstViewedAt DateTime @default(now()) @map("first_viewed_at")
+  lastViewedAt  DateTime @default(now()) @map("last_viewed_at")
+  viewCount     Int      @default(1) @map("view_count")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, articleId])
+  @@index([userId, lastViewedAt])
+  @@map("workspace_academy_article_views")
+}
+
+// ── SPR-30-08 — Operational Configuration (metadata only; future ops behavior) ─
+model OperationalSettings {
+  id                          String   @id @default(uuid()) @db.Uuid
+  /// Optimistic locking / config version (increments on every save)
+  version                     Int      @default(1)
+  riskAtRiskMinutes           Int      @default(1) @map("risk_at_risk_minutes")
+  riskDelayedMinutes          Int      @default(1440) @map("risk_delayed_minutes")
+  defaultEtaBufferHours       Int      @default(24) @map("default_eta_buffer_hours")
+  defaultIssueSeverity        String   @default("MEDIUM") @map("default_issue_severity")
+  defaultTaskPriority         String   @default("MEDIUM") @map("default_task_priority")
+  completionDocsRequired      Boolean  @default(false) @map("completion_docs_required")
+  updatedById                 String?  @map("updated_by_id") @db.Uuid
+  createdAt                   DateTime @default(now()) @map("created_at")
+  updatedAt                   DateTime @updatedAt @map("updated_at")
+
+  @@map("operational_settings")
+}
+
+model OperationalAutomationRule {
+  id          String    @id @default(uuid()) @db.Uuid
+  /// Stable event key, e.g. inspection.failed
+  key         String    @unique
+  name        String
+  description String?   @db.Text
+  enabled     Boolean   @default(true)
+  priority    Int       @default(100)
+  deletedAt   DateTime? @map("deleted_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([enabled, priority])
+  @@map("operational_automation_rules")
+}
+
+model OperationalTaskTemplate {
+  id                   String    @id @default(uuid()) @db.Uuid
+  name                 String
+  category             String    @default("GENERAL")
+  priority             String    @default("MEDIUM")
+  defaultAssigneeRole  String?   @map("default_assignee_role")
+  dueOffsetDays        Int       @default(3) @map("due_offset_days")
+  /// Links to automation rule key or task automation key (e.g. upload_bill_of_lading)
+  automationTrigger    String?   @map("automation_trigger")
+  description          String?   @db.Text
+  enabled              Boolean   @default(true)
+  version              Int       @default(1)
+  deletedAt            DateTime? @map("deleted_at")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  @@index([enabled])
+  @@index([automationTrigger])
+  @@map("operational_task_templates")
+}
+
+model OperationalMilestoneTemplate {
+  id                String    @id @default(uuid()) @db.Uuid
+  /// ShipmentMilestoneType value
+  type              String
+  name              String
+  sequence          Int
+  defaultOffsetDays Int       @default(0) @map("default_offset_days")
+  enabled           Boolean   @default(true)
+  required          Boolean   @default(true)
+  skipByDefault     Boolean   @default(false) @map("skip_by_default")
+  version           Int       @default(1)
+  deletedAt         DateTime? @map("deleted_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  @@unique([type])
+  @@index([enabled, sequence])
+  @@map("operational_milestone_templates")
+}
+
+model OperationalConfigAudit {
+  id          String   @id @default(uuid()) @db.Uuid
+  action      String
+  actorUserId String?  @map("actor_user_id") @db.Uuid
+  actorEmail  String?  @map("actor_email")
+  actorRole   String?  @map("actor_role")
+  entityType  String?  @map("entity_type")
+  entityId    String?  @map("entity_id")
+  payload     Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([action, createdAt])
+  @@index([entityType, entityId])
+  @@map("operational_config_audits")
 }

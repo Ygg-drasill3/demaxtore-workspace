@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import type { Role } from "@prisma/client";
 import { z } from "zod";
 import {
   ConfirmBookingPayload, AssignContainerPayload, PickupCargoPayload,
@@ -17,6 +18,22 @@ import { TradeActionGateway } from "../orchestration/trade-action.gateway.js";
 import { canAccessShipment } from "./shipment.policy.js";
 import { LinkTrackingPayload } from "@dmx/contracts/shipment-tracking.zod";
 import { ShipmentPortfolioQuery } from "@dmx/contracts/shipment-portfolio";
+import {
+  CancelShipmentBookingSchema,
+  CompleteShipmentMilestoneSchema,
+  CreateShipmentContainerSchema,
+  CreateShipmentMilestoneSchema,
+  ListDelayedShipmentsQuerySchema,
+  ListUpcomingMilestonesQuerySchema,
+  PatchShipmentContainerSchema,
+  PatchShipmentMilestoneSchema,
+  PatchShipmentStatusAliasSchema,
+  PatchShipmentWorkspaceSchema,
+  TransitionShipmentBookingSchema,
+  UpsertShipmentBookingSchema,
+} from "@dmx/contracts/shipment-workspace.zod";
+import { ShipmentWorkspaceOps } from "./shipment-workspace.ops.js";
+import { ShipmentMilestoneService } from "./shipment-milestone.service.js";
 import { prisma } from "../../db.js";
 import { AppError } from "../../utils/httpErrors.js";
 import { TrackingService } from "../tracking/tracking.service.js";
@@ -29,6 +46,8 @@ const service = new ShipmentService(prisma);
 const tradeGateway = new TradeActionGateway(prisma);
 const trackingService = new TrackingService(prisma);
 const portfolioService = new ShipmentPortfolioService(prisma);
+const ops = new ShipmentWorkspaceOps(prisma);
+const milestones = new ShipmentMilestoneService(prisma);
 
 const ActionEnvelope = z.object({ payload: z.record(z.unknown()).optional(), reason: z.string().optional() });
 
@@ -61,6 +80,11 @@ async function loadAccessible(req: Request) {
   if (!ws || ws.type !== "SHIPMENT") throw new AppError(404, "SHIPMENT_NOT_FOUND");
   if (!(await canAccessShipment(prisma, req.user!, ws.id))) throw new AppError(403, "FORBIDDEN");
   return ws;
+}
+
+function actorOf(req: Request) {
+  const user = req.user!;
+  return { id: user.id, email: user.email, role: user.role as Role };
 }
 
 function buildContext(ws: Awaited<ReturnType<typeof loadAccessible>>, user: { id: string; role: string }) {
@@ -141,6 +165,116 @@ export const shipmentController = {
   async syncTracking(req: Request, res: Response) {
     await loadAccessible(req);
     res.json(await trackingService.syncShipment(req.params.id));
+  },
+
+  async patch(req: Request, res: Response) {
+    const ws = await loadAccessible(req);
+    await ops.patchWorkspace(ws.id, actorOf(req), PatchShipmentWorkspaceSchema.parse(req.body));
+    res.json(await service.fetchDTO(ws.id, req.user!));
+  },
+
+  async upsertBooking(req: Request, res: Response) {
+    const ws = await loadAccessible(req);
+    await ops.upsertBooking(ws.id, actorOf(req), UpsertShipmentBookingSchema.parse(req.body));
+    res.json(await service.fetchDTO(ws.id, req.user!));
+  },
+
+  async cancelBooking(req: Request, res: Response) {
+    const ws = await loadAccessible(req);
+    await ops.cancelBooking(ws.id, actorOf(req), CancelShipmentBookingSchema.parse(req.body ?? {}));
+    res.json(await service.fetchDTO(ws.id, req.user!));
+  },
+
+  async transitionBooking(req: Request, res: Response) {
+    const ws = await loadAccessible(req);
+    await ops.transitionBooking(
+      ws.id,
+      actorOf(req),
+      TransitionShipmentBookingSchema.parse(req.body),
+    );
+    res.json(await service.fetchDTO(ws.id, req.user!));
+  },
+
+  /** Alias endpoint: a coarse status maps onto the shipment FSM action. */
+  async patchStatus(req: Request, res: Response) {
+    const body = PatchShipmentStatusAliasSchema.parse(req.body);
+    return shipmentController.action(ops.statusAliasAction(body.status))(req, res);
+  },
+
+  async listContainers(req: Request, res: Response) {
+    const ws = await loadAccessible(req);
+    res.json({ items: await ops.listContainers(ws.id) });
+  },
+
+  async addContainer(req: Request, res: Response) {
+    const ws = await loadAccessible(req);
+    res.status(201).json(
+      await ops.addContainer(ws.id, actorOf(req), CreateShipmentContainerSchema.parse(req.body)),
+    );
+  },
+
+  async patchContainer(req: Request, res: Response) {
+    const ws = await loadAccessible(req);
+    res.json(
+      await ops.patchContainer(
+        ws.id,
+        req.params.containerId,
+        actorOf(req),
+        PatchShipmentContainerSchema.parse(req.body),
+      ),
+    );
+  },
+
+  async removeContainer(req: Request, res: Response) {
+    const ws = await loadAccessible(req);
+    await ops.removeContainer(ws.id, req.params.containerId, actorOf(req));
+    res.status(204).end();
+  },
+
+  async listMilestones(req: Request, res: Response) {
+    res.json(await milestones.list(req.user!, req.params.id));
+  },
+
+  async createMilestone(req: Request, res: Response) {
+    res.status(201).json(
+      await milestones.create(req.user!, req.params.id, CreateShipmentMilestoneSchema.parse(req.body)),
+    );
+  },
+
+  async patchMilestone(req: Request, res: Response) {
+    res.json(
+      await milestones.patch(
+        req.user!,
+        req.params.id,
+        req.params.milestoneId,
+        PatchShipmentMilestoneSchema.parse(req.body),
+      ),
+    );
+  },
+
+  async completeMilestone(req: Request, res: Response) {
+    res.json(
+      await milestones.complete(
+        req.user!,
+        req.params.id,
+        req.params.milestoneId,
+        CompleteShipmentMilestoneSchema.parse(req.body ?? {}),
+      ),
+    );
+  },
+
+  async delayedShipments(req: Request, res: Response) {
+    res.json(await milestones.delayed(req.user!, ListDelayedShipmentsQuerySchema.parse(req.query)));
+  },
+
+  async upcomingMilestones(req: Request, res: Response) {
+    res.json(
+      await milestones.upcoming(req.user!, ListUpcomingMilestonesQuerySchema.parse(req.query)),
+    );
+  },
+
+  async milestoneDashboardSummary(req: Request, res: Response) {
+    res.json(await milestones.dashboardSummary(req.user!));
   },
 
   action(action: ShipmentAction) {

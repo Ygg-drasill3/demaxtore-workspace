@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import ConversationHubPanel from "@/features/conversation-hub/components/ConversationHubPanel";
+import { UnifiedConversationPanel } from "@/features/unified-messages/components/UnifiedConversationPanel";
+import type { ConversationContextType } from "@dmx/contracts/unified-messaging";
 import { passwordlessAccessApi } from "@/features/passwordless-access/lib/passwordless-access.api";
 import { useAuth } from "@/store/auth.store";
-import type { CommWorkspaceType } from "@dmx/contracts/workspace-communication";
 import { AlertTriangle, Loader2, MessageSquare } from "lucide-react";
 
 /**
@@ -53,10 +53,11 @@ export default function PasswordlessConversationPage() {
           You are viewing this workspace via a secure, time-limited link. You can read and reply in the conversation.
           Workspace approvals and settings require a full sign-in.
         </div>
-        <ConversationHubPanel
-          workspaceType={scope.workspaceType as CommWorkspaceType}
-          workspaceId={scope.workspaceId}
-          communicationOnly
+        <UnifiedConversationPanel
+          contextType={scope.workspaceType as ConversationContextType}
+          contextId={scope.workspaceId}
+          compact
+          allowInternalNote={false}
           testId="passwordless-conversation-hub"
         />
       </div>

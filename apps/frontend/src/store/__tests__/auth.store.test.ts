@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-const { postMock } = vi.hoisted(() => ({
+const { postMock, getMock } = vi.hoisted(() => ({
   postMock: vi.fn(),
+  getMock: vi.fn(),
 }));
 
 vi.mock("axios", () => ({
   default: {
-    create: vi.fn(() => ({ post: postMock })),
+    create: vi.fn(() => ({ post: postMock, get: getMock })),
   },
 }));
 
@@ -15,6 +16,7 @@ import { resetAuthHydrateFlight, useAuth } from "../auth.store";
 describe("useAuth.hydrate", () => {
   beforeEach(() => {
     postMock.mockReset();
+    getMock.mockReset();
     resetAuthHydrateFlight();
     localStorage.clear();
     sessionStorage.clear();
@@ -66,5 +68,29 @@ describe("useAuth.hydrate", () => {
 
     expect(useAuth.getState().status).toBe("unauthenticated");
     expect(useAuth.getState().user).toBeNull();
+  });
+
+  it("keeps login-static session when refresh fails but access token is valid (E2E-001)", async () => {
+    const user = {
+      id: "u1",
+      email: "admin@demaxtore.local",
+      displayName: "Admin",
+      role: "ADMIN" as const,
+      organisation: null,
+      avatarUrl: null,
+      createdAt: new Date().toISOString(),
+    };
+    useAuth.setState({ user, accessToken: "persisted-token", status: "idle" });
+
+    getMock.mockResolvedValueOnce({ data: user });
+    postMock.mockRejectedValueOnce(new Error("no refresh cookie"));
+
+    await useAuth.getState().hydrate();
+
+    expect(useAuth.getState().status).toBe("authenticated");
+    expect(useAuth.getState().accessToken).toBe("persisted-token");
+    expect(getMock).toHaveBeenCalledWith("/auth/me", {
+      headers: { Authorization: "Bearer persisted-token" },
+    });
   });
 });

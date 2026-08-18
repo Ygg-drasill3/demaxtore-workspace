@@ -53,6 +53,21 @@ describe("<WhatHappensNextCard />", () => {
     expect(screen.getByTestId("whn-future")).toHaveTextContent(/demaxtore is reviewing/i);
   });
 
+  it("substitutes award progress variables for PARTIALLY_AWARDED", () => {
+    renderWithProviders(
+      <WhatHappensNextCard
+        {...baseProps}
+        state="PARTIALLY_AWARDED"
+        vars={{ awardedLines: 1, totalLines: 3, openLines: 2, awardedSuppliers: 1, posIssued: 0 }}
+      />,
+    );
+    expect(screen.getByTestId("whn-past")).toHaveTextContent(/1 of 3 products awarded/i);
+    expect(screen.getByTestId("whn-stat-left")).toHaveTextContent(/1\/3 lines/);
+    expect(screen.getByTestId("whn-stat-right")).toHaveTextContent(/2 still open/);
+    expect(screen.getByTestId("whn-primary-cta-issue_supplier_po")).toHaveTextContent(/issue po/i);
+    expect(screen.getByTestId("whn-promoted-cta-close_rfq_awards")).toBeInTheDocument();
+  });
+
   it("substitutes template variables", () => {
     renderWithProviders(
       <WhatHappensNextCard
@@ -94,5 +109,40 @@ describe("<WhatHappensNextCard />", () => {
       <WhatHappensNextCard {...baseProps} state="REJECTED_BY_ADMIN" vars={{}} />,
     );
     expect(screen.getByTestId("what-happens-next")).toHaveAttribute("data-mood", "returned");
+  });
+
+  it("hides order workspace fallback when orderId is missing @ CLOSED", () => {
+    renderWithProviders(
+      <WhatHappensNextCard
+        {...baseProps}
+        state="CLOSED"
+        vars={{ orderId: null }}
+      />,
+    );
+    expect(screen.queryByTestId("whn-fallback-cta")).toBeNull();
+    expect(screen.getByTestId("whn-past")).toHaveTextContent(/rfq closed/i);
+  });
+
+  it("shows order workspace fallback when orderId is present @ CLOSED", () => {
+    renderWithProviders(
+      <WhatHappensNextCard
+        {...baseProps}
+        state="CLOSED"
+        vars={{ orderId: "ord-123" }}
+      />,
+    );
+    expect(screen.getByTestId("whn-fallback-cta")).toHaveTextContent(/open order workspace/i);
+  });
+
+  it("shows open order alongside Issue PO when orderId is present @ PARTIALLY_AWARDED", () => {
+    renderWithProviders(
+      <WhatHappensNextCard
+        {...baseProps}
+        state="PARTIALLY_AWARDED"
+        vars={{ orderId: "ord-123", awardedLines: 1, totalLines: 4, openLines: 3, awardedSuppliers: 1, posIssued: 1 }}
+      />,
+    );
+    expect(screen.getByTestId("whn-primary-cta-issue_supplier_po")).toHaveTextContent(/issue po/i);
+    expect(screen.getByTestId("whn-fallback-cta")).toHaveTextContent(/open order workspace/i);
   });
 });

@@ -35,7 +35,7 @@ function withEmbedQuery(
 function buildPanelEmbedUrl(
   next: string,
   token: string,
-  opts: { embed: string | null; compact: string | null },
+  opts: { embed: string | null; compact: string | null; refreshToken?: string | null },
 ): string {
   const qIdx = next.indexOf("?");
   const path = qIdx >= 0 ? next.slice(0, qIdx) : next;
@@ -43,6 +43,7 @@ function buildPanelEmbedUrl(
   if (opts.embed) destParams.set("embed", opts.embed);
   if (opts.compact) destParams.set("compact", opts.compact);
   destParams.set("cb_t", token);
+  if (opts.refreshToken) destParams.set("cb_rt", opts.refreshToken);
   const qs = destParams.toString();
   return `${PANEL_BASE}${path}?${qs}`;
 }
@@ -96,27 +97,33 @@ export const commoditybidSso: RequestHandler[] = [
     if (compact) bridgeParams.set("compact", compact);
     const bridgeUrl = `${PANEL_BASE}/auth/bridge?${bridgeParams.toString()}`;
 
+    // Prefer server-side token exchange + cb_t embed URL so the iframe does not
+    // depend on the client /auth/bridge hop (often blocked / races to sign-in).
     let embedUrl: string | null = null;
     try {
-      const bridgeRes = await fetchWithTimeout(`${API_BASE}/auth/bridge`, {
+      const bridgeRes = await fetchWithTimeout(`${API_BASE}/auth/workspace-sso`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sso }),
         timeoutMs: BRIDGE_TIMEOUT_MS,
       });
       if (bridgeRes.ok) {
-        const bridged = (await bridgeRes.json()) as { token?: string };
+        const bridged = (await bridgeRes.json()) as { token?: string; refreshToken?: string };
         if (bridged.token && next) {
-          embedUrl = buildPanelEmbedUrl(next, bridged.token, { embed, compact });
+          embedUrl = buildPanelEmbedUrl(next, bridged.token, {
+            embed,
+            compact,
+            refreshToken: bridged.refreshToken ?? null,
+          });
         }
       } else {
         logger.warn(
           { status: bridgeRes.status, apiBase: API_BASE },
-          "CommodityBid auth bridge returned non-OK status",
+          "CommodityBid workspace-sso returned non-OK status",
         );
       }
     } catch (err) {
-      logger.warn({ err, apiBase: API_BASE }, "CommodityBid auth bridge request failed or timed out");
+      logger.warn({ err, apiBase: API_BASE }, "CommodityBid workspace-sso request failed or timed out");
     }
 
     res.json({

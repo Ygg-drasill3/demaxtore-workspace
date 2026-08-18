@@ -60,6 +60,14 @@ export const rfqApi = {
   adminQueue:      ()  => api.get("/admin/rfq/queue").then(r => r.data),
   lookupSuppliers: (q: string) =>
     api.get("/admin/rfq/suppliers", { params: { q, limit: 50 } }).then((r) => normalizeSupplierLookup(r.data)),
+  getSupplierQuoteScope: (workspaceId: string, supplierUserId: string) =>
+    api.get<{
+      supplierUserId: string;
+      allowedQuoteLineItemIds: string[] | null;
+      remainingQuoteLineItemIds: string[] | null;
+      quotedLineItemIds: string[];
+      existingQuotationId: string | null;
+    }>(`/rfq/${workspaceId}/quotations/admin/scope/${supplierUserId}`).then((r) => r.data),
 
   selectProcurementStrategy: (id: string, input: SelectProcurementStrategyInput) =>
     api.post<RfqDTO>(`/rfq/${id}/procurement-strategy`, input).then((r) => r.data),
@@ -82,7 +90,7 @@ export function rfqAttachmentUrl(workspaceId: string, attachmentId: string): str
 function actionPath(a: RfqAction): string {
   return ACTION_PATHS[a] ?? a.replace(/_/g, "-");
 }
-const ACTION_PATHS: Record<RfqAction, string> = {
+const ACTION_PATHS: Partial<Record<RfqAction, string>> = {
   create_rfq: "create", edit_rfq_draft: "edit-draft",
   submit_rfq: "submit", withdraw_rfq: "withdraw", cancel_rfq: "cancel",
   revise_rejected_rfq: "revise-rejected",
@@ -103,4 +111,7 @@ const ACTION_PATHS: Record<RfqAction, string> = {
   issue_po: "issue-po",
   sync_order_closed: "sync-order-closed",
   add_observer: "add-observer", remove_observer: "remove-observer",
+  // These two do not follow the kebab-case fallback: the backend mounts them as
+  // `unpublish` and `set-state`, so omitting them here sends a 404.
+  unpublish_rfq: "unpublish", admin_set_state: "set-state",
 };

@@ -8,6 +8,7 @@ import { canAccessShipment } from "./shipment.policy.js";
 import { ShipmentService } from "./shipment.service.js";
 import { AppError } from "../../utils/httpErrors.js";
 import { writeStoredFile, storagePathFor } from "../../lib/file-storage.js";
+import { uploadLimiter } from "../../middleware/rate-limit.js";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 const uploadSingle = upload.single("file") as unknown as RequestHandler;
@@ -18,6 +19,7 @@ const router = Router({ mergeParams: true });
 router.post(
   "/",
   requireAuth,
+  uploadLimiter,
   uploadSingle,
   asyncHandler(async (req: Request, res: Response) => {
     const workspaceId = req.params.id;

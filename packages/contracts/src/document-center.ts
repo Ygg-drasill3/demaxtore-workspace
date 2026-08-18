@@ -37,10 +37,8 @@ export const DocumentCenterQuery = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(25),
   offset: z.coerce.number().int().min(0).default(0),
   status: z.enum(DocumentCenterStatus).optional(),
-  source: z.enum(DocumentCenterSource).optional(),
   documentType: z.string().optional(),
   tradeId: z.string().optional(),
-  rfqId: z.string().uuid().optional(),
   buyerId: z.string().uuid().optional(),
   supplierId: z.string().uuid().optional(),
   shipmentId: z.string().uuid().optional(),
@@ -48,6 +46,10 @@ export const DocumentCenterQuery = z.object({
   dateTo: z.string().optional(),
   uploadedBy: z.string().uuid().optional(),
   search: z.string().optional(),
+  // DocumentCenterPage renders both controls and sends these params, but `.parse()` strips
+  // unknown keys — so the filters looked active while the backend never applied them.
+  source: z.enum(DocumentCenterSource).optional(),
+  rfqId: z.string().uuid().optional(),
 });
 export type DocumentCenterQuery = z.infer<typeof DocumentCenterQuery>;
 
@@ -73,6 +75,9 @@ export interface DocumentCenterRow {
   relatedEntityType: string;
   relatedEntityId: string;
   relatedEntityRef: string;
+  poNumber: string | null;
+  poOrderId: string | null;
+  orderWorkspaceUrl: string | null;
   buyerName: string | null;
   supplierName: string | null;
   shipmentRef: string | null;

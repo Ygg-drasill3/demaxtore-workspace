@@ -11,7 +11,7 @@ export async function scanPurchaseOrderAlerts(db: PrismaClient): Promise<number>
 
   const noAck = await db.purchaseOrder.findMany({
     where: {
-      status: "ISSUED",
+      status: "SUBMITTED",
       issuedAt: { lte: cutoff },
     },
     take: 50,

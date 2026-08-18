@@ -50,6 +50,7 @@ export function LanguageSwitcher({
       {btn("tr", "TR")}
       {btn("en", "EN")}
       {btn("fr", "FR")}
+      {btn("ar", "AR")}
     </div>
   );
 }

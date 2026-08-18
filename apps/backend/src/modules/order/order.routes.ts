@@ -3,6 +3,9 @@ import { requireAuth } from "../../middleware/auth.js";
 import { asyncHandler } from "../../middleware/asyncHandler.js";
 import { orderController } from "./order.controller.js";
 import { purchaseOrderController } from "../purchase-order/purchase-order.controller.js";
+import { inspectionController } from "../inspection/inspection.controller.js";
+import { operationalIssueController } from "../operational-issue/operational-issue.controller.js";
+import { operationalTaskController } from "../operational-task/operational-task.controller.js";
 
 export const orderRouter = Router();
 
@@ -14,6 +17,12 @@ orderRouter.get("/:id/documents", requireAuth, asyncHandler(orderController.docu
 orderRouter.get("/:id/status-updates", requireAuth, asyncHandler(orderController.statusUpdates));
 orderRouter.get("/:id/next-actions", requireAuth, asyncHandler(orderController.nextActions));
 orderRouter.get("/:id/spawned-shipments", requireAuth, asyncHandler(orderController.spawnedShipments));
+
+// Order-scoped views of the operational modules. The handlers live with their own
+// module but are only reachable here, since the collections are keyed by order.
+orderRouter.get("/:id/tasks", requireAuth, asyncHandler(operationalTaskController.listForOrder));
+orderRouter.get("/:id/issues", requireAuth, asyncHandler(operationalIssueController.listForOrder));
+orderRouter.get("/:id/inspections", requireAuth, asyncHandler(inspectionController.listForOrder));
 
 orderRouter.post("/:id/actions/supplier-confirm-order", requireAuth, asyncHandler(orderController.action("supplier_confirm_order")));
 orderRouter.post("/:id/actions/start-production", requireAuth, asyncHandler(orderController.action("start_production")));

@@ -115,10 +115,28 @@ export class PhoneVerificationService {
     }
     const phone = normalizePhoneInput(input.phone);
 
+    const user = await this.db.user.findUniqueOrThrow({
+      where: { id: actor.id },
+      select: { phoneNumber: true, phoneVerificationStatus: true },
+    });
+
+    if (user.phoneNumber === phone && user.phoneVerificationStatus === PHONE_VERIFIED) {
+      const approved = await this.db.phoneVerificationRequest.findFirst({
+        where: { userId: actor.id, status: "APPROVED", phone },
+        orderBy: { approvedAt: "desc" },
+        include: { user: { include: { organisation: { select: { name: true } } } } },
+      });
+      if (approved) return mapRequest(approved);
+    }
+
     const existingPending = await this.db.phoneVerificationRequest.findFirst({
       where: { userId: actor.id, status: "PENDING" },
+      include: { user: { include: { organisation: { select: { name: true } } } } },
     });
-    if (existingPending) throw Validation("A phone verification request is already pending");
+    if (existingPending) {
+      if (existingPending.phone === phone) return mapRequest(existingPending);
+      throw Validation("A phone verification request is already pending");
+    }
 
     const row = await this.db.$transaction(async (tx) => {
       await tx.user.update({

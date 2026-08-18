@@ -1,0 +1,40 @@
+{
+  "marker": "MVP-UI17-R4-20260814-M3Q8",
+  "sku": "FLOUR-UI17R4-M3Q8",
+  "startedAt": "2026-08-14T15:27:39.595Z",
+  "stages": [
+    {
+      "name": "BUYER_LOGIN",
+      "result": "PASS",
+      "note": "https://workspace.demaxtore.com/buyer/control-tower",
+      "at": "2026-08-14T15:27:41.394Z"
+    },
+    {
+      "name": "PRODUCT_CREATION",
+      "result": "PASS",
+      "note": "FLOUR-UI17R4-M3Q8",
+      "at": "2026-08-14T15:27:47.479Z"
+    },
+    {
+      "name": "R4_ABORT",
+      "result": "DEAD END",
+      "note": "locator.fill: Error: strict mode violation: getByTestId('product-search-select-input') resolved to 4 elements:\n    1) <input value=\"\" class=\"dmx-input text-xs\" placeholder=\"Search products…\" data-testid=\"product-search-select-input\"/> aka getByRole('textbox', { name: 'Search products…' })\n    2) <input value=\"\" class=\"dmx-input text-xs\" placeholder=\"Search products…\" data-testid=\"product-search-select-input\"/> aka getByRole('table').getByLabel('Product', { exact: true })\n    3) <input value=\"\" class=\"dmx-input text-xs\" placeholder=\"Search products…\" data-testid=\"product-search-select-input\"/> aka getByTestId('product-search-select-input').nth(2)\n    4) <input value=\"\" class=\"dmx-input text-xs\" placeholder=\"Search products…\" data-testid=\"product-search-select-input\"/> aka getByTestId('product-search-select-input').nth(3)\n\nCall log:\n  - waiting for getByTestId('product-search-select-input')\n",
+      "at": "2026-08-14T15:27:51.914Z"
+    }
+  ],
+  "entities": {
+    "productSku": "FLOUR-UI17R4-M3Q8"
+  },
+  "errors": [],
+  "network5xx": 0,
+  "blocker": {
+    "stage": "UNHANDLED",
+    "note": "locator.fill: Error: strict mode violation: getByTestId('product-search-select-input') resolved to 4 elements:\n    1) <input value=\"\" class=\"dmx-input text-xs\" placeholder=\"Search products…\" data-testid=\"product-search-select-input\"/> aka getByRole('textbox', { name: 'Search products…' })\n    2) <input value=\"\" class=\"dmx-input text-xs\" placeholder=\"Search products…\" data-testid=\"product-search-select-input\"/> aka getByRole('table').getByLabel('Product', { exact: true })\n    3) <input value=\"\" class=\"dmx-input text-xs\" placeholder=\"Search products…\" data-testid=\"product-search-select-input\"/> aka getByTestId('product-search-select-input').nth(2)\n    4) <input value=\"\" class=\"dmx-input text-xs\" placeholder=\"Search products…\" data-testid=\"product-search-select-input\"/> aka getByTestId('product-search-select-input').nth(3)\n\nCall log:\n  - waiting for getByTestId('product-search-select-input')\n",
+    "kind": "PRODUCT"
+  },
+  "completedAt": "2026-08-14T15:27:51.916Z",
+  "verdict": {
+    "controlledPaidPilot": "PENDING",
+    "selfService": "PENDING"
+  }
+}

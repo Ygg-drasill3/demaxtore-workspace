@@ -8,6 +8,8 @@ export type MixedContainerState =
   | "MC_OFFER_READY"
   | "MC_BUYER_REVIEW"
   | "MC_APPROVED"
+  // Sprint 12D/12E — post-approval execution lifecycle. `mcStateToProcurementStatus`
+  // already mapped these states; only this FSM was left behind.
   | "MC_ALLOCATION_IN_PROGRESS"
   | "MC_PROFORMA_PENDING"
   | "MC_PAYMENT_TRACKING"
@@ -35,6 +37,8 @@ export type MixedContainerAction =
   | "expire_offer"
   | "regenerate_offer"
   | "resume_procurement"
+  // Sprint 12D/12E — post-approval execution lifecycle.
+  | "begin_organization"
   | "start_allocation"
   | "create_allocation"
   | "complete_allocations"
@@ -82,20 +86,27 @@ export const MC_TRANSITIONS: MixedContainerTransition[] = [
   { from: "MC_BUYER_REVIEW", to: "MC_APPROVED", action: "approve_offer", allowedRoles: ["BUYER"], auditEvent: "mixed_container.offer_approved" },
   { from: "MC_BUYER_REVIEW", to: "MC_REVISION_REQUESTED", action: "request_revision", allowedRoles: ["BUYER"], auditEvent: "mixed_container.revision_requested" },
   { from: "MC_BUYER_REVIEW", to: "MC_EXPIRED", action: "expire_offer", allowedRoles: ["ADMIN", "SYSTEM"], auditEvent: "mixed_container.offer_expired" },
-  // Sprint 12D — allocation, proforma & payment coordination
+  // Sprint 12D/12E — post-approval execution. Roles mirror the guards in the services.
+  // `begin_organization` is a self-loop, not a forward move: the organization layer is
+  // tracked on `mixedContainerDetails.organizationStatus`, and `startAllocation` still
+  // expects to run from MC_APPROVED.
+  { from: "MC_APPROVED", to: "MC_APPROVED", action: "begin_organization", allowedRoles: ["ADMIN", "SYSTEM"], auditEvent: "mixed_container.organization_started" },
   { from: "MC_APPROVED", to: "MC_ALLOCATION_IN_PROGRESS", action: "start_allocation", allowedRoles: ["ADMIN"], auditEvent: "mixed_container.allocation_started" },
+  { from: "MC_EXECUTION_READY", to: "MC_ALLOCATION_IN_PROGRESS", action: "start_allocation", allowedRoles: ["ADMIN"], auditEvent: "mixed_container.allocation_started" },
   { from: "MC_ALLOCATION_IN_PROGRESS", to: "MC_ALLOCATION_IN_PROGRESS", action: "create_allocation", allowedRoles: ["ADMIN"], auditEvent: "mixed_container.allocation_created" },
   { from: "MC_ALLOCATION_IN_PROGRESS", to: "MC_PROFORMA_PENDING", action: "complete_allocations", allowedRoles: ["ADMIN"], auditEvent: "mixed_container.allocations_completed" },
   { from: "MC_PROFORMA_PENDING", to: "MC_PROFORMA_PENDING", action: "upload_proforma", allowedRoles: ["ADMIN"], auditEvent: "mixed_container.proforma_uploaded" },
   { from: "MC_PROFORMA_PENDING", to: "MC_PAYMENT_TRACKING", action: "begin_payment_tracking", allowedRoles: ["ADMIN", "SYSTEM"], auditEvent: "mixed_container.payment_tracking_started" },
+  // BUYER is intentional: `updatePayment` lets a buyer set PAYMENT_SENT and rejects any
+  // other status from them.
   { from: "MC_PAYMENT_TRACKING", to: "MC_PAYMENT_TRACKING", action: "record_payment_sent", allowedRoles: ["BUYER", "ADMIN"], auditEvent: "mixed_container.payment_sent" },
   { from: "MC_PAYMENT_TRACKING", to: "MC_PAYMENT_TRACKING", action: "confirm_payment", allowedRoles: ["ADMIN"], auditEvent: "mixed_container.payment_confirmed" },
-  { from: "MC_PAYMENT_TRACKING", to: "MC_EXECUTION_READY", action: "mark_execution_ready", allowedRoles: ["ADMIN", "SYSTEM"], auditEvent: "smartcontainer.execution_ready" },
-  // Sprint 12E — execution bridge into Trade OS
+  { from: "MC_PAYMENT_TRACKING", to: "MC_EXECUTION_READY", action: "mark_execution_ready", allowedRoles: ["ADMIN", "SYSTEM"], auditEvent: "mixed_container.execution_ready" },
   { from: "MC_EXECUTION_READY", to: "MC_EXECUTION_ACTIVE", action: "spawn_execution_orders", allowedRoles: ["ADMIN", "SYSTEM"], auditEvent: "smartcontainer.order_spawned" },
   { from: "MC_EXECUTION_ACTIVE", to: "MC_EXECUTION_COMPLETE", action: "mark_execution_complete", allowedRoles: ["ADMIN", "SYSTEM"], auditEvent: "smartcontainer.execution_completed" },
 ];
 
+// MC_APPROVED is no longer the end of the line — execution continues past it.
 export const MC_TERMINAL_STATES: MixedContainerState[] = ["MC_EXECUTION_COMPLETE", "MC_CANCELLED"];
 
 export const MC_OFFER_VALIDITY_HOURS = 72;

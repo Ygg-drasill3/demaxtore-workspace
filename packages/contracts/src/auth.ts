@@ -2,6 +2,7 @@
 // @dmx/contracts — Auth contracts
 // =============================================================================
 import { z } from "zod";
+import { BuyerOperatingModelEnum } from "./buyer-operating-model.js";
 
 export type Role =
   | "BUYER"
@@ -13,7 +14,10 @@ export type Role =
   | "LOGISTICS_OPERATOR"
   | "FINANCE_OPERATOR"
   | "DOCUMENT_CONTROLLER"
-  | "FORWARDER";
+  | "FORWARDER"
+  | "ORIGIN_AGENT"
+  | "TRUCKER"
+  | "CUSTOMS_BROKER";
 
 export const RoleEnum = z.enum([
   "BUYER",
@@ -26,6 +30,9 @@ export const RoleEnum = z.enum([
   "FINANCE_OPERATOR",
   "DOCUMENT_CONTROLLER",
   "FORWARDER",
+  "ORIGIN_AGENT",
+  "TRUCKER",
+  "CUSTOMS_BROKER",
 ]);
 
 export const LoginInput = z.object({
@@ -67,6 +74,8 @@ export const UserDTO = z.object({
     .nullable()
     .optional(),
   createdAt:    z.string().datetime(),
+  /** Organisation-level commercial profile. Missing ⇒ International. */
+  buyerOperatingModel: BuyerOperatingModelEnum.optional(),
 });
 export type UserDTO = z.infer<typeof UserDTO>;
 
@@ -90,6 +99,9 @@ export const ROLE_DASHBOARD: Record<Role, string> = {
   FINANCE_OPERATOR:   "/operations",
   DOCUMENT_CONTROLLER:"/admin/dashboard",
   FORWARDER:          "/forwarder/dashboard",
+  ORIGIN_AGENT:       "/partner",
+  TRUCKER:            "/partner",
+  CUSTOMS_BROKER:     "/partner",
 };
 
 /** Roles with access to operations console routes (/operations/*). */
@@ -104,3 +116,11 @@ export const OPERATIONS_PLATFORM_ROLES = [
 
 /** Roles with full admin platform access (/admin/* destructive controls). */
 export const ADMIN_PLATFORM_ROLES = ["ADMIN", "SUPER_ADMIN"] as const satisfies readonly Role[];
+
+
+export const UpdateProfileInput = z.object({
+  displayName: z.string().trim().min(2).max(120).optional(),
+  phoneNumber: z.string().trim().min(8).max(20).optional().nullable(),
+  avatarUrl: z.string().url().optional().nullable(),
+});
+export type UpdateProfileInput = z.infer<typeof UpdateProfileInput>;

@@ -85,6 +85,10 @@ export async function resolveRecipients(
 }
 
 // Minimal i18n shim — production code wires this to a real locale catalogue.
+export function notificationMeta(key: string, ref: string): { title: string; message: string } {
+  return { title: titleFor(key, ref), message: messageFor(key, ref) };
+}
+
 function titleFor(key: string, ref: string): string {
   return TITLE_MAP[key]?.replace("{ref}", ref) ?? key;
 }
@@ -99,6 +103,7 @@ const TITLE_MAP: Record<string, string> = {
   "rfq.suppliers.assigned.supplier": "You've been assigned to RFQ {ref}",
   "rfq.suppliers.assigned.buyer":    "Suppliers assigned to your RFQ",
   "rfq.suppliers.added":             "Additional suppliers added to RFQ {ref}",
+  "rfq.supplier_scope.expanded":     "Additional products added to your quote scope for {ref}",
   "rfq.published":                   "RFQ is now open for quotations: {ref}",
   "rfq.deadline.extended":           "RFQ deadline extended: {ref}",
   "rfq.quotations.closed":           "Quotation period closed: {ref}",

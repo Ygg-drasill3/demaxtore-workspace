@@ -1,0 +1,253 @@
+{
+  "at": "2026-08-17T07:44:45.022Z",
+  "base": "https://workspace.demaxtore.com",
+  "screens": [
+    {
+      "role": "BUYER",
+      "route": "/buyer/dashboard",
+      "label": "buyer-dashboard",
+      "status": "PASS",
+      "notes": []
+    },
+    {
+      "role": "BUYER",
+      "route": "/buyer/products",
+      "label": "product-list",
+      "status": "PASS",
+      "notes": []
+    },
+    {
+      "role": "BUYER",
+      "route": "/buyer/products/b5748ad0-ba1d-4c7f-9402-3352c41ba606",
+      "label": "product-detail",
+      "status": "PASS",
+      "notes": []
+    },
+    {
+      "role": "BUYER",
+      "route": "/buyer/purchase-orders",
+      "label": "po-list",
+      "status": "PASS",
+      "notes": []
+    },
+    {
+      "role": "BUYER",
+      "route": "/workspace/purchase-order/32ce9003-af7e-438e-aa21-0848c8e338c1",
+      "label": "po-workspace",
+      "status": "PASS",
+      "notes": []
+    },
+    {
+      "role": "BUYER",
+      "route": "/buyer/shipments",
+      "label": "shipments-list",
+      "status": "PASS",
+      "notes": []
+    },
+    {
+      "role": "BUYER",
+      "route": "/workspace/shipment/9f1c326a-97ad-4937-a200-09e628251070",
+      "label": "shipment-workspace",
+      "status": "PASS",
+      "notes": []
+    },
+    {
+      "role": "BUYER",
+      "route": "/buyer/customs/8a96c974-700e-40ba-9db0-0b331f7d4583",
+      "label": "customs-case",
+      "status": "PASS",
+      "notes": []
+    },
+    {
+      "role": "BUYER",
+      "route": "/buyer/inland/5110057f-904d-4219-95e3-689aa6cf701c",
+      "label": "inland-delivery",
+      "status": "PASS",
+      "notes": []
+    },
+    {
+      "role": "BUYER",
+      "route": "/buyer/landed-cost",
+      "label": "landed-cost-list",
+      "status": "PASS",
+      "notes": []
+    },
+    {
+      "role": "BUYER",
+      "route": "/buyer/landed-cost/54bd93ab-cdd8-4da7-8dc5-8bea6c08a93c",
+      "label": "landed-cost-detail",
+      "status": "PASS",
+      "notes": []
+    },
+    {
+      "role": "BUYER",
+      "route": "/buyer/trade-documents",
+      "label": "trade-documents",
+      "status": "PASS",
+      "notes": []
+    },
+    {
+      "role": "CUSTOMS_BROKER",
+      "route": "/partner",
+      "label": "partner-home",
+      "status": "PASS",
+      "notes": []
+    },
+    {
+      "role": "CUSTOMS_BROKER",
+      "route": "/partner/customs",
+      "label": "my-customs-cases",
+      "status": "PASS",
+      "notes": []
+    },
+    {
+      "role": "CUSTOMS_BROKER",
+      "route": "/partner/customs/8a96c974-700e-40ba-9db0-0b331f7d4583",
+      "label": "customs-case-exec",
+      "status": "PASS",
+      "notes": []
+    },
+    {
+      "role": "TRUCKER",
+      "route": "/partner",
+      "label": "partner-home",
+      "status": "PASS",
+      "notes": []
+    },
+    {
+      "role": "TRUCKER",
+      "route": "/partner/inland",
+      "label": "my-deliveries",
+      "status": "PASS",
+      "notes": []
+    },
+    {
+      "role": "TRUCKER",
+      "route": "/partner/inland/5110057f-904d-4219-95e3-689aa6cf701c",
+      "label": "delivery-exec",
+      "status": "PASS",
+      "notes": []
+    },
+    {
+      "role": "SUPPLIER",
+      "route": "/supplier/dashboard",
+      "label": "supplier-dashboard",
+      "status": "PASS",
+      "notes": []
+    },
+    {
+      "role": "SUPPLIER",
+      "route": "/supplier/orders",
+      "label": "supplier-orders",
+      "status": "PASS",
+      "notes": []
+    },
+    {
+      "role": "ORIGIN_AGENT",
+      "route": "/partner",
+      "label": "partner-home",
+      "status": "PASS",
+      "notes": []
+    },
+    {
+      "role": "ADMIN",
+      "route": "/admin/dashboard",
+      "label": "admin-dashboard",
+      "status": "PASS",
+      "notes": []
+    },
+    {
+      "role": "ADMIN",
+      "route": "/operations",
+      "label": "operations-center",
+      "status": "PASS",
+      "notes": []
+    },
+    {
+      "role": "ADMIN",
+      "route": "/workspace/shipment/9f1c326a-97ad-4937-a200-09e628251070",
+      "label": "admin-shipment",
+      "status": "PASS",
+      "notes": []
+    }
+  ],
+  "findings": [
+    {
+      "severity": "P0",
+      "code": "FORBIDDEN_TEXT",
+      "msg": "Forbidden pattern /shipment\\.[a-z]+\\.[a-z]+/ on shipment-workspace",
+      "url": "https://workspace.demaxtore.com/workspace/shipment/9f1c326a-97ad-4937-a200-09e628251070",
+      "role": "BUYER"
+    },
+    {
+      "severity": "P2",
+      "code": "RAW_ENUM",
+      "msg": "Raw enum \"PROOF_OF_DELIVERY\" visible on shipment-workspace",
+      "url": "https://workspace.demaxtore.com/workspace/shipment/9f1c326a-97ad-4937-a200-09e628251070",
+      "role": "BUYER"
+    },
+    {
+      "severity": "P2",
+      "code": "RAW_ENUM",
+      "msg": "Raw enum \"READY_FOR_BROKER\" visible on customs-case",
+      "url": "https://workspace.demaxtore.com/buyer/customs/8a96c974-700e-40ba-9db0-0b331f7d4583",
+      "role": "BUYER"
+    },
+    {
+      "severity": "P2",
+      "code": "RAW_ENUM",
+      "msg": "Raw enum \"PROOF_OF_DELIVERY\" visible on inland-delivery",
+      "url": "https://workspace.demaxtore.com/buyer/inland/5110057f-904d-4219-95e3-689aa6cf701c",
+      "role": "BUYER"
+    },
+    {
+      "severity": "P1",
+      "code": "TLC_NAV",
+      "msg": "True Landed Cost not in buyer sidebar navigation",
+      "role": "BUYER"
+    },
+    {
+      "severity": "P2",
+      "code": "RAW_ENUM",
+      "msg": "Raw enum \"READY_FOR_BROKER\" visible on customs-case-exec",
+      "url": "https://workspace.demaxtore.com/partner/customs/8a96c974-700e-40ba-9db0-0b331f7d4583",
+      "role": "CUSTOMS_BROKER"
+    },
+    {
+      "severity": "P2",
+      "code": "RAW_ENUM",
+      "msg": "Raw enum \"PROOF_OF_DELIVERY\" visible on delivery-exec",
+      "url": "https://workspace.demaxtore.com/partner/inland/5110057f-904d-4219-95e3-689aa6cf701c",
+      "role": "TRUCKER"
+    },
+    {
+      "severity": "P0",
+      "code": "FORBIDDEN_TEXT",
+      "msg": "Forbidden pattern /shipment\\.[a-z]+\\.[a-z]+/ on admin-shipment",
+      "url": "https://workspace.demaxtore.com/workspace/shipment/9f1c326a-97ad-4937-a200-09e628251070",
+      "role": "ADMIN"
+    },
+    {
+      "severity": "P2",
+      "code": "RAW_ENUM",
+      "msg": "Raw enum \"PROOF_OF_DELIVERY\" visible on admin-shipment",
+      "url": "https://workspace.demaxtore.com/workspace/shipment/9f1c326a-97ad-4937-a200-09e628251070",
+      "role": "ADMIN"
+    }
+  ],
+  "consoleErrors": [],
+  "network": {
+    "s5xx": 0,
+    "unexpected404": [],
+    "unexpected403": []
+  },
+  "counts": {
+    "flowBreakingConsole": 0,
+    "ui404": 0,
+    "ui403": 0,
+    "s5xx": 0,
+    "newP0": 2,
+    "newP1": 1,
+    "newP2": 6
+  }
+}

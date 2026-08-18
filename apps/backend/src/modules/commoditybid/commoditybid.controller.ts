@@ -14,6 +14,7 @@ import { canAccessCommodityBid, canViewSupplierIdentity } from "./commoditybid.p
 import { prisma } from "../../db.js";
 import { toActorRole } from "../../types/auth-user.js";
 import { AppError } from "../../utils/httpErrors.js";
+import { looksLikeUuid } from "../../lib/resolve-rfq-ref.js";
 
 const service = new CommodityBidService(prisma);
 const rfqService = new RfqService(prisma);
@@ -32,8 +33,10 @@ const PAYLOAD_SCHEMAS: Partial<Record<CommodityBidAction, z.ZodTypeAny>> = {
 };
 
 async function loadAccessible(req: Request) {
+  const id = req.params.id;
+  if (!id || !looksLikeUuid(id)) throw new AppError(404, "COMMODITYBID_NOT_FOUND");
   const ws = await prisma.workspace.findUnique({
-    where: { id: req.params.id },
+    where: { id },
     include: {
       commodityBidDetails: true,
       commodityBidLots: true,

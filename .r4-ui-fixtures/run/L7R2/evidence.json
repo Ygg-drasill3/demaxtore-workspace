@@ -1,0 +1,192 @@
+{
+  "marker": "MVP-UI17-R4-20260814-L7R2",
+  "sku": "FLOUR-UI17R4-L7R2",
+  "startedAt": "2026-08-14T15:44:07.051Z",
+  "stages": [
+    {
+      "name": "BUYER_LOGIN",
+      "result": "PASS",
+      "note": "https://workspace.demaxtore.com/buyer/control-tower",
+      "at": "2026-08-14T15:44:08.451Z"
+    },
+    {
+      "name": "PRODUCT_CREATION",
+      "result": "PASS",
+      "note": "FLOUR-UI17R4-L7R2",
+      "at": "2026-08-14T15:44:14.348Z"
+    },
+    {
+      "name": "DIRECT_PO",
+      "result": "PASS",
+      "note": "PO-MST4AV8L-68D8EC39",
+      "at": "2026-08-14T15:44:20.310Z"
+    },
+    {
+      "name": "PRODUCT_TO_PO",
+      "result": "PASS",
+      "note": "https://workspace.demaxtore.com/workspace/order/0cf235e1-81a7-4846-9e3a-e6bf124dfd67",
+      "at": "2026-08-14T15:44:21.232Z"
+    },
+    {
+      "name": "DEPOSIT_CONFIRMATION",
+      "result": "PASS",
+      "note": "Admin recorded DEPOSIT_PAID",
+      "at": "2026-08-14T15:44:24.732Z"
+    },
+    {
+      "name": "FREIGHT_REQUEST",
+      "result": "PASS",
+      "note": "Admin created freight request",
+      "at": "2026-08-14T15:44:58.541Z"
+    },
+    {
+      "name": "FREIGHT_OFFER",
+      "result": "PASS",
+      "note": "2100 USD offer published",
+      "at": "2026-08-14T15:45:33.826Z"
+    },
+    {
+      "name": "OFFER_SELECTION",
+      "result": "PASS",
+      "note": "",
+      "at": "2026-08-14T15:45:42.518Z"
+    },
+    {
+      "name": "OFFER_TO_BOOKING",
+      "result": "PASS",
+      "note": "",
+      "at": "2026-08-14T15:45:44.657Z"
+    },
+    {
+      "name": "BOOKING_TO_SHIPMENT",
+      "result": "PASS",
+      "note": "https://workspace.demaxtore.com/workspace/shipment/ed92e25f-f212-4522-a95e-77dde7c5c193",
+      "at": "2026-08-14T15:45:46.833Z"
+    },
+    {
+      "name": "BOOKING_LIFECYCLE",
+      "result": "PASS",
+      "note": "MSCBK-R4-L7R2",
+      "at": "2026-08-14T15:45:51.768Z"
+    },
+    {
+      "name": "LINE_ALLOCATION",
+      "result": "PASS",
+      "note": "90 PCS",
+      "at": "2026-08-14T15:45:53.447Z"
+    },
+    {
+      "name": "CONTAINER",
+      "result": "PASS",
+      "note": "MSKU17R4L7R2",
+      "at": "2026-08-14T15:45:55.327Z"
+    },
+    {
+      "name": "TRACKING",
+      "result": "PASS",
+      "note": "",
+      "at": "2026-08-14T15:45:55.333Z"
+    },
+    {
+      "name": "SHIPMENT_TO_CUSTOMS",
+      "result": "PASS",
+      "note": "",
+      "at": "2026-08-14T15:45:58.736Z"
+    },
+    {
+      "name": "BROKER_ASSIGNMENT",
+      "result": "PASS",
+      "note": "",
+      "at": "2026-08-14T15:46:02.534Z"
+    },
+    {
+      "name": "DOCUMENT_READINESS",
+      "result": "PASS",
+      "note": "Trade docs uploaded via UI",
+      "at": "2026-08-14T15:46:07.693Z"
+    },
+    {
+      "name": "BROKER_CASE_DISCOVERY",
+      "result": "PASS",
+      "note": "",
+      "at": "2026-08-14T15:46:10.691Z"
+    },
+    {
+      "name": "BROKER_EXECUTION",
+      "result": "PASS",
+      "note": "Start review",
+      "at": "2026-08-14T15:46:13.145Z"
+    },
+    {
+      "name": "GTIP_VERIFICATION",
+      "result": "PASS",
+      "note": "",
+      "at": "2026-08-14T15:46:14.866Z"
+    },
+    {
+      "name": "DUTY_TAX",
+      "result": "PASS",
+      "note": "",
+      "at": "2026-08-14T15:46:17.070Z"
+    },
+    {
+      "name": "CUSTOMS_CLEARED",
+      "result": "PASS",
+      "note": "",
+      "at": "2026-08-14T15:46:24.323Z"
+    },
+    {
+      "name": "CLEARED_TO_INLAND",
+      "result": "PASS",
+      "note": "",
+      "at": "2026-08-14T15:46:28.901Z"
+    },
+    {
+      "name": "TRUCKER_ASSIGNMENT",
+      "result": "PASS",
+      "note": "",
+      "at": "2026-08-14T15:46:31.053Z"
+    },
+    {
+      "name": "TRUCKER_DELIVERY_DISCOVERY",
+      "result": "PASS",
+      "note": "",
+      "at": "2026-08-14T15:46:33.304Z"
+    },
+    {
+      "name": "TRUCKER_EXECUTION",
+      "result": "PASS",
+      "note": "",
+      "at": "2026-08-14T15:46:36.142Z"
+    },
+    {
+      "name": "DELIVERED",
+      "result": "DEAD END",
+      "note": "Mark delivered unavailable",
+      "at": "2026-08-14T15:46:36.146Z"
+    }
+  ],
+  "entities": {
+    "productSku": "FLOUR-UI17R4-L7R2",
+    "poNumber": "PO-MST4AV8L-68D8EC39",
+    "orderUrl": "https://workspace.demaxtore.com/workspace/order/0cf235e1-81a7-4846-9e3a-e6bf124dfd67",
+    "orderId": "0cf235e1-81a7-4846-9e3a-e6bf124dfd67",
+    "shipmentUrl": "https://workspace.demaxtore.com/workspace/shipment/ed92e25f-f212-4522-a95e-77dde7c5c193",
+    "shipmentRef": "SHP-ORD-DIR-PO-MST4AV8L-68D8EC39-68D8EC39Shipment ORD-DIR-PO-MST4AV8L-68D8EC39-68D8EC39Status: SHIPMENT_CREATEDCNSHA → TRISTContract: PO-MST4AV8L-68D8EC39Order: ORD-DIR-PO-MST4AV8L-68D8EC39-68D8EC39",
+    "shipmentId": "ed92e25f-f212-4522-a95e-77dde7c5c193",
+    "bookingRef": "MSCBK-R4-L7R2",
+    "containerRef": "MSKU17R4L7R2"
+  },
+  "errors": [],
+  "network5xx": 0,
+  "blocker": {
+    "stage": "DELIVERED",
+    "note": "Mark delivered unavailable",
+    "kind": "PRODUCT"
+  },
+  "completedAt": "2026-08-14T15:46:36.147Z",
+  "verdict": {
+    "controlledPaidPilot": "PENDING",
+    "selfService": "PENDING"
+  }
+}

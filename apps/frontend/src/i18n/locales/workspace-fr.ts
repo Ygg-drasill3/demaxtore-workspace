@@ -136,8 +136,8 @@ const workspaceFr: TranslationDict = {
   "order.freightiq.requestCreated": "Devis fret demandé",
   "order.freightiq.offerSelected": "Transporteur sélectionné",
   "order.freightiq.emptyTitle": "Pas encore d'activité fret",
-  "order.freightiq.emptyHint": "Demandez un devis quand la production est prête.",
-  "order.freightiq.notEligible": "Fret indisponible à cette étape.",
+  "order.freightiq.emptyHint": "Quand la production est prête, vous pouvez demander le fret. D'ici là, les opérations DeMaxtore préparent les options.",
+  "order.freightiq.notEligible": "Préparation fret en attente. Les opérations DeMaxtore préparent les options. Le self-service acheteur s'ouvre après production (et enregistrement de l'acompte).",
 
   "order.freightQuote.create": "Demander un devis fret",
 

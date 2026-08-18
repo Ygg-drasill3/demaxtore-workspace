@@ -19,6 +19,7 @@ import { rfqApi, rfqAttachmentUrl } from "../lib/rfq.api";
 import { supplierCompanyLabel } from "../lib/suppliers.normalize";
 import { productSectionTitle } from "../lib/quotations-by-product";
 import { EstimatedCifPoGateSummary } from "@/features/freight-estimate/components/EstimatedCifPanel";
+import type { RfqAction } from "@dmx/contracts/rfq.fsm";
 
 export const PICKER_ACTIONS = new Set<string>([
   "assign_suppliers",
@@ -29,6 +30,7 @@ export const PICKER_ACTIONS = new Set<string>([
 
 export interface PickerProps {
   workspaceId?: string;
+  pickerAction?: RfqAction;
   open:        boolean;
   onClose:     () => void;
   onConfirm:   (payload: Record<string, unknown>) => void;
@@ -576,3 +578,7 @@ export function SubmitProformaPicker({ workspaceId, open, onClose, onConfirm, is
     </Modal>
   );
 }
+
+export function IssueSupplierPoPicker({ children }: any) { return children ?? null; }
+
+export function ReopenQuotationsPicker({ children }: any) { return children ?? null; }

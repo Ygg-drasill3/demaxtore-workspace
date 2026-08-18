@@ -7,11 +7,18 @@ import { useAuth } from "@/store/auth.store";
 type Props = {
   rfqWorkspaceId: string;
   rfqRef?: string | null;
+  /** When set, selects the supplier thread in the sidebar / chat panel. */
+  focusedSupplierUserId?: string | null;
   testId?: string;
 };
 
 /** RFQ-scoped WhatsApp chat — one thread per assigned supplier (buyer) or buyer thread (supplier). */
-export function RfqWhatsAppChatPanel({ rfqWorkspaceId, rfqRef, testId = "rfq-whatsapp-chat" }: Props) {
+export function RfqWhatsAppChatPanel({
+  rfqWorkspaceId,
+  rfqRef,
+  focusedSupplierUserId,
+  testId = "rfq-whatsapp-chat",
+}: Props) {
   const user = useAuth((s) => s.user);
   const isSupplier = user?.role === "SUPPLIER";
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -30,10 +37,18 @@ export function RfqWhatsAppChatPanel({ rfqWorkspaceId, rfqRef, testId = "rfq-wha
   });
 
   useEffect(() => {
-    if (conversations?.length && !activeId) {
-      setActiveId(conversations[0].id);
+    if (!conversations?.length) return;
+    if (focusedSupplierUserId) {
+      const match = conversations.find(
+        (c) => c.supplierId === focusedSupplierUserId,
+      );
+      if (match) {
+        setActiveId(match.id);
+        return;
+      }
     }
-  }, [conversations, activeId]);
+    setActiveId((prev) => prev ?? conversations[0]!.id);
+  }, [conversations, focusedSupplierUserId]);
 
   const active = conversations?.find((c) => c.id === activeId);
   const showSidebar = !isSupplier && (conversations?.length ?? 0) > 1;

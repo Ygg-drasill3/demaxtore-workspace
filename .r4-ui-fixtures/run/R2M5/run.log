@@ -1,0 +1,43 @@
+R4 Golden Path → MVP-UI17-R4-20260814-R2M5
+
+[PASS] BUYER_LOGIN — https://workspace.demaxtore.com/buyer/control-tower
+[PASS] PRODUCT_CREATION — FLOUR-UI17R4-R2M5
+[PASS] DIRECT_PO — PO-MST4OG0H-9BC37FAB
+[PASS] PRODUCT_TO_PO — https://workspace.demaxtore.com/workspace/order/39b6c5d8-11dd-4c45-bb1a-70ae7308b0d4
+[PASS] DEPOSIT_CONFIRMATION — Admin recorded DEPOSIT_PAID
+[PASS] FREIGHT_REQUEST — Admin created freight request
+[PASS] FREIGHT_OFFER — 2100 USD offer published
+[PASS] OFFER_SELECTION
+[PASS] OFFER_TO_BOOKING
+[PASS] BOOKING_TO_SHIPMENT — https://workspace.demaxtore.com/workspace/shipment/9f1c326a-97ad-4937-a200-09e628251070
+[PASS] BOOKING_LIFECYCLE — MSCBK-R4-R2M5
+[PASS] LINE_ALLOCATION — 90 PCS
+[PASS] CONTAINER — MSKU17R4R2M5
+[PASS] TRACKING
+[PASS] SHIPMENT_TO_CUSTOMS
+[PASS] BROKER_ASSIGNMENT
+[PASS] DOCUMENT_READINESS — Trade docs uploaded via UI
+[PASS] BROKER_CASE_DISCOVERY
+[PASS] BROKER_EXECUTION — Start review
+[PASS] GTIP_VERIFICATION
+[PASS] DUTY_TAX
+[PASS] CUSTOMS_CLEARED
+[PASS] CLEARED_TO_INLAND
+[PASS] TRUCKER_ASSIGNMENT
+[PASS] TRUCKER_DELIVERY_DISCOVERY
+[PASS] TRUCKER_PICKUP_SCHEDULED
+[FRICTION] INLAND_READY_FOR_PICKUP — Buyer marked ready for pickup after trucker schedule
+[PASS] TRUCKER_EXECUTION
+[PASS] DELIVERED
+[PASS] POD
+[FRICTION] TRUE_LANDED_COST — Opened landed cost list; shipment panel unavailable
+[PASS] FINAL_BUYER_VIEW — Buyer re-entered transaction via order workspace
+[PASS] SAME_TRANSACTION_LINEAGE — MVP-UI17-R4-20260814-R2M5
+[PASS] FRESH_TRANSACTION — MVP-UI17-R4-20260814-R2M5
+
+=== R4 SUMMARY ===
+Marker: MVP-UI17-R4-20260814-R2M5
+Fresh Transaction: PASS
+Blocker: none
+Unexpected 5xx: 0
+Evidence: /var/www/demaxtore/DemaxtoreSolitions-main/.r4-ui-fixtures/run/R2M5/evidence.json

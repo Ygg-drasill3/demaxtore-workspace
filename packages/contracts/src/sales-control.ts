@@ -31,35 +31,92 @@ const optionalName = z
   .optional()
   .transform((v) => (v?.trim() ? v.trim() : undefined));
 
-const requiredPhone = z.string().trim().min(8).max(32);
-
 export const CreateCustomerAccountInput = z.object({
   displayName: z.string().trim().min(2).max(120),
   email: z.string().email().max(200),
   password: z.string().min(8).max(200),
   role: CustomerAccountRole,
   organisationName: z.string().trim().min(2).max(160),
-  whatsappPhone: requiredPhone,
+  whatsappPhone: optionalPhone,
+  /** Legacy WhatsApp-only notify (no login). Prefer additionalMembers for real accounts. */
   secondaryContactName: optionalName,
   secondaryContactEmail: optionalEmail,
   secondaryContactWhatsapp: optionalPhone,
+  /**
+   * Extra login users under the same organisation (max 2 → 3 people total with primary).
+   * Each gets a real SUPPLIER/BUYER account sharing organisationId.
+   */
+  additionalMembers: z
+    .array(
+      z.object({
+        displayName: z.string().trim().min(2).max(120),
+        email: z.string().email().max(200),
+        password: z.string().min(8).max(200).optional(),
+        whatsappPhone: optionalPhone,
+      }),
+    )
+    .max(2)
+    .optional()
+    .default([]),
 });
 export type CreateCustomerAccountInput = z.infer<typeof CreateCustomerAccountInput>;
 
+export const SetSupplierCatalogLinkInput = z.object({
+  url: z
+    .union([z.string().url().max(2000), z.literal("")])
+    .transform((v) => (typeof v === "string" && v.trim() ? v.trim() : null)),
+});
+export type SetSupplierCatalogLinkInput = z.infer<typeof SetSupplierCatalogLinkInput>;
+
 export const CustomerAccountDto = z.object({
   id: z.string().uuid(),
+  organisationId: z.string().uuid().nullable(),
   email: z.string().email(),
   displayName: z.string(),
   role: CustomerAccountRole,
   organisation: z.string(),
+  /** Free-text interest / product category labels from the organisation. */
+  interestAreas: z.array(z.string()).default([]),
+  whatsappPhone: z.string().nullable().optional(),
+  phoneNumber: z.string().nullable().optional(),
+  phoneVerificationStatus: z.string().nullable().optional(),
+  logoUrl: z.string().nullable().optional(),
+  catalogUrl: z.string().nullable().optional(),
+  /** True when catalogUrl is an external https link (not uploaded PDF). */
+  catalogIsExternal: z.boolean().optional(),
   createdAt: z.string().datetime(),
   createdByName: z.string().nullable().optional(),
 });
 export type CustomerAccountDto = z.infer<typeof CustomerAccountDto>;
 
+export const CustomerAccountDetailDto = CustomerAccountDto.extend({
+  /** Other login users under the same organisation (excluding this account). */
+  teammates: z.array(CustomerAccountDto).default([]),
+});
+export type CustomerAccountDetailDto = z.infer<typeof CustomerAccountDetailDto>;
+
+export const UpdateCustomerAccountInput = z.object({
+  displayName: z.string().trim().min(2).max(120),
+  email: z.string().email().max(200),
+  organisationName: z.string().trim().min(2).max(160),
+  whatsappPhone: optionalPhone,
+});
+export type UpdateCustomerAccountInput = z.infer<typeof UpdateCustomerAccountInput>;
+
 export const CreateCustomerAccountResponse = z.object({
   account: CustomerAccountDto,
   loginUrl: z.string(),
+  /** All created login credentials (primary first, then additional members). */
+  members: z
+    .array(
+      z.object({
+        id: z.string().uuid(),
+        displayName: z.string(),
+        email: z.string().email(),
+        password: z.string(),
+      }),
+    )
+    .optional(),
 });
 export type CreateCustomerAccountResponse = z.infer<typeof CreateCustomerAccountResponse>;
 

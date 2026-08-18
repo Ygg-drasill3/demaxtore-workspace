@@ -516,6 +516,7 @@ export class CommodityBidService {
             actorUserId: actor.id,
             actorEmail: actor.email,
             actorRole: actor.role,
+            source: "COMMODITY_BID",
           });
           socketBus.scheduleEmit(() => {
             socketBus.emitToWorkspace(spawned.orderWorkspaceId, SocketEvents.PO_ISSUED, {

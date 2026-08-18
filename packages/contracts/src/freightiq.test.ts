@@ -11,8 +11,12 @@ describe("isFreightIntakeEligible", () => {
     expect(isFreightIntakeEligible("ORDER_CREATED", "ADMIN")).toBe(true);
   });
 
-  it("blocks buyer on ORDER_CREATED", () => {
-    expect(isFreightIntakeEligible("ORDER_CREATED", "BUYER")).toBe(false);
+  it("allows buyer on ORDER_CREATED for freight quote request (Sprint 43)", () => {
+    expect(isFreightIntakeEligible("ORDER_CREATED", "BUYER")).toBe(true);
+  });
+
+  it("blocks buyer on SHIPMENT_BOOKED", () => {
+    expect(isFreightIntakeEligible("SHIPMENT_BOOKED", "BUYER")).toBe(false);
   });
 
   it("blocks everyone on CLOSED", () => {

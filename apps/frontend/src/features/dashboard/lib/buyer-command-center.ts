@@ -11,6 +11,8 @@ import { shipmentApi } from "@/features/shipment/lib/shipment.api";
 import { freightEstimateApi } from "@/features/freight-estimate/lib/freight-estimate.api";
 import { freightBookingApi } from "@/features/freight-booking/lib/freight-booking.api";
 import { tradeTimelineApi } from "@/features/trade/lib/trade-timeline.api";
+import { customsApi } from "@/features/customs/lib/customs.api";
+import { inlandApi } from "@/features/inland/lib/inland.api";
 import type { PurchaseOrderSummary } from "@dmx/contracts/purchase-order";
 import type { TradeDocumentsSummary } from "@dmx/contracts/trade-documents";
 import type { WorkspaceConversation } from "@dmx/contracts/workspace-communication";
@@ -36,6 +38,9 @@ export interface CommandCenterKpis {
   cutoffRisks: number;
   forecastChanges: number;
   rebookRequired: number;
+  /** Sprint 43 — optional import-ops counts */
+  customsActive?: number;
+  deliveriesActive?: number;
 }
 
 export type ActionPriority = "high" | "medium" | "low";
@@ -151,7 +156,7 @@ function humanizeState(state: string): string {
 export async function fetchBuyerDashboardQuick(
   onboarding?: OnboardingProgressDTO | null,
 ): Promise<Pick<BuyerCommandCenter, "mode" | "kpis" | "timelineKpis">> {
-  const [rfqs, orders, auctions, timelineKpis, cifKpi, bookingKpi] = await Promise.all([
+  const [rfqs, orders, auctions, timelineKpis, cifKpi, bookingKpi, customsList, inlandList] = await Promise.all([
     rfqApi.list({ limit: LIMIT }),
     orderApi.list({ bucket: "active", limit: LIMIT }),
     apiListCommodityBids(),
@@ -170,6 +175,8 @@ export async function fetchBuyerDashboardQuick(
       forecastChanges: 0,
       rebookRequired: 0,
     })),
+    customsApi.list({ page: 1, pageSize: 1, attention: true }).catch(() => ({ items: [], pagination: { totalItems: 0 } })),
+    inlandApi.list({ attention: true }).catch(() => ({ items: [] as Array<{ id: string }> })),
   ]);
 
   const rfqItems = rfqs.items as Array<{ state: string; procurementMethod: string | null }>;
@@ -193,6 +200,8 @@ export async function fetchBuyerDashboardQuick(
     cutoffRisks: bookingKpi.cutoffRisks,
     forecastChanges: bookingKpi.forecastChanges,
     rebookRequired: bookingKpi.rebookRequired,
+    customsActive: customsList.pagination?.totalItems ?? customsList.items.length,
+    deliveriesActive: inlandList.items?.length ?? 0,
   };
 
   const mode = resolveMode(onboarding ?? null, orderItems.length + openRfqs.length);

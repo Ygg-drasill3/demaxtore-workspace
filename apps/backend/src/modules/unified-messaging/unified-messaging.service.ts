@@ -14,8 +14,8 @@ import {
 } from "./unified-messaging.constants.js";
 import {
   MessagingChannelDispatcher,
+  WhatsAppChannelAdapter,
   WorkspaceChannelAdapter,
-  WhatsAppChannelAdapterStub,
 } from "./unified-messaging.channel-adapter.js";
 import { UnifiedMessagingErrors } from "./unified-messaging.errors.js";
 import {
@@ -32,6 +32,20 @@ import { getMessagingWriteDispatcher } from "./messaging-write.dispatcher.js";
 import { registerWiredSurface, buildSocketOutbox } from "./messaging-write.registry.js";
 import { UnifiedMessagingWriteOrchestrator } from "./unified-messaging-write.orchestrator.js";
 import { assertCanSendMessages, loadUserMessagingGate } from "../phone-verification/phone-verification.policy.js";
+import { AppError } from "../../utils/httpErrors.js";
+import {
+  assertWhatsAppRecipientAllowed,
+  isSupplierConversation,
+  resolveWhatsAppTargetPhone,
+} from "./unified-messaging.whatsapp-target.js";
+import { assertWhatsAppOutboundAllowed } from "./unified-messaging.whatsapp-outbound.js";
+import {
+  assertBuyerCredentialIsolation,
+  requireBuyerWhatsAppCredentials,
+  resolveBuyerIdForConversation,
+} from "../whatsapp-business/whatsapp-business-credential.resolver.js";
+import { isBuyerConnectionWhatsAppMode } from "../../config/env.js";
+import { isWhatsAppConfigured, normalizePhone } from "../chat/whatsapp.service.js";
 
 export class UnifiedMessagingService {
   private readonly repo: UnifiedMessagingRepository;
@@ -45,7 +59,7 @@ export class UnifiedMessagingService {
     this.policy = new UnifiedMessagingPolicy(prisma);
     this.channelDispatcher = new MessagingChannelDispatcher([
       new WorkspaceChannelAdapter(),
-      new WhatsAppChannelAdapterStub(),
+      new WhatsAppChannelAdapter(prisma),
     ]);
     this.writeOrchestrator = new UnifiedMessagingWriteOrchestrator(prisma);
     this.writeDispatcher = getMessagingWriteDispatcher(prisma);
@@ -93,7 +107,6 @@ export class UnifiedMessagingService {
     conversationId: string,
     input: CreateMessageRequest,
   ): Promise<{ message: ReturnType<typeof mapMessage>; duplicate: boolean }> {
-    assertCanSendMessages(await loadUserMessagingGate(this.prisma, user.id));
     await this.policy.assertConversationAccess(user, conversationId);
     if (!(await this.policy.canSendExternalMessage(user, conversationId))) {
       throw UnifiedMessagingErrors.cannotAccessConversation();
@@ -108,13 +121,79 @@ export class UnifiedMessagingService {
       if (existing) return { message: mapMessage(existing), duplicate: true };
     }
 
+    const supplierConversation = await isSupplierConversation(this.prisma, conversationId);
+    // Workspace-first: in-app chat by default; WhatsApp only when explicitly requested.
     const channel: "WORKSPACE" | "WHATSAPP" =
-      input.channel === "WHATSAPP" ? "WHATSAPP" : "WORKSPACE";
+      supplierConversation && user.role === "SUPPLIER"
+        ? "WORKSPACE"
+        : input.channel === "WHATSAPP"
+          ? "WHATSAPP"
+          : "WORKSPACE";
     const audienceScope = "EXTERNAL" as const;
     this.policy.assertCanDispatchToChannel(audienceScope, channel);
 
+    assertCanSendMessages(await loadUserMessagingGate(this.prisma, user.id), { channel });
+
     registerWiredSurface("general_messages_send");
-    const message = await this.writeDispatcher.persistMessageWithOutbox(
+
+    let phoneE164: string | null = null;
+    let senderDisplayName: string | null = null;
+    let whatsappCredentials: Awaited<ReturnType<typeof requireBuyerWhatsAppCredentials>> | null = null;
+    if (channel === "WHATSAPP") {
+      const buyerId = await resolveBuyerIdForConversation(this.prisma, conversationId, user);
+      if (!buyerId && isBuyerConnectionWhatsAppMode()) {
+        throw UnifiedMessagingErrors.whatsappNotConfigured();
+      }
+
+      if (buyerId) {
+        if (isBuyerConnectionWhatsAppMode()) {
+          whatsappCredentials = await requireBuyerWhatsAppCredentials(this.prisma, buyerId);
+          await assertBuyerCredentialIsolation(this.prisma, buyerId, whatsappCredentials);
+        } else {
+          whatsappCredentials = await import("../whatsapp-business/whatsapp-business-credential.resolver.js")
+            .then((m) => m.resolveBuyerWhatsAppCredentials(this.prisma, buyerId));
+          if (whatsappCredentials) {
+            await assertBuyerCredentialIsolation(this.prisma, buyerId, whatsappCredentials);
+          } else if (!isWhatsAppConfigured()) {
+            throw UnifiedMessagingErrors.whatsappNotConfigured();
+          }
+        }
+      } else if (!isWhatsAppConfigured()) {
+        throw UnifiedMessagingErrors.whatsappNotConfigured();
+      }
+
+      phoneE164 = await resolveWhatsAppTargetPhone(this.prisma, conversationId, user);
+      if (!phoneE164) {
+        throw supplierConversation
+          ? UnifiedMessagingErrors.supplierWhatsAppRequired()
+          : UnifiedMessagingErrors.whatsappBlocked();
+      }
+      const senderProfile = await this.prisma.user.findUnique({
+        where: { id: user.id },
+        select: { whatsappPhone: true, phoneNumber: true, displayName: true },
+      });
+      senderDisplayName = senderProfile?.displayName?.trim() || user.email.split("@")[0] || "User";
+      const senderWa = normalizePhone(senderProfile?.whatsappPhone);
+      const isSupplierThreadMirror =
+        supplierConversation &&
+        user.role === "SUPPLIER" &&
+        Boolean(senderWa) &&
+        normalizePhone(phoneE164) === senderWa;
+      if (!isSupplierThreadMirror) {
+        assertWhatsAppRecipientAllowed(phoneE164, user, {
+          whatsappPhone: senderProfile?.whatsappPhone,
+          phoneNumber: senderProfile?.phoneNumber,
+        });
+      }
+      await assertWhatsAppOutboundAllowed(
+        this.prisma,
+        phoneE164,
+        whatsappCredentials?.phoneNumberId,
+        whatsappCredentials ?? undefined,
+      );
+    }
+
+    let message = await this.writeDispatcher.persistMessageWithOutbox(
       user,
       "unified_api",
       {
@@ -131,12 +210,47 @@ export class UnifiedMessagingService {
     if (!message) throw UnifiedMessagingErrors.cannotAccessConversation();
 
     if (channel === "WHATSAPP") {
-      await this.channelDispatcher.dispatch("WHATSAPP", {
-        conversationId,
-        messageId: message.id,
-        body: input.body,
-        audienceScope,
-      });
+      if (!phoneE164) {
+        throw supplierConversation
+          ? UnifiedMessagingErrors.supplierWhatsAppRequired()
+          : UnifiedMessagingErrors.whatsappBlocked();
+      }
+      try {
+        const result = await this.channelDispatcher.dispatch("WHATSAPP", {
+          conversationId,
+          messageId: message.id,
+          body: input.body,
+          senderName: senderDisplayName,
+          audienceScope,
+          phoneE164,
+          whatsappCredentials: whatsappCredentials ?? undefined,
+        });
+        message = await this.prisma.workspaceMessage.update({
+          where: { id: message.id },
+          data: {
+            channelSource: "WHATSAPP",
+            whatsappMessageId: result.whatsappMessageId,
+            externalMessageId: result.externalMessageId ?? result.whatsappMessageId,
+            sentAt: result.sentAt ?? new Date(),
+          },
+        });
+      } catch (err) {
+        const reason =
+          err instanceof AppError
+            ? (err.message ?? err.code)
+            : err instanceof Error
+              ? err.message
+              : "WHATSAPP_SEND_FAILED";
+        message = await this.prisma.workspaceMessage.update({
+          where: { id: message.id },
+          data: {
+            channelSource: "WHATSAPP",
+            failedAt: new Date(),
+            failureReason: reason,
+          },
+        });
+        throw err;
+      }
     } else {
       await this.channelDispatcher.dispatch("WORKSPACE", {
         conversationId,

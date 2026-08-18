@@ -10,9 +10,11 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../db/prisma.js";
 import { RfqService } from "../rfq/rfq.service.js";
 import { AppError } from "../../utils/httpErrors.js";
+import { isPlatformAdminRole } from "../../lib/staff-roles.js";
 import { canAccessRfq, type AuthUser } from "../rfq/rfq.policy.js";
 import type {
-  SubmitQuotationPayload, ReviseQuotationPayload, WithdrawQuotationPayload,
+  SubmitQuotationPayload, AdminSubmitQuotationPayload,
+  ReviseQuotationPayload, WithdrawQuotationPayload,
 } from "@dmx/contracts/rfq.zod";
 
 const rfqService = new RfqService(prisma);
@@ -27,6 +29,9 @@ function lineItemRows(quotationId: string, payload: SubmitQuotationPayload) {
     quantity:      new Prisma.Decimal(li.quantity),
     unitPrice:     new Prisma.Decimal(li.unitPrice),
     total:         new Prisma.Decimal(li.quantity * li.unitPrice),
+    packing:       li.packing ?? null,
+    priceUnit:     li.priceUnit ?? null,
+    moq:           li.moq ?? null,
   }));
 }
 
@@ -58,30 +63,39 @@ async function findActiveQuotation(workspaceId: string, supplierId: string) {
   });
 }
 
-// ─── submit_quotation ────────────────────────────────────────────────────────
-export async function submitQuotation(
+async function assertSupplierAssigned(workspaceId: string, supplierUserId: string): Promise<void> {
+  const assignment = await prisma.supplierAssignment.findFirst({
+    where: { workspaceId, supplierUserId, removedAt: null },
+    select: { id: true },
+  });
+  if (assignment) return;
+
+  const participant = await prisma.workspaceParticipant.findFirst({
+    where: { workspaceId, userId: supplierUserId, participantRole: "COUNTERPARTY" },
+    select: { id: true },
+  });
+  if (!participant) throw new AppError(403, "SUPPLIER_NOT_ASSIGNED");
+}
+
+async function loadSupplierActor(supplierUserId: string) {
+  const supplier = await prisma.user.findUnique({
+    where: { id: supplierUserId },
+    select: { id: true, email: true, role: true },
+  });
+  if (!supplier || supplier.role !== "SUPPLIER") throw new AppError(400, "INVALID_SUPPLIER");
+  return { id: supplier.id, email: supplier.email, role: "SUPPLIER" as const };
+}
+
+async function persistSubmittedQuotation(
   workspaceId: string,
-  actor: AuthUser,
+  supplierUserId: string,
   payload: SubmitQuotationPayload,
 ) {
-  if (actor.role !== "SUPPLIER") throw new AppError(403, "FORBIDDEN_ROLE");
-  if (!(await canAccessRfq(prisma, actor, workspaceId))) throw new AppError(403, "FORBIDDEN");
-  await assertWorkspaceOpen(workspaceId);
-
-  const { assertSupplierQuoteLinesAllowed } = await import("../rfq/supplier-line-scope.service.js");
-  await assertSupplierQuoteLinesAllowed(workspaceId, actor.id, payload);
-
-  const existing = await findActiveQuotation(workspaceId, actor.id);
-  if (existing) throw new AppError(409, "QUOTATION_ALREADY_SUBMITTED");
-
-  // A withdrawn quotation row may still exist for this (workspace, supplier).
-  // Since the DB has @@unique([workspaceId, supplierUserId]), we re-activate
-  // that row rather than creating a new one.
   const withdrawn = await prisma.quotation.findFirst({
-    where: { workspaceId, supplierUserId: actor.id, withdrawnAt: { not: null } },
+    where: { workspaceId, supplierUserId, withdrawnAt: { not: null } },
   });
 
-  const created = await prisma.$transaction(async (tx) => {
+  return await prisma.$transaction(async (tx) => {
     let q;
     if (withdrawn) {
       await tx.quotationLineItem.deleteMany({ where: { quotationId: withdrawn.id } });
@@ -107,7 +121,7 @@ export async function submitQuotation(
       q = await tx.quotation.create({
         data: {
           workspaceId,
-          supplierUserId: actor.id,
+          supplierUserId,
           total:         totalFor(payload),
           unitPriceAvg:  unitPriceAvgFor(payload),
           currency:      payload.currency,
@@ -124,22 +138,30 @@ export async function submitQuotation(
     await tx.quotationLineItem.createMany({ data: lineItemRows(q.id, payload) });
     return q;
   });
+}
 
-  // Fire the FSM self-loop so notifications + timeline + audit + sockets land.
+async function finalizeQuotationSubmit(
+  workspaceId: string,
+  supplierUserId: string,
+  created: { id: string; total: Prisma.Decimal; currency: string },
+  fsmActor: { id: string; email: string; role: "SUPPLIER" },
+  opts?: { submittedByAdminId?: string },
+) {
   await rfqService.applyTransition({
     workspaceId,
-    action:      "submit_quotation",
-    actor:       { id: actor.id, email: actor.email, role: actor.role },
-    payload:     {
-      quotationId: created.id,
-      supplierUserId: actor.id,
-      total: Number(created.total),
-      currency: created.currency,
+    action:  "submit_quotation",
+    actor:   fsmActor,
+    payload: {
+      quotationId:    created.id,
+      supplierUserId,
+      total:          Number(created.total),
+      currency:       created.currency,
+      ...(opts?.submittedByAdminId ? { submittedByAdminId: opts.submittedByAdminId } : {}),
     },
   });
 
   const { markQuoted } = await import("../supplier-activity/supplier-activity.service.js");
-  await markQuoted(workspaceId, actor.id);
+  await markQuoted(workspaceId, supplierUserId);
 
   void (async () => {
     const { emitConversationSystemEvent } = await import("../conversation-hub/conversation-hub.hooks.js");
@@ -148,13 +170,114 @@ export async function submitQuotation(
       "RFQ",
       workspaceId,
       "QUOTATION_SUBMITTED",
-      actor.id,
+      supplierUserId,
       created.currency,
       { quotationId: created.id, dedupeKey: created.id },
     );
   })();
 
   return await getQuotationDTO(created.id);
+}
+
+// ─── submit_quotation ────────────────────────────────────────────────────────
+export async function submitQuotation(
+  workspaceId: string,
+  actor: AuthUser,
+  payload: SubmitQuotationPayload,
+) {
+  if (actor.role !== "SUPPLIER") throw new AppError(403, "FORBIDDEN_ROLE");
+  if (!(await canAccessRfq(prisma, actor, workspaceId))) throw new AppError(403, "FORBIDDEN");
+  await assertWorkspaceOpen(workspaceId);
+
+  const { assertSupplierQuoteLinesAllowed } = await import("../rfq/supplier-line-scope.service.js");
+  await assertSupplierQuoteLinesAllowed(workspaceId, actor.id, payload);
+
+  const existing = await findActiveQuotation(workspaceId, actor.id);
+  if (existing) throw new AppError(409, "QUOTATION_ALREADY_SUBMITTED");
+
+  const created = await persistSubmittedQuotation(workspaceId, actor.id, payload);
+  return await finalizeQuotationSubmit(
+    workspaceId,
+    actor.id,
+    created,
+    { id: actor.id, email: actor.email, role: "SUPPLIER" },
+  );
+}
+
+// ─── admin_submit_quotation (on behalf of supplier) ──────────────────────────
+export async function adminSubmitQuotation(
+  workspaceId: string,
+  adminActor: AuthUser,
+  payload: AdminSubmitQuotationPayload,
+) {
+  if (!isPlatformAdminRole(adminActor.role)) throw new AppError(403, "FORBIDDEN_ROLE");
+  if (!(await canAccessRfq(prisma, adminActor, workspaceId))) throw new AppError(403, "FORBIDDEN");
+  await assertWorkspaceOpen(workspaceId);
+
+  const { supplierUserId, ...quotePayload } = payload;
+  await assertSupplierAssigned(workspaceId, supplierUserId);
+  const fsmActor = await loadSupplierActor(supplierUserId);
+
+  const { assertSupplierQuoteLinesAllowed } = await import("../rfq/supplier-line-scope.service.js");
+  await assertSupplierQuoteLinesAllowed(workspaceId, supplierUserId, quotePayload);
+
+  const existing = await findActiveQuotation(workspaceId, supplierUserId);
+  if (existing) throw new AppError(409, "QUOTATION_ALREADY_SUBMITTED");
+
+  const created = await persistSubmittedQuotation(workspaceId, supplierUserId, quotePayload);
+  return await finalizeQuotationSubmit(
+    workspaceId,
+    supplierUserId,
+    created,
+    fsmActor,
+    { submittedByAdminId: adminActor.id },
+  );
+}
+
+export async function getSupplierQuoteScopeForAdmin(
+  workspaceId: string,
+  adminActor: AuthUser,
+  supplierUserId: string,
+) {
+  if (!isPlatformAdminRole(adminActor.role)) throw new AppError(403, "FORBIDDEN_ROLE");
+  if (!(await canAccessRfq(prisma, adminActor, workspaceId))) throw new AppError(403, "FORBIDDEN");
+  await assertSupplierAssigned(workspaceId, supplierUserId);
+  await loadSupplierActor(supplierUserId);
+
+  const ws = await prisma.workspace.findUnique({
+    where: { id: workspaceId },
+    select: { rfqLineItems: { select: { id: true } } },
+  });
+  const allLineIds = ws?.rfqLineItems.map((l) => l.id) ?? [];
+
+  const { getAllowedQuoteLineIds } = await import("../rfq/supplier-line-scope.service.js");
+  const allowedQuoteLineItemIds = await getAllowedQuoteLineIds(workspaceId, supplierUserId);
+
+  const activeQuotation = await findActiveQuotation(workspaceId, supplierUserId);
+  const quotedRows = activeQuotation
+    ? await prisma.quotationLineItem.findMany({
+        where: { quotationId: activeQuotation.id },
+        select: { rfqLineItemId: true },
+      })
+    : [];
+  const quotedLineItemIds = [
+    ...new Set(
+      quotedRows
+        .map((r) => r.rfqLineItemId)
+        .filter((id): id is string => typeof id === "string"),
+    ),
+  ];
+
+  const scopeIds = allowedQuoteLineItemIds ?? allLineIds;
+  const remainingQuoteLineItemIds = scopeIds.filter((id) => !quotedLineItemIds.includes(id));
+
+  return {
+    supplierUserId,
+    allowedQuoteLineItemIds,
+    remainingQuoteLineItemIds: remainingQuoteLineItemIds.length ? remainingQuoteLineItemIds : null,
+    quotedLineItemIds,
+    existingQuotationId: activeQuotation?.id ?? null,
+  };
 }
 
 // ─── revise_quotation ────────────────────────────────────────────────────────
@@ -211,6 +334,70 @@ export async function reviseQuotation(
 
   const { markQuoted } = await import("../supplier-activity/supplier-activity.service.js");
   await markQuoted(workspaceId, actor.id);
+
+  return await getQuotationDTO(quotationId);
+}
+
+// ─── admin_revise_quotation (on behalf of supplier) ────────────────────────────
+export async function adminReviseQuotation(
+  workspaceId: string,
+  quotationId: string,
+  adminActor: AuthUser,
+  payload: AdminSubmitQuotationPayload,
+) {
+  if (!isPlatformAdminRole(adminActor.role)) throw new AppError(403, "FORBIDDEN_ROLE");
+  if (!(await canAccessRfq(prisma, adminActor, workspaceId))) throw new AppError(403, "FORBIDDEN");
+  await assertWorkspaceOpen(workspaceId);
+
+  const { supplierUserId, ...quotePayload } = payload;
+  await assertSupplierAssigned(workspaceId, supplierUserId);
+  const fsmActor = await loadSupplierActor(supplierUserId);
+
+  const existing = await prisma.quotation.findUnique({ where: { id: quotationId } });
+  if (!existing || existing.workspaceId !== workspaceId) throw new AppError(404, "QUOTATION_NOT_FOUND");
+  if (existing.supplierUserId !== supplierUserId) throw new AppError(403, "FORBIDDEN");
+  if (existing.withdrawnAt) throw new AppError(409, "QUOTATION_WITHDRAWN");
+
+  const { assertSupplierQuoteLinesAllowed } = await import("../rfq/supplier-line-scope.service.js");
+  await assertSupplierQuoteLinesAllowed(workspaceId, supplierUserId, quotePayload);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.quotationLineItem.deleteMany({ where: { quotationId } });
+    await tx.quotationLineItem.createMany({ data: lineItemRows(quotationId, quotePayload) });
+    await tx.quotation.update({
+      where: { id: quotationId },
+      data: {
+        total:        totalFor(quotePayload),
+        unitPriceAvg: unitPriceAvgFor(quotePayload),
+        currency:     quotePayload.currency,
+        leadTimeDays: quotePayload.leadTimeDays ?? null,
+        moq:          quotePayload.moq          ?? null,
+        incoterm:     quotePayload.incoterm     ?? null,
+        paymentTerms: quotePayload.paymentTerms ?? null,
+        sampleAvail:  quotePayload.sampleAvail  ?? null,
+        validUntil:   quotePayload.validUntil ? new Date(quotePayload.validUntil) : null,
+        status:       "REVISED",
+        revisedAt:    new Date(),
+      },
+    });
+  });
+
+  const revised = await prisma.quotation.findUniqueOrThrow({ where: { id: quotationId } });
+  await rfqService.applyTransition({
+    workspaceId,
+    action:  "revise_quotation",
+    actor:   fsmActor,
+    payload: {
+      quotationId,
+      supplierUserId,
+      total:              Number(revised.total),
+      currency:           revised.currency,
+      revisedByAdminId:   adminActor.id,
+    },
+  });
+
+  const { markQuoted } = await import("../supplier-activity/supplier-activity.service.js");
+  await markQuoted(workspaceId, supplierUserId);
 
   return await getQuotationDTO(quotationId);
 }
@@ -283,6 +470,9 @@ async function getQuotationDTO(id: string) {
       id: l.id, position: l.position, description: l.description,
       unitPrice: Number(l.unitPrice), quantity: Number(l.quantity),
       total: Number(l.total),
+      packing: l.packing ?? null,
+      priceUnit: l.priceUnit ?? null,
+      moq: l.moq ?? null,
     })),
   };
 }

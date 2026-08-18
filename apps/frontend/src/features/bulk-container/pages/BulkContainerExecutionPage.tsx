@@ -26,7 +26,7 @@ export default function BulkContainerExecutionPage() {
   }
 
   return (
-    <div data-testid="bc-execution-page" className="max-w-[1200px] mx-auto space-y-6 animate-fade-in">
+    <div data-testid="bc-execution-page" data-guide="bc-execution" className="max-w-[1200px] mx-auto space-y-6 animate-fade-in">
       <header>
         <Link to="/buyer/bulk-container/requests" className="text-xs text-zinc-500 hover:underline">← My Bulk Requests</Link>
         <h1 className="font-display text-4xl font-semibold tracking-tight mt-1">

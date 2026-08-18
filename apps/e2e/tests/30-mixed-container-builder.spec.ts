@@ -1,4 +1,4 @@
-// Sprint 12B — Mixed Container builder E2E
+// Sprint 12B + Sprint 02 — Mixed Container discovery & builder E2E
 import { test, expect } from "@playwright/test";
 import { uiLogin, USERS, apiLogin, newRequest, API_BASE } from "./_helpers";
 
@@ -22,31 +22,34 @@ test.describe.serial("Mixed Container builder (Sprint 12B)", () => {
   test("02 — Categories and products visible", async ({ page }) => {
     await uiLogin(page, USERS.buyer1);
     await page.goto("/buyer/mixed-container/catalog");
+    await expect(page.getByTestId("mc-discovery-layout")).toBeVisible();
     await expect(page.getByTestId("mc-catalog-categories")).toBeVisible();
-    await expect(page.getByTestId("mc-category-rice")).toBeVisible();
-    await page.getByTestId("mc-category-rice").click();
+    await expect(page.getByTestId("mc-industry-label")).toHaveText("Food & Beverages");
+    await expect(page.getByTestId("mc-category-pulses")).toBeVisible();
+    await page.getByTestId("mc-category-pulses").click();
     await expect(page.getByTestId("mc-catalog-products")).toBeVisible();
-    await expect(page.getByTestId("mc-product-card-MC-RICE-001")).toBeVisible();
-    // Supplier anonymity — count label only, no supplier identity fields
-    await expect(page.getByTestId("mc-product-card-MC-RICE-001").getByText("Available from 3 verified suppliers")).toBeVisible();
+    await expect(page.getByTestId("mc-product-card-MC-PUL-RL")).toBeVisible();
     await expect(page.getByText(/supplier.*@/i)).toHaveCount(0);
+    await expect(page.getByText(/\$\d/)).toHaveCount(0);
   });
 
-  test("03 — Add to container, pallet adjustment, fill meter, estimated value", async ({ page }) => {
+  test("03 — Add to container, pallet adjustment, fill meter", async ({ page }) => {
     await uiLogin(page, USERS.buyer1);
-    await page.goto("/buyer/mixed-container/catalog/rice");
-    await page.getByTestId("mc-add-to-container-MC-RICE-001").click();
-    await expect(page.getByTestId("mc-add-modal")).toBeVisible();
-    await page.getByTestId("mc-packing-option-PT-MC-PULSE-5KG").click();
+    await page.goto("/buyer/mixed-container/catalog/pulses");
+    await page.getByTestId("mc-product-card-MC-PUL-RL").click();
+    await expect(page.getByTestId("mc-product-detail")).toBeVisible();
+    await page.getByTestId("mc-packaging-option-5-kg").click();
     await page.getByTestId("mc-pallet-increase").click();
     await expect(page.getByTestId("mc-pallet-count")).toHaveText("3");
     await page.getByTestId("mc-add-confirm").click();
+    await expect(page.getByTestId("mc-sidebar")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId("mc-sidebar-pallet-count")).not.toHaveText("0");
+    await page.getByTestId("mc-sidebar-review").click();
     await page.waitForURL(/\/buyer\/mixed-container\/requests\//, { timeout: 15000 });
     containerId = page.url().split("/").pop()!;
     await expect(page.getByTestId("mc-builder-page")).toBeVisible();
     await expect(page.getByTestId("mc-fill-meter")).toBeVisible();
     await expect(page.getByTestId("mc-fill-percent")).not.toHaveText("0%");
-    await expect(page.getByTestId("mc-est-value")).not.toHaveText("—");
     await page.getByTestId(/mc-line-inc-/).first().click();
     await expect(page.getByTestId("mc-fill-percent")).toBeVisible();
   });
@@ -63,29 +66,32 @@ test.describe.serial("Mixed Container builder (Sprint 12B)", () => {
 
   test("05 — Request live pricing and appears in My Containers", async ({ page }) => {
     await uiLogin(page, USERS.buyer1);
-    // Re-add product if removed
-    await page.goto("/buyer/mixed-container/catalog/rice");
-    await page.getByTestId("mc-add-to-container-MC-RICE-001").click();
+    await page.goto("/buyer/mixed-container/catalog/pulses");
+    await page.getByTestId("mc-product-card-MC-PUL-RL").click();
     await page.getByTestId("mc-add-confirm").click();
+    await page.getByTestId("mc-sidebar-review").click();
     await page.waitForURL(/\/buyer\/mixed-container\/requests\//);
     containerId = page.url().split("/").pop()!;
     await page.getByTestId("mc-request-pricing").click();
-    await expect(page.getByTestId("mc-pricing-submitted")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId("mc-procurement-request-detail")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId("mc-pr-ref")).toHaveText(/PR-\d{4}-\d{6}/);
     await page.goto("/buyer/mixed-container/requests");
     await expect(page.getByTestId("mc-requests-page")).toBeVisible();
     await expect(page.getByTestId(/mc-request-row-MC-/).first()).toBeVisible();
   });
 
-  test("06 — API: supplier fields not in catalog DTO", async () => {
+  test("06 — API: no pricing or supplier fields in discovery DTO", async () => {
     const req = await newRequest();
-    const res = await req.get(`${API_BASE}/api/mixed-container/catalog/products?category=rice&limit=1`, {
+    const res = await req.get(`${API_BASE}/api/mixed-container/catalog/products?category=pulses&limit=1`, {
       headers: { Authorization: `Bearer ${buyerToken}` },
     });
     expect(res.ok()).toBeTruthy();
     const body = await res.json();
     const item = body.items[0];
     expect(item).toBeTruthy();
-    expect(item.supplierAvailabilityLabel).toMatch(/verified suppliers/i);
+    expect(item.packagingOptions.length).toBeGreaterThan(0);
+    expect(item).not.toHaveProperty("supplierAvailabilityLabel");
+    expect(item).not.toHaveProperty("indicativeLow");
     expect(item).not.toHaveProperty("supplierOrgId");
     expect(item).not.toHaveProperty("supplierName");
     expect(item).not.toHaveProperty("factoryName");

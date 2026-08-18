@@ -222,11 +222,21 @@ export class DocumentCenterService {
   }
 
   async getShipmentDocuments(actor: AuthUser, shipmentId: string) {
+    // canAccessShipment short-circuits to true for ADMIN, so without this an unknown
+    // id answered 200 with an empty list instead of 404.
+    const shipment = await this.db.workspace.findFirst({
+      where: { id: shipmentId, type: "SHIPMENT" },
+      select: { id: true },
+    });
+    if (!shipment) throw new AppError(404, "SHIPMENT_NOT_FOUND");
     if (!(await canAccessShipment(this.db, actor, shipmentId))) {
       throw new AppError(403, "FORBIDDEN");
     }
     const all = await this.collectAccessible(actor);
-    return all.filter((d) => d.relatedEntityId === shipmentId || d.shipmentRef);
+    // `shipmentRef` is only set when the document's own workspace is the shipment, in
+    // which case relatedEntityId already is that shipment. Or-ing it in matched every
+    // shipment-attached document instead of this one's.
+    return all.filter((d) => d.relatedEntityId === shipmentId);
   }
 
   async streamDownload(actor: AuthUser, compositeId: string, res: import("express").Response) {
@@ -371,7 +381,9 @@ export class DocumentCenterService {
         })
       : [];
     const owMap = new Map(orderWorkspaces.map((o) => [o.workspaceId, o]));
-    const parentIds = [...new Set(orderWorkspaces.map((o) => o.parentWorkspaceId))];
+    const parentIds = [...new Set(
+      orderWorkspaces.map((o) => o.parentWorkspaceId).filter((id): id is string => !!id),
+    )];
     const parents = parentIds.length
       ? await this.db.workspace.findMany({ where: { id: { in: parentIds } }, select: { id: true, externalRef: true } })
       : [];
@@ -388,9 +400,26 @@ export class DocumentCenterService {
       : [];
     const userName = new Map(users.map((u) => [u.id, u.displayName]));
 
+    const purchaseOrders = orderIds.length
+      ? await this.db.purchaseOrder.findMany({
+          where: { orderId: { in: orderIds } },
+          select: { id: true, orderId: true, poNumber: true },
+        })
+      : [];
+    const poByOrderWorkspace = new Map(purchaseOrders.map((p) => [p.orderId, p]));
+
+    const resolvePo = (orderWorkspaceId: string | null | undefined) => {
+      const po = orderWorkspaceId ? poByOrderWorkspace.get(orderWorkspaceId) : undefined;
+      return {
+        poNumber: po?.poNumber ?? null,
+        poOrderId: po?.orderId ?? null,
+        orderWorkspaceUrl: orderWorkspaceId ? `/workspace/order/${orderWorkspaceId}` : null,
+      };
+    };
+
     const resolveTrade = (workspaceId: string, wsType: string) => {
       const ow = owMap.get(workspaceId);
-      const parent = ow ? parentMap.get(ow.parentWorkspaceId) : undefined;
+      const parent = ow?.parentWorkspaceId ? parentMap.get(ow.parentWorkspaceId) : undefined;
       const tradeRootId = parent?.id ?? ow?.parentWorkspaceId ?? null;
       const tradeId = parent ? tradeRefFromRoot(parent as Parameters<typeof tradeRefFromRoot>[0]) : null;
       return { tradeRootId, tradeId, buyerId: ow?.buyerUserId, supplierId: ow?.supplierUserId };
@@ -410,6 +439,7 @@ export class DocumentCenterService {
         tradeId: trade.tradeId,
         tradeRootId: d.tradeRootId ?? trade.tradeRootId,
         tradeWorkspaceUrl: trade.tradeRootId ? `/workspace/trade/${trade.tradeRootId}` : null,
+        ...resolvePo(d.workspaceType === "SHIPMENT" ? shipmentWs?.spawnedFromId : d.workspaceId),
         relatedEntityType: d.workspaceType,
         relatedEntityId: d.workspaceId,
         relatedEntityRef: ws?.externalRef ?? "",
@@ -449,6 +479,7 @@ export class DocumentCenterService {
         tradeId: trade.tradeId,
         tradeRootId: trade.tradeRootId,
         tradeWorkspaceUrl: trade.tradeRootId ? `/workspace/trade/${trade.tradeRootId}` : null,
+        ...resolvePo(d.workspaceId),
         relatedEntityType: "ORDER",
         relatedEntityId: d.workspaceId,
         relatedEntityRef: ws?.externalRef ?? "",
@@ -485,6 +516,7 @@ export class DocumentCenterService {
         tradeId: trade.tradeId,
         tradeRootId: trade.tradeRootId,
         tradeWorkspaceUrl: trade.tradeRootId ? `/workspace/trade/${trade.tradeRootId}` : null,
+        ...resolvePo(ws?.spawnedFromId),
         relatedEntityType: "SHIPMENT",
         relatedEntityId: d.workspaceId,
         relatedEntityRef: ws?.externalRef ?? "",
@@ -521,6 +553,9 @@ export class DocumentCenterService {
         tradeId: ws ? tradeRefFromRoot(ws as Parameters<typeof tradeRefFromRoot>[0]) : null,
         tradeRootId,
         tradeWorkspaceUrl: `/workspace/trade/${tradeRootId}`,
+        poNumber: null,
+        poOrderId: null,
+        orderWorkspaceUrl: null,
         relatedEntityType: "RFQ",
         relatedEntityId: d.workspaceId,
         relatedEntityRef: ws?.externalRef ?? "",
@@ -575,7 +610,16 @@ function parseCompositeId(compositeId: string): { source: DocumentCenterSource; 
   return { source, id };
 }
 
-function applyFilters(rows: RawDoc[], query: DocumentCenterQuery): RawDoc[] {
+/**
+ * The Document Center UI sends `source` and `rfqId`, but DocumentCenterQuery (contracts)
+ * does not declare them yet, so zod strips them and both filters stay inert until it does.
+ */
+type DocumentCenterFilterQuery = DocumentCenterQuery & {
+  source?: DocumentCenterSource;
+  rfqId?: string;
+};
+
+function applyFilters(rows: RawDoc[], query: DocumentCenterFilterQuery): RawDoc[] {
   let out = rows;
   if (query.source) out = out.filter((r) => r.source === query.source);
   if (query.rfqId) out = out.filter((r) => r.relatedEntityId === query.rfqId && r.source === "RFQ");
@@ -590,7 +634,7 @@ function applyFilters(rows: RawDoc[], query: DocumentCenterQuery): RawDoc[] {
   }
   if (query.buyerId) out = out.filter((r) => r._buyerId === query.buyerId);
   if (query.supplierId) out = out.filter((r) => r._supplierId === query.supplierId);
-  if (query.shipmentId) out = out.filter((r) => r.relatedEntityId === query.shipmentId || r.shipmentRef);
+  if (query.shipmentId) out = out.filter((r) => r.relatedEntityId === query.shipmentId);
   if (query.uploadedBy) out = out.filter((r) => r._uploadedBy === query.uploadedBy);
   if (query.dateFrom) {
     const from = new Date(query.dateFrom).getTime();

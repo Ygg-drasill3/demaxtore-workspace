@@ -4,7 +4,6 @@
  */
 import { describe, it, expect } from "vitest";
 import { io as ioClient, type Socket } from "socket.io-client";
-import { request } from "playwright";
 import { SocketEvents } from "@dmx/contracts";
 import { SOCKET_TEST_CONVERSATION_ID } from "../../../scripts/seed-socket-test-fixture.js";
 import { TEST_PASSWORD, TEST_USER_EMAILS } from "../../test/fixture-users.js";
@@ -18,6 +17,14 @@ const E2E_SECRET = process.env.E2E_TEST_SECRET ?? "";
 async function health(url: string) {
   const res = await fetch(`${url}/api/healthz`);
   return res.ok;
+}
+
+async function postJson(url: string, body: unknown, headers: Record<string, string> = {}) {
+  return fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...headers },
+    body: JSON.stringify(body),
+  });
 }
 
 function connectSocket(baseUrl: string, token: string): Promise<Socket> {
@@ -56,11 +63,11 @@ describe("Two-process socket dedup (live)", () => {
       expect(aOk, `instance A not healthy on ${PORT_A}`).toBe(true);
       expect(bOk, `instance B not healthy on ${PORT_B}`).toBe(true);
 
-      const req = await request.newContext();
-      const login = await req.post(`${API_A}/api/auth/login`, {
-        data: { email: TEST_USER_EMAILS.admin, password: TEST_PASSWORD },
+      const login = await postJson(`${API_A}/api/auth/login`, {
+        email: TEST_USER_EMAILS.admin,
+        password: TEST_PASSWORD,
       });
-      expect(login.ok(), "admin login failed for socket test").toBe(true);
+      expect(login.ok, "admin login failed for socket test").toBe(true);
       const { accessToken } = (await login.json()) as { accessToken: string };
       const token = accessToken;
 
@@ -95,21 +102,22 @@ describe("Two-process socket dedup (live)", () => {
         "x-e2e-test-secret": E2E_SECRET,
       };
 
-      const emitA = await req.post(`${API_A}/api/internal/messaging/socket-emit-test`, {
+      const emitA = await postJson(
+        `${API_A}/api/internal/messaging/socket-emit-test`,
+        { event: eventName, payload },
         headers,
-        data: { event: eventName, payload },
-      });
-      const emitB = await req.post(`${API_B}/api/internal/messaging/socket-emit-test`, {
+      );
+      const emitB = await postJson(
+        `${API_B}/api/internal/messaging/socket-emit-test`,
+        { event: eventName, payload },
         headers,
-        data: { event: eventName, payload },
-      });
-      expect(emitA.ok(), "socket emit test route A failed").toBe(true);
-      expect(emitB.ok(), "socket emit test route B failed").toBe(true);
+      );
+      expect(emitA.ok, "socket emit test route A failed").toBe(true);
+      expect(emitB.ok, "socket emit test route B failed").toBe(true);
 
       await done;
       await new Promise((r) => setTimeout(r, 500));
       socket.disconnect();
-      await req.dispose();
 
       expect(received.length).toBe(1);
       expect(received[0]?.idempotencyKey).toBe(dedupKey);

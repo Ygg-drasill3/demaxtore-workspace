@@ -11,7 +11,7 @@ export default function ForwarderDashboardPage() {
   });
 
   return (
-    <div data-testid="forwarder-dashboard" className="max-w-[1200px] mx-auto space-y-6 animate-fade-in">
+    <div data-testid="forwarder-dashboard" data-guide="forwarder-requests" className="max-w-[1200px] mx-auto space-y-6 animate-fade-in">
       <header>
         <span className="text-[11px] uppercase tracking-wider text-zinc-500">Forwarder portal</span>
         <h1 className="font-display text-3xl font-semibold tracking-tight mt-1">Shipments</h1>
@@ -29,7 +29,7 @@ export default function ForwarderDashboardPage() {
         <p className="text-sm text-zinc-500">No assigned shipments yet.</p>
       )}
       {data && data.length > 0 && (
-        <ul className="divide-y divide-paper-200 dmx-card">
+        <ul data-guide="forwarder-shipments" className="divide-y divide-paper-200 dmx-card">
           {data.map((s) => (
             <li key={s.id} className="px-5 py-4 flex items-center justify-between gap-4">
               <div>

@@ -11,6 +11,7 @@ import {
   fetchSupplierTradeDocList,
   fetchSupplierMessageList,
 } from "@/features/navigation/lib/supplier-portfolio";
+import { rfqWorkspacePath } from "@/features/rfq/lib/rfq-path";
 
 const LIMIT = 15;
 
@@ -182,7 +183,7 @@ export async function fetchSupplierCommandCenter(
 }
 
 function buildOpportunities(
-  rfqs: Array<{ id: string; externalRef: string; title: string; state: string }>,
+  rfqs: Array<{ id: string; externalRef: string; slug?: string | null; title: string; state: string }>,
   auctions: Array<{ id: string; externalRef: string; title: string; state: string; auctionEndsAt: string | null }>,
 ): OpportunityRow[] {
   const rows: OpportunityRow[] = [
@@ -194,7 +195,7 @@ function buildOpportunities(
       state: r.state,
       auctionEndsAt: null,
       participationStatus: "Awaiting quotation",
-      workspaceUrl: `/workspace/rfq/${r.id}`,
+      workspaceUrl: rfqWorkspacePath(r),
     })),
     ...auctions.filter((a) => CB_OPPORTUNITY.has(a.state)).map((a) => ({
       id: a.id,
@@ -253,7 +254,7 @@ function nextOrderAction(state: string): string {
 }
 
 function buildActions(
-  rfqs: Array<{ id: string; externalRef: string; title: string; state: string; hasMyQuotation?: boolean }>,
+  rfqs: Array<{ id: string; externalRef: string; slug?: string | null; title: string; state: string; hasMyQuotation?: boolean }>,
   auctions: Array<{ id: string; externalRef: string; title: string; state: string }>,
   pos: Awaited<ReturnType<typeof fetchSupplierPoList>>,
   docs: Awaited<ReturnType<typeof fetchSupplierTradeDocList>>,
@@ -272,7 +273,7 @@ function buildActions(
         : `Submit RFQ response — ${r.externalRef}`,
       priority: "high",
       dueLabel: hasQuote ? "Revision available" : "Quotation requested",
-      workspaceUrl: `/workspace/rfq/${r.id}`,
+      workspaceUrl: rfqWorkspacePath(r),
       actionLabel: hasQuote ? "Submit revision" : "Submit quote",
       kind: hasQuote ? "revise_rfq_response" : "submit_rfq_response",
     });
@@ -355,7 +356,7 @@ function buildActions(
 }
 
 function buildEvents(
-  rfqs: Array<{ id: string; externalRef: string; deadlineAt: string | null }>,
+  rfqs: Array<{ id: string; externalRef: string; slug?: string | null; deadlineAt: string | null }>,
   auctions: Array<{ id: string; externalRef: string; auctionStartsAt: string | null; auctionEndsAt: string | null }>,
   pos: Awaited<ReturnType<typeof fetchSupplierPoList>>,
   shipments: Awaited<ReturnType<typeof fetchSupplierShipmentList>>,
@@ -370,7 +371,7 @@ function buildEvents(
         at: r.deadlineAt,
         label: `RFQ deadline — ${r.externalRef}`,
         kind: "rfq_deadline",
-        workspaceUrl: `/workspace/rfq/${r.id}`,
+        workspaceUrl: rfqWorkspacePath(r),
       });
     }
   }

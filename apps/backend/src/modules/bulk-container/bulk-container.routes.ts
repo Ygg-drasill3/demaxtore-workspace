@@ -12,6 +12,7 @@ bulkContainerRouter.get("/offers/:offerId", requireAuth, requireRole("BUYER", "A
 bulkContainerRouter.post("/offers/:offerId/actions/approve", requireAuth, requireRole("BUYER"), asyncHandler(bulkContainerController.approveOffer));
 bulkContainerRouter.post("/offers/:offerId/actions/request-revision", requireAuth, requireRole("BUYER"), asyncHandler(bulkContainerController.requestRevision));
 bulkContainerRouter.get("/", requireAuth, requireRole("BUYER", "ADMIN"), asyncHandler(bulkContainerController.list));
+bulkContainerRouter.post("/actions/ensure-active", requireAuth, requireRole("BUYER"), asyncHandler(bulkContainerController.ensureActiveBuilding));
 bulkContainerRouter.post("/", requireAuth, requireRole("BUYER"), asyncHandler(bulkContainerController.create));
 bulkContainerRouter.get("/:id", requireAuth, asyncHandler(bulkContainerController.get));
 bulkContainerRouter.patch("/:id", requireAuth, requireRole("BUYER"), asyncHandler(bulkContainerController.update));

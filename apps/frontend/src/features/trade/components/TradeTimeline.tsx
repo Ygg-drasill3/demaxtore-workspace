@@ -25,7 +25,7 @@ export function TradeTimeline({ tradeId }: TradeTimelineProps) {
   }
 
   return (
-    <div data-testid="trade-timeline-engine" className="space-y-5">
+    <div data-testid="trade-timeline-engine" data-guide="workspace-timeline" className="space-y-5">
       <TradeProgressBar progressPercent={data.progressPercent} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

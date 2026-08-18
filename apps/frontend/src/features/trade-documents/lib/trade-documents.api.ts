@@ -23,11 +23,12 @@ export const tradeDocumentsApi = {
     workspaceId: string,
     documentType: string,
     file: File,
+    ownerRole: "SUPPLIER" | "BUYER" | "OPERATOR" | "SYSTEM" = "SUPPLIER",
   ) => {
     const fd = new FormData();
     fd.append("file", file);
     fd.append("documentType", documentType);
-    fd.append("ownerRole", "SUPPLIER");
+    fd.append("ownerRole", ownerRole);
     const res = await api.post<TradeDocumentsSummary>(
       `${base(workspaceType, workspaceId)}/upload`,
       fd,

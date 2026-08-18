@@ -64,7 +64,7 @@ export default function OperationsPage() {
   const freightCommercial = dashboard.freightCommercial;
 
   return (
-    <div data-testid="operations-page" className="max-w-[1400px] mx-auto space-y-8 animate-fade-in">
+    <div data-testid="operations-page" data-guide="operations-control-tower" className="max-w-[1400px] mx-auto space-y-8 animate-fade-in">
       <header>
         <span className="dmx-eyebrow">Admin · Operations</span>
         <h1 className="font-display text-4xl font-semibold tracking-tight mt-1">Control Tower</h1>
@@ -134,7 +134,7 @@ export default function OperationsPage() {
         </div>
       </section>
 
-      <section data-testid="sla-dashboard">
+      <section data-testid="sla-dashboard" data-guide="operations-sla">
         <h2 className="font-display text-lg font-semibold mb-3">SLA overview</h2>
         <div className="dmx-card overflow-hidden">
           <table className="w-full text-sm">

@@ -26,12 +26,21 @@ export const FreightAction = [
   "withdraw_offer",
   "select_offer",
   "cancel_request",
+  "proceed_to_booking",
 ] as const;
 export type FreightAction = (typeof FreightAction)[number];
 
-/** Order states where FreightIQ request creation is allowed (no Order FSM edits). */
+/**
+ * Order states where a buyer may open a FreightIQ quote request (Sprint 43).
+ * Quote request is allowed before production completes; booking remains deposit-gated separately.
+ */
 export const FREIGHTIQ_ORDER_ELIGIBLE_STATES = [
+  "ORDER_CREATED",
+  "SUPPLIER_CONFIRMED",
+  "PRODUCTION_STARTED",
+  "PRODUCTION_IN_PROGRESS",
   "PRODUCTION_COMPLETED",
+  "INSPECTION_REQUESTED",
   "INSPECTION_COMPLETED",
   "FREIGHT_REQUESTED",
 ] as const;
@@ -131,6 +140,23 @@ export interface FreightSummary {
   commercialSummary?: import("./freight-commercial").FreightCommercialSummary | null;
   /** Sprint 6B — suggested margin on intake (admin only) */
   marginIntakeHint?: import("./freight-analytics").MarginPolicySuggestion | null;
+  /** Execution roll-up, mirroring `FreightPortfolioItem.execution`. */
+  execution?: import("./freightiq-execution").FreightIqExecutionSummary | null;
+}
+
+export interface FreightPortfolioItem {
+  orderId: string;
+  orderRef: string;
+  orderState: string;
+  request: FreightRequest;
+  offers: FreightOffer[];
+  selection: FreightSelection | null;
+  comparisonHints: FreightSummary["comparisonHints"];
+  execution?: import("./freightiq-execution").FreightIqExecutionSummary | null;
+}
+
+export interface FreightPortfolio {
+  items: FreightPortfolioItem[];
 }
 
 export interface FreightOpsOverview {

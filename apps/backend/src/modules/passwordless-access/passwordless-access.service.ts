@@ -10,7 +10,7 @@ import { prisma } from "../../db/prisma.js";
 import { env } from "../../config/env.js";
 import { Forbidden, Validation } from "../../lib/errors.js";
 import { hashToken, signPasswordlessSessionToken, newJti } from "../auth/jwt.js";
-import { toUserDTO } from "../auth/auth.service.js";
+import { AUTH_ORG_SELECT, toUserDTO } from "../auth/auth.service.js";
 import type { AuthUser } from "../../types/auth-user.js";
 import {
   canAccessCommWorkspace,
@@ -280,7 +280,7 @@ export async function consumePasswordlessAccess(
 
   const user = await prisma.user.findUnique({
     where: { id: row.userId },
-    include: { organisation: { select: { name: true } } },
+    include: { organisation: { select: AUTH_ORG_SELECT } },
   });
   if (!user) return fail("USER_NOT_FOUND");
 

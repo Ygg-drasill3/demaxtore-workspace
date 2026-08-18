@@ -1,0 +1,381 @@
+{
+  "phase": "PHASE_4",
+  "base": "https://workspace.demaxtore.com",
+  "api": "http://127.0.0.1:3001",
+  "at": "2026-08-15T18:25:38.328Z",
+  "healthBefore": {
+    "healthz": 200,
+    "ready": 200
+  },
+  "healthAfter": {
+    "healthz": 200,
+    "ready": 200
+  },
+  "roleResults": [
+    {
+      "role": "BUYER",
+      "login": {
+        "ok": true
+      },
+      "landing": {
+        "ok": true
+      },
+      "layout": {
+        "ok": true
+      },
+      "academyState": null,
+      "academyInit": {
+        "ok": false,
+        "helpButton": false
+      },
+      "navigation": [
+        {
+          "path": "/buyer/products",
+          "label": "Product Master",
+          "testId": "product-list-page",
+          "ok": true,
+          "url": "https://workspace.demaxtore.com/buyer/products",
+          "blank": false
+        },
+        {
+          "path": "/buyer/purchase-orders",
+          "label": "PO list",
+          "ok": true,
+          "url": "https://workspace.demaxtore.com/buyer/purchase-orders",
+          "blank": false
+        },
+        {
+          "path": "/buyer/shipments",
+          "label": "Shipments",
+          "ok": true,
+          "url": "https://workspace.demaxtore.com/buyer/shipments",
+          "blank": false
+        },
+        {
+          "path": "/buyer/customs",
+          "label": "Customs",
+          "ok": true,
+          "url": "https://workspace.demaxtore.com/buyer/customs",
+          "blank": false
+        },
+        {
+          "path": "/buyer/inland",
+          "label": "Inland",
+          "ok": true,
+          "url": "https://workspace.demaxtore.com/buyer/inland",
+          "blank": false
+        },
+        {
+          "path": "/buyer/landed-cost",
+          "label": "Landed Cost",
+          "ok": true,
+          "url": "https://workspace.demaxtore.com/buyer/landed-cost",
+          "blank": false
+        }
+      ],
+      "helpCenter": {
+        "ok": false,
+        "tested": false
+      },
+      "consoleErrors": [],
+      "pageErrors": [],
+      "academyRequests": [],
+      "rawKeys": [],
+      "screenshot": "/var/www/demaxtore/DemaxtoreSolitions-main/.phase-4-evidence/buyer-landing.png"
+    },
+    {
+      "role": "ADMIN",
+      "login": {
+        "ok": true
+      },
+      "landing": {
+        "ok": true
+      },
+      "layout": {
+        "ok": true
+      },
+      "academyState": null,
+      "academyInit": {
+        "ok": false,
+        "helpButton": false
+      },
+      "navigation": [
+        {
+          "path": "/admin",
+          "label": "Admin home",
+          "ok": true,
+          "url": "https://workspace.demaxtore.com/admin/dashboard",
+          "blank": false
+        },
+        {
+          "path": "/admin/freight-bookings",
+          "label": "Freight bookings",
+          "ok": true,
+          "url": "https://workspace.demaxtore.com/admin/freight-bookings",
+          "blank": false
+        },
+        {
+          "path": "/admin/customs",
+          "label": "Customs ops",
+          "ok": true,
+          "url": "https://workspace.demaxtore.com/admin/customs",
+          "blank": false
+        },
+        {
+          "path": "/admin/inland",
+          "label": "Inland ops",
+          "ok": true,
+          "url": "https://workspace.demaxtore.com/admin/inland",
+          "blank": false
+        },
+        {
+          "path": "/admin/control-tower",
+          "label": "Control Tower",
+          "ok": true,
+          "url": "https://workspace.demaxtore.com/admin/control-tower",
+          "blank": false
+        }
+      ],
+      "helpCenter": {
+        "ok": false,
+        "tested": false
+      },
+      "consoleErrors": [],
+      "pageErrors": [],
+      "academyRequests": [],
+      "rawKeys": [],
+      "screenshot": "/var/www/demaxtore/DemaxtoreSolitions-main/.phase-4-evidence/admin-landing.png"
+    },
+    {
+      "role": "SUPPLIER",
+      "login": {
+        "ok": true
+      },
+      "landing": {
+        "ok": true
+      },
+      "layout": {
+        "ok": true
+      },
+      "academyState": null,
+      "academyInit": {
+        "ok": false,
+        "helpButton": false
+      },
+      "navigation": [
+        {
+          "path": "/supplier/dashboard",
+          "label": "Supplier dashboard",
+          "testId": "supplier-dashboard",
+          "ok": true,
+          "url": "https://workspace.demaxtore.com/supplier/dashboard",
+          "blank": false
+        },
+        {
+          "path": "/supplier/rfq",
+          "label": "RFQ",
+          "ok": true,
+          "url": "https://workspace.demaxtore.com/supplier/rfq",
+          "blank": false
+        },
+        {
+          "path": "/supplier/orders",
+          "label": "Orders",
+          "ok": true,
+          "url": "https://workspace.demaxtore.com/supplier/orders",
+          "blank": false
+        }
+      ],
+      "helpCenter": {
+        "ok": false,
+        "tested": false
+      },
+      "consoleErrors": [],
+      "pageErrors": [],
+      "academyRequests": [],
+      "rawKeys": [],
+      "screenshot": "/var/www/demaxtore/DemaxtoreSolitions-main/.phase-4-evidence/supplier-landing.png"
+    },
+    {
+      "role": "CUSTOMS_BROKER",
+      "login": {
+        "ok": true
+      },
+      "landing": {
+        "ok": true
+      },
+      "layout": {
+        "ok": true
+      },
+      "academyState": null,
+      "academyInit": {
+        "ok": false,
+        "helpButton": false
+      },
+      "navigation": [
+        {
+          "path": "/partner",
+          "label": "Partner home",
+          "ok": true,
+          "url": "https://workspace.demaxtore.com/partner",
+          "blank": false
+        },
+        {
+          "path": "/partner/customs",
+          "label": "My Customs Cases",
+          "testId": "nav-partner-customs",
+          "ok": false,
+          "url": "https://workspace.demaxtore.com/partner/customs",
+          "blank": false,
+          "error": "TimeoutError: locator.waitFor: Timeout 15000ms exceeded.\nCall log:\n  - waiting for getByTestId('nav-partner-customs') to be visible\n"
+        },
+        {
+          "path": "/partner/customs/8a96c974-700e-40ba-9db0-0b331f7d4583",
+          "label": "R4 customs case (read-only)",
+          "ok": true,
+          "url": "https://workspace.demaxtore.com/partner/customs/8a96c974-700e-40ba-9db0-0b331f7d4583",
+          "blank": false
+        },
+        {
+          "path": "/partner",
+          "label": "Return partner home",
+          "ok": true,
+          "url": "https://workspace.demaxtore.com/partner",
+          "blank": false
+        }
+      ],
+      "helpCenter": {
+        "ok": false,
+        "tested": false
+      },
+      "consoleErrors": [],
+      "pageErrors": [],
+      "academyRequests": [],
+      "rawKeys": [],
+      "screenshot": "/var/www/demaxtore/DemaxtoreSolitions-main/.phase-4-evidence/customs_broker-landing.png"
+    },
+    {
+      "role": "TRUCKER",
+      "login": {
+        "ok": true
+      },
+      "landing": {
+        "ok": true
+      },
+      "layout": {
+        "ok": true
+      },
+      "academyState": null,
+      "academyInit": {
+        "ok": false,
+        "helpButton": false
+      },
+      "navigation": [
+        {
+          "path": "/partner",
+          "label": "Partner home",
+          "ok": true,
+          "url": "https://workspace.demaxtore.com/partner",
+          "blank": false
+        },
+        {
+          "path": "/partner/deliveries",
+          "label": "My Deliveries",
+          "ok": true,
+          "url": "https://workspace.demaxtore.com/partner/deliveries",
+          "blank": false
+        },
+        {
+          "path": "/partner",
+          "label": "Return partner home",
+          "ok": true,
+          "url": "https://workspace.demaxtore.com/partner",
+          "blank": false
+        }
+      ],
+      "helpCenter": {
+        "ok": false,
+        "tested": false
+      },
+      "consoleErrors": [],
+      "pageErrors": [],
+      "academyRequests": [],
+      "rawKeys": [],
+      "screenshot": "/var/www/demaxtore/DemaxtoreSolitions-main/.phase-4-evidence/trucker-landing.png"
+    },
+    {
+      "role": "ORIGIN_AGENT",
+      "login": {
+        "ok": true
+      },
+      "landing": {
+        "ok": true
+      },
+      "layout": {
+        "ok": true
+      },
+      "academyState": null,
+      "academyInit": {
+        "ok": false,
+        "helpButton": false
+      },
+      "navigation": [
+        {
+          "path": "/partner",
+          "label": "Partner home",
+          "ok": true,
+          "url": "https://workspace.demaxtore.com/partner",
+          "blank": false
+        }
+      ],
+      "helpCenter": {
+        "ok": false,
+        "tested": false
+      },
+      "consoleErrors": [],
+      "pageErrors": [],
+      "academyRequests": [],
+      "rawKeys": [],
+      "screenshot": "/var/www/demaxtore/DemaxtoreSolitions-main/.phase-4-evidence/origin_agent-landing.png"
+    }
+  ],
+  "persistence": {
+    "role": "BUYER",
+    "dismissChecklist": null,
+    "refresh": null,
+    "relogin": null,
+    "userB": null,
+    "error": "TimeoutError: page.waitForResponse: Timeout 20000ms exceeded while waiting for event \"response\""
+  },
+  "persistenceFailure": {
+    "ok": false,
+    "persistFailedEvents": [],
+    "appUsable": true,
+    "consoleWarnings": [],
+    "blank": false
+  },
+  "consoleErrors": [],
+  "pageErrors": [],
+  "academyNetwork": [],
+  "totals": {
+    "roles": 6,
+    "loginPass": 6,
+    "layoutPass": 6,
+    "navFails": 1,
+    "academy5xx": 0,
+    "unexplainedPageErrors": 0,
+    "persistFailureResilience": false
+  },
+  "navFails": [
+    {
+      "role": "CUSTOMS_BROKER",
+      "path": "/partner/customs",
+      "label": "My Customs Cases",
+      "testId": "nav-partner-customs",
+      "ok": false,
+      "url": "https://workspace.demaxtore.com/partner/customs",
+      "blank": false,
+      "error": "TimeoutError: locator.waitFor: Timeout 15000ms exceeded.\nCall log:\n  - waiting for getByTestId('nav-partner-customs') to be visible\n"
+    }
+  ]
+}

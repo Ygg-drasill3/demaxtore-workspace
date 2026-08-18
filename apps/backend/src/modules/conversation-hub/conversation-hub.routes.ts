@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type RequestHandler } from "express";
 import multer from "multer";
 import { requireAuth } from "../../middleware/auth.js";
 import { asyncHandler } from "../../middleware/asyncHandler.js";
@@ -14,6 +14,7 @@ import {
 import type { CommWorkspaceType } from "@dmx/contracts/workspace-communication";
 import { CommunicationService } from "../workspace-communication/communication.service.js";
 import { streamStoredFileToResponse } from "../../lib/file-storage.js";
+import { uploadLimiter } from "../../middleware/rate-limit.js";
 import {
   getLegacyMessagingAdapters,
   shouldUseAdapterLayer,
@@ -21,6 +22,7 @@ import {
 } from "../unified-messaging/adapters/legacy/index.js";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+const uploadSingle = upload.single("file") as unknown as RequestHandler;
 const hub = () => new ConversationHubService(prisma);
 const comm = () => new CommunicationService(prisma);
 const adapters = () => getLegacyMessagingAdapters(prisma);
@@ -115,7 +117,8 @@ conversationHubRouter.post("/timeline/:messageId/pin", asyncHandler(async (req, 
 
 conversationHubRouter.post(
   "/attachments",
-  upload.single("file"),
+  uploadLimiter,
+  uploadSingle,
   asyncHandler(async (req, res) => {
     if (!req.file) {
       res.status(400).json({ code: "FILE_REQUIRED" });

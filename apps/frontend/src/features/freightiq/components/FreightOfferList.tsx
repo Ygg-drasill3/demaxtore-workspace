@@ -30,7 +30,7 @@ export function FreightOfferList({ summary, pol, pod, canSelect, onRequestSelect
   if (!offers.length) return null;
 
   return (
-    <section data-testid="freightiq-offer-list" className="space-y-3">
+    <section data-testid="freightiq-offer-list" data-guide="freight-comparison" className="space-y-3">
       <div>
         <span className="dmx-eyebrow text-zinc-500">{t("order.freightiq.offerListEyebrow")}</span>
         <h3 className="font-display text-lg font-semibold mt-0.5">{t("order.freightiq.offerListTitle")}</h3>

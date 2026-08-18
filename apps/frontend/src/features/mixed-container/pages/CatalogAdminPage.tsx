@@ -4,7 +4,7 @@ import { adminCatalogApi } from "../lib/mixed-container.api";
 import { Button } from "@/components/ui/Button";
 import { CATALOG_MARKET_STATUS } from "@dmx/contracts/mixed-container-catalog";
 
-type AdminCategory = { id: string; slug: string; name: string };
+type AdminCategory = { id: string; slug: string; name: string; industry?: { id: string; name: string; slug: string } };
 type AdminProduct = {
   id: string;
   productRef: string;
@@ -61,7 +61,9 @@ export default function CatalogAdminPage() {
   };
 
   const createCategory = async () => {
-    await adminCatalogApi.createCategory({ slug: catSlug, name: catName, sortOrder: categories.length + 1 });
+    const industryId = categories.find((c) => c.industry?.id)?.industry?.id;
+    if (!industryId) return;
+    await adminCatalogApi.createCategory({ industryId, slug: catSlug, name: catName, sortOrder: categories.length + 1 });
     setCatName("");
     setCatSlug("");
     await qc.invalidateQueries({ queryKey: ["admin-mc-cats"] });

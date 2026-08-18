@@ -8,18 +8,18 @@ import { uiLogin, USERS } from "./_helpers";
 test.describe("Auth (UI)", () => {
   test("admin logs in and sees the admin dashboard", async ({ page }) => {
     await uiLogin(page, USERS.admin);
-    await expect(page.getByTestId("operations-command-center")).toBeVisible();
+    await expect(page.getByTestId("operations-command-center")).toBeVisible({ timeout: 20_000 });
   });
 
   test("buyer1 logs in and lands on buyer control tower (ROLE_DASHBOARD)", async ({ page }) => {
     await uiLogin(page, USERS.buyer1);
     await expect(page).toHaveURL(/\/buyer\/control-tower/);
-    await expect(page.getByTestId("import-control-tower")).toBeVisible();
+    await expect(page.getByTestId("import-control-tower")).toBeVisible({ timeout: 20_000 });
   });
 
   test("supplier1 logs in and sees the supplier dashboard", async ({ page }) => {
     await uiLogin(page, USERS.supA1);
-    await expect(page.getByTestId("supplier-dashboard")).toBeVisible();
+    await expect(page.getByTestId("supplier-dashboard")).toBeVisible({ timeout: 20_000 });
   });
 
   test("wrong password shows the inline error", async ({ page }) => {

@@ -13,7 +13,7 @@ export function ActionInbox({ actions, loading }: { actions?: RequiredAction[]; 
   const { t } = useT();
 
   return (
-    <section id="cc-action-inbox" data-testid="cc-action-inbox" className="dmx-card p-5">
+    <section id="cc-action-inbox" data-testid="cc-action-inbox" data-guide="dashboard-pending-actions" className="dmx-card p-5">
       <div className="flex items-center justify-between gap-2 mb-4">
         <div>
           <span className="dmx-eyebrow text-zinc-500">{t("dash.eyebrow.priority")}</span>

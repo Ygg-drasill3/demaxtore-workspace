@@ -217,6 +217,10 @@ export class MixedContainerExecutionService {
             actorUserId: actor.id,
             actorEmail: actor.email,
             actorRole: actor.role,
+            // Catalog products bought straight through a container — no RFQ negotiation.
+            // A dedicated MIXED_CONTAINER enum value would be more precise but needs a
+            // migration; DIRECT is accurate in the sense that matters (not RFQ-sourced).
+            source: "DIRECT",
             issueReason: `SmartContainer ${scRef} allocation ${alloc.sortOrder + 1}`,
           });
 
@@ -254,7 +258,7 @@ export class MixedContainerExecutionService {
     }
   }
 
-  async getExecution(id: string, actor: AuthUser) {
+  async getExecution(id: string, actor: AuthUser, opts: { readOnly?: boolean } = {}) {
     const ws = await this.prisma.workspace.findUniqueOrThrow({
       where: { id },
       include: {
@@ -430,12 +434,18 @@ export class MixedContainerExecutionService {
       completionPercent = 80;
     }
 
-    await this.tryMarkExecutionComplete(id);
+    // Callers on a pure read path (e.g. the organization aggregate) opt out of the
+    // auto-completion transition so a GET never mutates workspace state.
+    if (!opts.readOnly) {
+      await this.tryMarkExecutionComplete(id);
+    }
 
     return {
       workspaceId: ws.id,
       containerExternalRef: ws.externalRef,
-      state: (await this.prisma.workspace.findUnique({ where: { id }, select: { state: true } }))!.state,
+      state: opts.readOnly
+        ? ws.state
+        : (await this.prisma.workspace.findUnique({ where: { id }, select: { state: true } }))!.state,
       masterOrderRef: master?.externalRef ?? null,
       masterOrderId: master?.id ?? null,
       completionPercent,

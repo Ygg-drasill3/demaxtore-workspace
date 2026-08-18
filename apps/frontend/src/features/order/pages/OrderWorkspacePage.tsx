@@ -10,8 +10,9 @@ import type { OrderState, ActorRole, OrderAction } from "@dmx/contracts/order.fs
 import { api } from "@/lib/api";
 import { freightiqApi } from "@/features/freightiq/lib/freightiq.api";
 import { toast } from "@/store/toast.store";
+import { getApiErrorMessage } from "@/lib/api-errors";
 import PoSummaryPanel from "@/features/purchase-order/components/PoSummaryPanel";
-import { OnlinePaymentDisabledNotice } from "@/features/payments/components/OnlinePaymentDisabledNotice";
+import { TradeFinancialPanel } from "@/features/trade/components/TradeFinancialPanel";
 import ConversationHubPanel from "@/features/conversation-hub/components/ConversationHubPanel";
 import { SocketEvents } from "@dmx/contracts/socket-events";
 import { useWorkspaceSocket } from "@/lib/socket";
@@ -233,8 +234,7 @@ export default function OrderWorkspacePage() {
       qc.invalidateQueries({ queryKey: ["order", id, "status-updates"] });
       setPendingAction(null);
     } catch (e: unknown) {
-      const err = e as { response?: { data?: { error?: { message?: string } } } };
-      toast.error(err.response?.data?.error?.message ?? "Action failed");
+      toast.error(getApiErrorMessage(e, t("common.error")));
     } finally {
       setActionBusy(false);
     }
@@ -362,7 +362,7 @@ export default function OrderWorkspacePage() {
 
       <section data-testid="order-payment-section" className="dmx-card p-4 space-y-2">
         <h2 className="font-medium text-sm">{t("order.payment.title", "Payment milestones")}</h2>
-        <OnlinePaymentDisabledNotice />
+        <TradeFinancialPanel orderId={id!} />
       </section>
 
       <ConversationHubPanel workspaceType="ORDER" workspaceId={id!} testId="order-communication" />

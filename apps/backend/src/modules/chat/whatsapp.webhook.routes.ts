@@ -6,12 +6,10 @@ import {
   verifySubscription,
 } from "./whatsapp.service.js";
 import { logger } from "../../config/logger.js";
-import { TradeChatService } from "./chat.service.js";
 import { WhatsAppInboxService } from "../whatsapp-inbox/whatsapp-inbox.service.js";
 
 export const whatsappWebhookRouter = Router();
 
-const chat = () => new TradeChatService(prisma);
 const inbox = () => new WhatsAppInboxService(prisma);
 
 whatsappWebhookRouter.get("/", (req, res) => {
@@ -67,26 +65,23 @@ whatsappWebhookRouter.post("/", (req, res) => {
             "../unified-messaging/unified-messaging-inbound.handler.js"
           );
           const unifiedInbound = new UnifiedMessagingInboundHandler(prisma);
-          if (inboxResult && typeof inboxResult === "object") {
-            await unifiedInbound.mirrorWhatsAppInboxResult(inboxResult as never);
-          }
           for (const st of parseWhatsAppStatusWebhook(body)) {
-            await unifiedInbound.mirrorDeliveryStatus(st.providerMessageId, st.status);
+            await unifiedInbound.mirrorDeliveryStatus(st.providerMessageId, st.status, st.raw);
           }
         } catch (mirrorErr) {
           logger.warn({ err: mirrorErr }, "[WA] unified mirror skipped");
         }
 
+        // WhatsApp Cloud inbox is the sole writer into unified workspace_messages.
+        // Never run legacy trade-chat ingest for the same Meta payload — even when
+        // inboxResult.inbound===0 (duplicates / already stored). Dual ingest was
+        // creating a second OUTBOUND ghost row for every supplier reply.
         const legacyInbound = parseInboundWebhook(body);
-        for (const item of legacyInbound) {
-          const result = await chat().ingestInbound(
-            item.fromPhone,
-            item.messageText,
-            item.whatsappMessageId,
+        if (legacyInbound.length > 0) {
+          logger.debug(
+            { legacyCount: legacyInbound.length, inboxInbound: inboxResult.inbound },
+            "[WA] skipping legacy trade-chat ingest — inbox owns WhatsApp Cloud inbound",
           );
-          if (!result) {
-            logger.debug({ from: item.fromPhone }, "[WA] trade chat — no conversation match");
-          }
         }
       } catch (err) {
         logger.error({ err }, "[WA] webhook async processing failed");

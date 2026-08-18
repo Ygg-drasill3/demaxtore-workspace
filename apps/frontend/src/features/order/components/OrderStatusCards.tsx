@@ -24,7 +24,7 @@ export function OrderStatusCards({ state, productionUpdates = [], inspectionResu
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       {showProduction && (
-        <section data-testid="order-production-section" className="dmx-card p-4">
+        <section data-testid="order-production-section" data-guide="production-timeline" className="dmx-card p-4">
           <div className="flex items-center gap-2 mb-3">
             <div className="h-8 w-8 rounded-lg bg-accent-50 text-accent-900 grid place-items-center">
               <Factory className="h-4 w-4" />
@@ -56,7 +56,7 @@ export function OrderStatusCards({ state, productionUpdates = [], inspectionResu
         </section>
       )}
       {showInspection && (
-        <section data-testid="order-inspection-section" className="dmx-card p-4">
+        <section data-testid="order-inspection-section" data-guide="inspection-panel" className="dmx-card p-4">
           <div className="flex items-center gap-2 mb-3">
             <div className="h-8 w-8 rounded-lg bg-emerald-50 text-emerald-800 grid place-items-center">
               <ClipboardCheck className="h-4 w-4" />

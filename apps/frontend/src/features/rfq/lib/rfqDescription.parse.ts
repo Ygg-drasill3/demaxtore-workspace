@@ -13,6 +13,7 @@ const SKIP_SECTION_KEYS_UI = new Set([
   "system info",
   "quantity",
   "catalog request",
+  "price quotation request",
   "your contact details",
 ]);
 
@@ -22,7 +23,8 @@ export type ParseRfqDescriptionOptions = {
 };
 
 const SECTION_ALIASES: Record<string, string> = {
-  "catalog request": "Catalog request",
+  "catalog request": "Price quotation Request",
+  "price quotation request": "Price quotation Request",
   "your contact details": "Your contact details",
   "line items": "Catalog line items",
   "request details": "Request details",

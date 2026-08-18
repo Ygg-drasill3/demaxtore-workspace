@@ -1,0 +1,2 @@
+/* Legacy driver.js chrome removed — motion lives in Framer Motion (motion/).
+   Kept as an empty import shim so any stale dynamic imports resolve safely. */

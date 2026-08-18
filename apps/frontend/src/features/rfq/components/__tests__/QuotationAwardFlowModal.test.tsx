@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen, fireEvent, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithProviders } from "@/test/utils";
 import { useLocale } from "@/i18n/store";
@@ -35,46 +35,49 @@ describe("<QuotationAwardFlowModal />", () => {
     vi.mocked(rfqApi.action).mockResolvedValue({});
   });
 
-  it("shows close-quotations step first when RFQ is open", () => {
+  it("opens directly on award confirm step (no close-quotations chain)", () => {
     renderWithProviders(
       <QuotationAwardFlowModal
         open
         onClose={vi.fn()}
         workspaceId="w1"
-        state="RFQ_OPEN"
+        rfqLineItemId="line-1"
+        productTitle="Pasta"
         quotation={quotation}
         unitPrice={2}
         onSuccess={vi.fn()}
       />,
     );
-
-    expect(screen.getByTestId("quotation-award-close-modal")).toBeInTheDocument();
-    expect(screen.getByText(/Teklifleri kapatıp devam edelim mi/i)).toBeInTheDocument();
-    expect(screen.getByText("deneme")).toBeInTheDocument();
-  });
-
-  it("advances to supplier selection after confirming close step", async () => {
-    const user = userEvent.setup();
-    renderWithProviders(
-      <QuotationAwardFlowModal
-        open
-        onClose={vi.fn()}
-        workspaceId="w1"
-        state="RFQ_OPEN"
-        quotation={quotation}
-        unitPrice={2}
-        onSuccess={vi.fn()}
-      />,
-    );
-
-    await user.click(screen.getByTestId("quotation-award-close-confirm"));
 
     expect(screen.getByTestId("quotation-award-select-modal")).toBeInTheDocument();
-    expect(screen.getByTestId("quotation-award-rationale")).toBeInTheDocument();
-    expect(rfqApi.action).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("quotation-award-close-modal")).toBeNull();
+    expect(screen.getByText(/Pasta/)).toBeInTheDocument();
   });
 
-  it("skips close step and runs select flow directly in UNDER_EVALUATION", async () => {
+  it("lists variation breakdown for multi-variation quotations", () => {
+    const multi: QuotationRowDTO = {
+      ...quotation,
+      lineItems: [
+        { id: "li-1", position: 1, description: "500 ml", quantity: 1, unitPrice: 2.1, total: 2.1, priceUnit: "Piece" },
+        { id: "li-2", position: 2, description: "1 L", quantity: 1, unitPrice: 3.85, total: 3.85, priceUnit: "Piece" },
+      ],
+    };
+    renderWithProviders(
+      <QuotationAwardFlowModal
+        open
+        onClose={vi.fn()}
+        workspaceId="w1"
+        rfqLineItemId="line-1"
+        quotation={multi}
+        onSuccess={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId("quotation-award-variations")).toBeInTheDocument();
+    expect(screen.getByText(/500 ml/)).toBeInTheDocument();
+    expect(screen.getByText(/1 L/)).toBeInTheDocument();
+  });
+
+  it("calls award_line_item with rfqLineItemId and rationale", async () => {
     const user = userEvent.setup();
     const onSuccess = vi.fn();
     const onClose = vi.fn();
@@ -84,15 +87,12 @@ describe("<QuotationAwardFlowModal />", () => {
         open
         onClose={onClose}
         workspaceId="w1"
-        state="UNDER_EVALUATION"
+        rfqLineItemId="line-pasta"
         quotation={quotation}
         unitPrice={2}
         onSuccess={onSuccess}
       />,
     );
-
-    expect(screen.queryByTestId("quotation-award-close-modal")).toBeNull();
-    expect(screen.getByTestId("quotation-award-select-modal")).toBeInTheDocument();
 
     const textarea = screen.getByTestId("quotation-award-rationale");
     await user.type(textarea, "En uygun fiyat ve termin süresi.");
@@ -100,49 +100,15 @@ describe("<QuotationAwardFlowModal />", () => {
 
     await waitFor(() => {
       expect(rfqApi.action).toHaveBeenCalledTimes(1);
-      expect(rfqApi.action).toHaveBeenCalledWith("w1", "select_supplier", {
+      expect(rfqApi.action).toHaveBeenCalledWith("w1", "award_line_item", {
         payload: {
+          rfqLineItemId: "line-pasta",
           quotationId: "q1",
-          supplierUserId: "s1",
           rationale: "En uygun fiyat ve termin süresi.",
         },
       });
     });
     expect(onSuccess).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
-  });
-
-  it("runs close, evaluation, and select actions from RFQ_OPEN", async () => {
-    const user = userEvent.setup();
-    renderWithProviders(
-      <QuotationAwardFlowModal
-        open
-        onClose={vi.fn()}
-        workspaceId="w1"
-        state="RFQ_OPEN"
-        quotation={quotation}
-        unitPrice={2}
-        onSuccess={vi.fn()}
-      />,
-    );
-
-    await user.click(screen.getByTestId("quotation-award-close-confirm"));
-    fireEvent.change(screen.getByTestId("quotation-award-rationale"), {
-      target: { value: "Fiyat avantajı ve güvenilir üretici." },
-    });
-    await user.click(screen.getByTestId("quotation-award-select-confirm"));
-
-    await waitFor(() => {
-      expect(rfqApi.action).toHaveBeenCalledTimes(3);
-      expect(rfqApi.action).toHaveBeenNthCalledWith(1, "w1", "close_quotations_early");
-      expect(rfqApi.action).toHaveBeenNthCalledWith(2, "w1", "start_evaluation");
-      expect(rfqApi.action).toHaveBeenNthCalledWith(3, "w1", "select_supplier", {
-        payload: {
-          quotationId: "q1",
-          supplierUserId: "s1",
-          rationale: "Fiyat avantajı ve güvenilir üretici.",
-        },
-      });
-    });
   });
 });

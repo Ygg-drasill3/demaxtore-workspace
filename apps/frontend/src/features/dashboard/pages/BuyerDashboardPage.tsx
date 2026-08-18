@@ -3,9 +3,12 @@ import { Link } from "react-router-dom";
 import type { ReactNode } from "react";
 import { useAuth } from "@/store/auth.store";
 import { useT } from "@/i18n/useT";
+import { isTurkeyImporterOperatingModel } from "@dmx/contracts/buyer-operating-model";
 import { useBuyerCommandCenter } from "../hooks/useBuyerCommandCenter";
 import { useBuyerDashboardQuick } from "../hooks/useBuyerDashboardQuick";
 import { BuyerDashboardHero } from "../components/command-center/BuyerDashboardHero";
+import { ImportExecutionKpiRow } from "../components/command-center/ImportExecutionKpiRow";
+import { ActiveImportsWidget } from "../components/command-center/ActiveImportsWidget";
 import { KpiRow } from "../components/command-center/KpiRow";
 import { BookingKpiRow } from "../components/command-center/BookingKpiRow";
 import { TimelineKpiRow } from "../components/command-center/TimelineKpiRow";
@@ -32,6 +35,7 @@ function SectionLabel({ children }: { children: ReactNode }) {
 export default function BuyerDashboardPage() {
   const { t } = useT();
   const user = useAuth((s) => s.user);
+  const turkey = isTurkeyImporterOperatingModel(user?.buyerOperatingModel);
   const { data, isLoading, isError, refetch } = useBuyerCommandCenter();
   const { data: quick, isLoading: quickLoading } = useBuyerDashboardQuick();
   const firstName = user?.displayName?.split(" ")[0] ?? "Buyer";
@@ -41,12 +45,18 @@ export default function BuyerDashboardPage() {
   const kpiLoading = quickLoading && !quick;
 
   return (
-    <div data-testid="buyer-dashboard" data-dashboard-mode={mode} className="max-w-[1400px] mx-auto space-y-7 animate-fade-in">
+    <div
+      data-testid="buyer-dashboard"
+      data-dashboard-mode={mode}
+      data-buyer-operating-model={turkey ? "TURKEY_IMPORTER" : "INTERNATIONAL"}
+      className="max-w-[1400px] mx-auto space-y-7 animate-fade-in"
+    >
       <BuyerDashboardHero
         firstName={firstName}
         mode={mode}
         kpis={kpis}
         loading={kpiLoading}
+        buyerOperatingModel={user?.buyerOperatingModel}
       />
 
       {isError && (
@@ -56,51 +66,100 @@ export default function BuyerDashboardPage() {
         </div>
       )}
 
-      <div className="space-y-4">
-        <SectionLabel>{t("dash.buyer.section.overview")}</SectionLabel>
-        <Link
-          to="/buyer/control-tower"
-          data-testid="buyer-control-tower-link"
-          className="inline-flex items-center gap-2 text-sm font-medium text-accent-900 hover:underline mb-2"
-        >
-          Open Import Control Tower →
-        </Link>
-        <KpiRow kpis={kpis} loading={kpiLoading} />
-        <TimelineKpiRow kpis={timelineKpis} loading={kpiLoading} />
-        <BookingKpiRow kpis={kpis} loading={kpiLoading} />
-      </div>
+      {turkey ? (
+        <>
+          <div className="space-y-4">
+            <SectionLabel>{t("s43.dashboard.section.importOps", "Import operations")}</SectionLabel>
+            <ImportExecutionKpiRow kpis={kpis} timelineKpis={timelineKpis} loading={kpiLoading} />
+            <TimelineKpiRow kpis={timelineKpis} loading={kpiLoading} />
+            <BookingKpiRow kpis={kpis} loading={kpiLoading} />
+          </div>
 
-      <TradePipelineSnippet topTrade={data?.activeTrades?.[0]} />
+          <div className="space-y-4">
+            <SectionLabel>{t("dash.buyer.section.priority")}</SectionLabel>
+            <ActionInbox actions={data?.requiredActions} loading={isLoading} />
+          </div>
 
-      <div className="space-y-4">
-        <SectionLabel>{t("dash.buyer.section.priority")}</SectionLabel>
-        <ActionInbox actions={data?.requiredActions} loading={isLoading} />
-      </div>
+          <div className="space-y-4">
+            <SectionLabel>{t("s43.dashboard.section.activeImports", "Active imports")}</SectionLabel>
+            <ActiveImportsWidget />
+          </div>
 
-      <div className="space-y-4">
-        <SectionLabel>{t("dash.buyer.section.trades")}</SectionLabel>
-        <ActiveTradesTable rows={data?.activeTrades} loading={isLoading} />
-      </div>
+          <div className="space-y-4">
+            <SectionLabel>{t("dash.buyer.section.trades")}</SectionLabel>
+            <ActiveTradesTable rows={data?.activeTrades} loading={isLoading} />
+          </div>
 
-      <div className="space-y-4">
-        <SectionLabel>{t("dash.buyer.section.operations")}</SectionLabel>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          <LiveAuctionsWidget rows={data?.liveAuctions} loading={isLoading} />
-          <MyShipmentsWidget />
-        </div>
-        <MyExceptionsWidget />
-      </div>
+          <div className="space-y-4">
+            <SectionLabel>{t("s43.dashboard.section.sourcing", "Sourcing (optional)")}</SectionLabel>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              <LiveAuctionsWidget rows={data?.liveAuctions} loading={isLoading} />
+              <MyShipmentsWidget />
+            </div>
+          </div>
 
-      <div className="space-y-4">
-        <SectionLabel>{t("dash.buyer.section.monitoring")}</SectionLabel>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          <DocumentStatusWidget rows={data?.documents} loading={isLoading} />
-          <CommunicationCenter rows={data?.communications} loading={isLoading} />
-          <UpcomingEventsWidget events={data?.upcomingEvents} loading={isLoading} />
-        </div>
-      </div>
+          <div className="space-y-4">
+            <SectionLabel>{t("dash.buyer.section.monitoring")}</SectionLabel>
+            <MyExceptionsWidget />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+              <DocumentStatusWidget rows={data?.documents} loading={isLoading} />
+              <CommunicationCenter rows={data?.communications} loading={isLoading} />
+              <UpcomingEventsWidget events={data?.upcomingEvents} loading={isLoading} />
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="space-y-4">
+            <SectionLabel>{t("dash.buyer.section.overview")}</SectionLabel>
+            <Link
+              to="/buyer/control-tower"
+              data-testid="buyer-control-tower-link"
+              className="inline-flex items-center gap-2 text-sm font-medium text-accent-900 hover:underline mb-2"
+            >
+              Open Import Control Tower →
+            </Link>
+            <KpiRow kpis={kpis} loading={kpiLoading} />
+            <TimelineKpiRow kpis={timelineKpis} loading={kpiLoading} />
+            <BookingKpiRow kpis={kpis} loading={kpiLoading} />
+          </div>
 
-      <OnboardingSection mode={data?.mode ?? "standard"} />
+          <TradePipelineSnippet topTrade={data?.activeTrades?.[0]} />
+
+          <div className="space-y-4">
+            <SectionLabel>{t("dash.buyer.section.priority")}</SectionLabel>
+            <ActionInbox actions={data?.requiredActions} loading={isLoading} />
+          </div>
+
+          <div className="space-y-4">
+            <SectionLabel>{t("dash.buyer.section.trades")}</SectionLabel>
+            <ActiveTradesTable rows={data?.activeTrades} loading={isLoading} />
+          </div>
+
+          <div className="space-y-4">
+            <SectionLabel>{t("dash.buyer.section.operations")}</SectionLabel>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              <LiveAuctionsWidget rows={data?.liveAuctions} loading={isLoading} />
+              <MyShipmentsWidget />
+            </div>
+            <MyExceptionsWidget />
+          </div>
+
+          <div className="space-y-4">
+            <SectionLabel>{t("dash.buyer.section.monitoring")}</SectionLabel>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+              <DocumentStatusWidget rows={data?.documents} loading={isLoading} />
+              <CommunicationCenter rows={data?.communications} loading={isLoading} />
+              <UpcomingEventsWidget events={data?.upcomingEvents} loading={isLoading} />
+            </div>
+          </div>
+        </>
+      )}
+
+      <OnboardingSection
+        mode={data?.mode ?? "standard"}
+        buyerOperatingModel={user?.buyerOperatingModel}
+      />
     </div>
   );
 }

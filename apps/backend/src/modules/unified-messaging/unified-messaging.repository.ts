@@ -10,6 +10,23 @@ import {
 } from "./unified-messaging.constants.js";
 import type { AuthUser } from "./unified-messaging.types.js";
 
+function workspaceTypesForContext(contextType: string): string[] {
+  switch (contextType) {
+    case "COMMODITY_BID":
+      return ["COMMODITYBID"];
+    case "SMART_CONTAINER":
+      return ["MIXED_CONTAINER"];
+    case "MIXED_CONTAINER":
+      return ["MIXED_CONTAINER"];
+    case "BULK_CONTAINER":
+      return ["BULK_CONTAINER"];
+    case "PURCHASE_ORDER":
+      return ["ORDER"];
+    default:
+      return [contextType];
+  }
+}
+
 export class UnifiedMessagingRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -36,9 +53,38 @@ export class UnifiedMessagingRepository {
     if (filters.channel) where.primaryChannel = filters.channel;
 
     if (filters.contextType && filters.contextId) {
-      where.contexts = {
-        some: { contextType: filters.contextType, contextId: filters.contextId },
+      const workspaceTypes = workspaceTypesForContext(filters.contextType);
+      const contextMatch = {
+        OR: [
+          {
+            contexts: {
+              some: { contextType: filters.contextType, contextId: filters.contextId },
+            },
+          },
+          {
+            workspaceId: filters.contextId,
+            workspaceType: { in: workspaceTypes },
+          },
+        ],
       };
+      if (filters.search) {
+        where.AND = [
+          contextMatch,
+          {
+            OR: [
+              { subject: { contains: filters.search, mode: "insensitive" } },
+              { messages: { some: { body: { contains: filters.search, mode: "insensitive" } } } },
+            ],
+          },
+        ];
+      } else {
+        where.OR = contextMatch.OR;
+      }
+    } else if (filters.search) {
+      where.OR = [
+        { subject: { contains: filters.search, mode: "insensitive" } },
+        { messages: { some: { body: { contains: filters.search, mode: "insensitive" } } } },
+      ];
     }
 
     if (!this.isStaff(user)) {
@@ -51,13 +97,6 @@ export class UnifiedMessagingRepository {
       where.participants = {
         some: { companyId: filters.companyId, leftAt: null },
       };
-    }
-
-    if (filters.search) {
-      where.OR = [
-        { subject: { contains: filters.search, mode: "insensitive" } },
-        { messages: { some: { body: { contains: filters.search, mode: "insensitive" } } } },
-      ];
     }
 
     if (filters.cursor) {
@@ -192,7 +231,8 @@ export class UnifiedMessagingRepository {
 
   async createMessage(data: {
     conversationId: string;
-    authorUserId: string;
+    /** Null for system-generated messages — `author_user_id` is a nullable uuid. */
+    authorUserId: string | null;
     body: string;
     messageType: string;
     visibility: string;
@@ -234,7 +274,7 @@ export class UnifiedMessagingRepository {
 
   async findMessageByClientId(
     conversationId: string,
-    authorUserId: string,
+    authorUserId: string | null,
     clientMessageId: string,
   ) {
     return this.prisma.workspaceMessage.findFirst({

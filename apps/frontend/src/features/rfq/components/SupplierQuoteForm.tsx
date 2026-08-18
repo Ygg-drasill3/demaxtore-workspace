@@ -13,7 +13,7 @@
 //
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, FilePen, FilePlus, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Plus, Trash2, FilePen, FilePlus, AlertCircle, CheckCircle2, Pencil } from "lucide-react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -95,15 +95,57 @@ function normalizeQuoteUom(uom: string | undefined): (typeof QUOTE_UOM_OPTIONS)[
   return "piece";
 }
 
-function blankLineFromRfq(li: { id: string; position: number; description: string; quantity: number; uom: string }): LineRow {
+interface LineRow {
+  clientLineId: string;
+  rfqLineItemId?: string;
+  position:     number;
+  description:  string;
+  quantity:     string;
+  uom:          string;
+  unitPrice:    string;
+}
+
+function newClientLineId(): string {
+  return `cline-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function blankLineFromRfq(
+  li: { id: string; position: number; description: string; quantity: number; uom: string },
+  overrides?: Partial<LineRow>,
+): LineRow {
   return {
+    clientLineId: newClientLineId(),
     rfqLineItemId: li.id,
     position: li.position,
     description: li.description,
     quantity: String(li.quantity),
     uom: normalizeQuoteUom(li.uom),
     unitPrice: "",
+    ...overrides,
   };
+}
+
+function blankCustomLine(position: number): LineRow {
+  return {
+    clientLineId: newClientLineId(),
+    position,
+    description: "",
+    quantity: "1",
+    uom: "piece",
+    unitPrice: "",
+  };
+}
+
+function mergeQuotedAndAvailableLines(
+  quoted: LineRow[],
+  quotable: Array<{ id: string; position: number; description: string; quantity: number; uom: string }>,
+): LineRow[] {
+  const quotedIds = new Set(quoted.map((l) => l.rfqLineItemId).filter(Boolean));
+  const extra = quotable.filter((li) => !quotedIds.has(li.id)).map((li) => blankLineFromRfq(li));
+  return [
+    ...quoted.map((l) => ({ ...l, clientLineId: l.clientLineId ?? newClientLineId() })),
+    ...extra,
+  ];
 }
 
 interface Props {
@@ -114,15 +156,14 @@ interface Props {
   currency:     string;
   /** Buyer RFQ incoterm — pre-fills supplier quote when set. */
   defaultIncoterm?: string;
-}
-
-interface LineRow {
-  rfqLineItemId?: string;
-  position:     number;
-  description:  string;
-  quantity:     string;
-  uom:          string;
-  unitPrice:    string;
+  /** Admin submits or revises on behalf of this supplier user id. */
+  onBehalfOfSupplierId?: string;
+  /** When set, submit merges new lines into this existing quotation (partial product quote). */
+  appendToQuotationId?: string;
+  /** Supplier display name for admin-mode headings. */
+  onBehalfOfSupplierName?: string;
+  /** Render without outer card chrome (nested inside admin panel). */
+  embedded?: boolean;
 }
 
 const num = (s: string): number => {
@@ -136,9 +177,15 @@ export function SupplierQuoteForm({
   allowedQuoteLineItemIds,
   currency,
   defaultIncoterm,
+  onBehalfOfSupplierId,
+  onBehalfOfSupplierName,
+  appendToQuotationId,
+  embedded,
 }: Props) {
   const qc = useQueryClient();
   const userId = useAuth((s) => s.user?.id);
+  const effectiveSupplierId = onBehalfOfSupplierId ?? userId;
+  const adminMode = !!onBehalfOfSupplierId;
 
   const quotableLineItems = useMemo(() => {
     if (!allowedQuoteLineItemIds?.length) return rfqLineItems;
@@ -147,13 +194,13 @@ export function SupplierQuoteForm({
   }, [rfqLineItems, allowedQuoteLineItemIds]);
 
   const myQuotation = useQuery({
-    queryKey: ["rfq", workspaceId, "quotations", "mine", userId],
+    queryKey: ["rfq", workspaceId, "quotations", "mine", effectiveSupplierId],
     queryFn: async () => {
       const r = await api.get(`/rfq/${workspaceId}/quotations`);
       const rows = normalizeQuotationList(r.data);
-      return userId ? rows.filter((q) => q.supplierId === userId) : rows;
+      return effectiveSupplierId ? rows.filter((q) => q.supplierId === effectiveSupplierId) : rows;
     },
-    enabled: !!userId,
+    enabled: !!effectiveSupplierId,
     staleTime: 10_000,
   });
 
@@ -167,11 +214,12 @@ export function SupplierQuoteForm({
 
   const buildBlankLines = (): LineRow[] =>
     quotableLineItems.length
-      ? quotableLineItems.map(blankLineFromRfq)
-      : [{ position: 1, description: "", quantity: "1", uom: "piece", unitPrice: "" }];
+      ? quotableLineItems.map((li) => blankLineFromRfq(li))
+      : [blankCustomLine(1)];
 
   // Form state.
   const [lines, setLines] = useState<LineRow[]>(buildBlankLines);
+  const [editingDescIds, setEditingDescIds] = useState<Set<string>>(() => new Set());
   const [quoteCurrency, setQuoteCurrency] = useState<QuoteCurrency>(() => normalizeQuoteCurrency(currency));
   const [leadTimeDays, setLeadTimeDays] = useState("");
   const [moq,          setMoq         ] = useState("");
@@ -187,6 +235,30 @@ export function SupplierQuoteForm({
   const [hydrated, setHydrated] = useState(false);
 
   const scopeKey = quotableLineItems.map((li) => li.id).join(",");
+  const multiProductRfq = quotableLineItems.length > 1;
+  const soleQuotableLineId = quotableLineItems.length === 1 ? quotableLineItems[0]!.id : undefined;
+  const hasProductScope = !!allowedQuoteLineItemIds?.length;
+
+  const toggleDescriptionEdit = (clientLineId: string) => {
+    setEditingDescIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(clientLineId)) next.delete(clientLineId);
+      else next.add(clientLineId);
+      return next;
+    });
+  };
+
+  const addRfqLineItem = (li: (typeof quotableLineItems)[number]) => {
+    const isDuplicate = lines.some((l) => l.rfqLineItemId === li.id);
+    const row = blankLineFromRfq(
+      li,
+      isDuplicate ? { description: `${li.description} — ` } : undefined,
+    );
+    setLines((rows) => [...rows, row]);
+    if (isDuplicate) {
+      setEditingDescIds((prev) => new Set(prev).add(row.clientLineId));
+    }
+  };
 
   // Reset form when user logs out/in or switches workspace — avoids stale draft after re-login.
   useEffect(() => {
@@ -202,29 +274,44 @@ export function SupplierQuoteForm({
     setValidUntil("");
     setNotes("");
     setHydrated(false);
+    setEditingDescIds(new Set());
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reset only on identity/scope change
   }, [userId, workspaceId, scopeKey, currency]);
 
   // Hydrate form from existing quotation when it loads (once).
   useEffect(() => {
-    if (!existing || hydrated) return;
+    if (!existing || hydrated || appendToQuotationId) return;
     setHydrated(true);
     if (existing.status === "WITHDRAWN") return;
     const detail = existing as typeof existing & {
-      lineItems?: Array<{ position: number; description: string; quantity: number; unitPrice: number }>;
+      lineItems?: Array<{
+        position: number;
+        description: string;
+        quantity: number;
+        unitPrice: number;
+        priceUnit?: string | null;
+        packing?: string | null;
+        moq?: number | null;
+      }>;
     };
     if (detail.lineItems?.length) {
-      setLines(detail.lineItems.map((l) => {
-        const rfqLine = quotableLineItems.find((li) => li.position === l.position);
+      const quoted = detail.lineItems.map((l) => {
+        const rfqLine =
+          quotableLineItems.find((li) => li.position === l.position)
+          ?? quotableLineItems.find((li) => li.description.trim().toLowerCase() === l.description.trim().toLowerCase());
         return {
-          rfqLineItemId: rfqLine?.id,
+          clientLineId: newClientLineId(),
+          rfqLineItemId: rfqLine?.id ?? soleQuotableLineId,
           position: l.position,
           description: l.description,
           quantity: String(l.quantity),
-          uom: normalizeQuoteUom(rfqLine?.uom),
+          uom: normalizeQuoteUom(l.priceUnit ?? rfqLine?.uom),
           unitPrice: String(l.unitPrice),
         };
-      }));
+      });
+      setLines(
+        multiProductRfq ? mergeQuotedAndAvailableLines(quoted, quotableLineItems) : quoted,
+      );
     }
     setLeadTimeDays(existing.leadTimeDays?.toString() ?? "");
     setMoq(existing.moq?.toString() ?? "");
@@ -235,26 +322,61 @@ export function SupplierQuoteForm({
       existing.sampleAvail === true ? "yes" : existing.sampleAvail === false ? "no" : "",
     );
     setValidUntil(existing.validUntil ? existing.validUntil.slice(0, 10) : "");
-  }, [existing, hydrated, quotableLineItems, currency]);
+  }, [existing, hydrated, appendToQuotationId, quotableLineItems, currency, multiProductRfq, soleQuotableLineId]);
+
+  const existingLineItemsForPayload = useMemo(() => {
+    if (!appendToQuotationId || !existing) return [];
+    const detail = existing as typeof existing & {
+      lineItems?: Array<{
+        position: number;
+        description: string;
+        quantity: number;
+        unitPrice: number;
+        rfqLineItemId?: string | null;
+        priceUnit?: string | null;
+        packing?: string | null;
+        moq?: number | null;
+      }>;
+    };
+    return (detail.lineItems ?? []).map((l) => ({
+      position: l.position,
+      description: l.description,
+      quantity: l.quantity,
+      unitPrice: l.unitPrice,
+      rfqLineItemId: l.rfqLineItemId ?? undefined,
+      priceUnit: l.priceUnit ?? undefined,
+      packing: l.packing ?? undefined,
+      moq: l.moq ?? undefined,
+    }));
+  }, [appendToQuotationId, existing]);
 
   // ── Derived totals ────────────────────────────────────────────────────────
   const totals = useMemo(() => {
     const perLine = lines.map((l) => {
+      if (!l.unitPrice.trim()) return 0;
       const q = num(l.quantity);
       const p = num(l.unitPrice);
       return Number.isFinite(q) && Number.isFinite(p) ? q * p : 0;
     });
     return {
       perLine,
-      grand: perLine.reduce((a, b) => a + b, 0),
     };
   }, [lines]);
 
+  const quotedLines = useMemo(
+    () => lines.filter((l) => l.unitPrice.trim() !== ""),
+    [lines],
+  );
+
   // ── Validation ────────────────────────────────────────────────────────────
   const validationError = useMemo(() => {
-    if (!lines.length) return "Add at least one line item";
-    for (let i = 0; i < lines.length; i++) {
-      const l = lines[i];
+    if (!quotedLines.length) {
+      return multiProductRfq
+        ? "Price at least one product you want to quote (leave others blank or remove them)"
+        : "Add at least one line item";
+    }
+    for (let i = 0; i < quotedLines.length; i++) {
+      const l = quotedLines[i];
       if (!l.description.trim()) return `Line ${i + 1}: description required`;
       const q = num(l.quantity);
       const p = num(l.unitPrice);
@@ -270,7 +392,7 @@ export function SupplierQuoteForm({
     if (moq) {
       const m = num(moq);
       if (!Number.isFinite(m) || m <= 0 || !Number.isInteger(m))
-        return "MOQ must be a whole number";
+        return "POQ must be a whole number";
     }
     if (validUntil) {
       const end = new Date(`${validUntil}T23:59:59`);
@@ -278,7 +400,7 @@ export function SupplierQuoteForm({
       if (end < new Date()) return "Quote validity must be today or later";
     }
     return null;
-  }, [lines, leadTimeDays, validUntil]);
+  }, [quotedLines, leadTimeDays, moq, validUntil, multiProductRfq]);
 
   // ── Mutations ─────────────────────────────────────────────────────────────
   const buildPayload = () =>
@@ -291,30 +413,49 @@ export function SupplierQuoteForm({
       sampleAvail,
       validUntil,
       notes,
-      lines,
+      lines: quotedLines.map((l) => ({
+        ...l,
+        rfqLineItemId: l.rfqLineItemId ?? soleQuotableLineId,
+      })),
     });
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["rfq", workspaceId, "quotations"], exact: true });
     qc.invalidateQueries({ queryKey: ["rfq", workspaceId, "quotations", "mine"] });
+    qc.invalidateQueries({ queryKey: ["rfq", workspaceId, "admin-quote-scope"] });
     qc.invalidateQueries({ queryKey: ["rfq", workspaceId, "timeline"] });
   };
 
   const submit = useMutation({
-    mutationFn: (body: ReturnType<typeof buildSubmitQuotationPayload>) =>
-      api.post(`/rfq/${workspaceId}/quotations`, body).then((r) => r.data),
+    mutationFn: (body: ReturnType<typeof buildSubmitQuotationPayload>) => {
+      if (adminMode && onBehalfOfSupplierId) {
+        return api
+          .post(`/rfq/${workspaceId}/quotations/admin`, { ...body, supplierUserId: onBehalfOfSupplierId })
+          .then((r) => r.data);
+      }
+      return api.post(`/rfq/${workspaceId}/quotations`, body).then((r) => r.data);
+    },
     onSuccess: () => {
-      toast.success("Quotation submitted", `Total ${totals.grand.toFixed(2)} ${quoteCurrency}`);
+      toast.success(adminMode ? "Quotation submitted on behalf of supplier" : "Quotation submitted");
       invalidate();
     },
     onError: (e: unknown) => toast.error(formatApiValidationError(e)),
   });
 
   const revise = useMutation({
-    mutationFn: (body: ReturnType<typeof buildSubmitQuotationPayload>) =>
-      api.patch(`/rfq/${workspaceId}/quotations/${existing!.id}`, body).then((r) => r.data),
+    mutationFn: (body: ReturnType<typeof buildSubmitQuotationPayload>) => {
+      if (adminMode && onBehalfOfSupplierId) {
+        return api
+          .patch(`/rfq/${workspaceId}/quotations/admin/${existing!.id}`, {
+            ...body,
+            supplierUserId: onBehalfOfSupplierId,
+          })
+          .then((r) => r.data);
+      }
+      return api.patch(`/rfq/${workspaceId}/quotations/${existing!.id}`, body).then((r) => r.data);
+    },
     onSuccess: () => {
-      toast.success("Quotation revised", `New total ${totals.grand.toFixed(2)} ${quoteCurrency}`);
+      toast.success(adminMode ? "Supplier quotation revised" : "Quotation revised");
       invalidate();
     },
     onError: (e: unknown) => toast.error(formatApiValidationError(e)),
@@ -322,7 +463,16 @@ export function SupplierQuoteForm({
 
   const runSubmit = () => {
     try {
-      submit.mutate(buildPayload());
+      const body = buildPayload();
+      if (appendToQuotationId && existing) {
+        const merged = {
+          ...body,
+          lineItems: [...existingLineItemsForPayload, ...body.lineItems],
+        };
+        revise.mutate(merged);
+        return;
+      }
+      submit.mutate(body);
     } catch (e) {
       toast.error(formatQuotationValidationError(e));
     }
@@ -357,7 +507,11 @@ export function SupplierQuoteForm({
 
   const busy = submit.isPending || revise.isPending || withdraw.isPending;
   const mode: "compose" | "review" =
-    !existing || existing.status === "WITHDRAWN" ? "compose" : "review";
+    appendToQuotationId
+      ? "compose"
+      : !existing || existing.status === "WITHDRAWN"
+        ? "compose"
+        : "review";
 
   const updateLine = (i: number, patch: Partial<LineRow>) =>
     setLines((rows) => rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
@@ -377,19 +531,36 @@ export function SupplierQuoteForm({
 
   return (
     <section
-      data-testid="supplier-quote-form"
-      className="bg-white border border-paper-200 rounded-2xl shadow-sm overflow-hidden"
+      data-testid={adminMode ? "admin-supplier-quote-form" : "supplier-quote-form"}
+      data-guide="quotation-form"
+      className={
+        embedded
+          ? "overflow-hidden"
+          : "bg-white border border-paper-200 rounded-2xl shadow-sm overflow-hidden"
+      }
     >
-      <header className="flex items-start justify-between gap-3 px-5 pt-5 sm:px-6 sm:pt-6">
+      <header className={`flex items-start justify-between gap-3 ${embedded ? "px-5 pt-4 sm:px-6" : "px-5 pt-5 sm:px-6 sm:pt-6"}`}>
         <div>
           <h2 className="font-display text-lg font-semibold flex items-center gap-2">
             {mode === "compose" ? <FilePlus className="h-4 w-4 text-accent-900" /> : <FilePen className="h-4 w-4 text-accent-900" />}
-            {mode === "compose" ? "Submit your quotation" : "Your quotation"}
+            {adminMode
+              ? mode === "compose"
+                ? `Submit quotation for ${onBehalfOfSupplierName ?? "supplier"}`
+                : `Quotation for ${onBehalfOfSupplierName ?? "supplier"}`
+              : mode === "compose"
+                ? "Submit your quotation"
+                : "Your quotation"}
           </h2>
           <p className="text-sm text-zinc-500 mt-1 max-w-xl">
-            {mode === "compose"
-              ? "Price each RFQ line. The buyer will compare quotations once they close the window."
-              : `Last ${existing!.status.toLowerCase()} ${new Date(existing!.submittedAt).toLocaleString()}.`}
+            {adminMode
+              ? appendToQuotationId
+                ? "This supplier already quoted some assigned products. Enter pricing only for the remaining products below."
+                : "Enter pricing on behalf of the assigned supplier. The quote will appear under their name in the comparison."
+              : mode === "compose"
+                ? multiProductRfq
+                  ? "Quote only the products you supply. Use the pencil to label variants (e.g. Olive Oil — 500 ml vs 10 L), add the same product again with + Add product, or remove lines you do not quote."
+                  : "Price the RFQ line. The buyer will compare quotations once they close the window."
+                : `Last ${existing!.status.toLowerCase()} ${new Date(existing!.submittedAt).toLocaleString()}.`}
           </p>
         </div>
         {mode === "review" && (
@@ -408,7 +579,14 @@ export function SupplierQuoteForm({
       {/* ── Line items ─────────────────────────────────────────────────── */}
       <div className="mt-5 mx-5 sm:mx-6 rounded-xl border border-paper-200 overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-paper-50 border-b border-paper-200">
-          <h3 className="dmx-eyebrow text-zinc-500">Line items</h3>
+          <div>
+            <h3 className="dmx-eyebrow text-zinc-500">Line items</h3>
+            {multiProductRfq && (
+              <p className="text-xs text-zinc-500 mt-0.5">
+                Optional per product — only priced lines are submitted. Same product can appear on multiple lines.
+              </p>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-zinc-500">Currency</span>
             <CurrencySelect
@@ -430,30 +608,56 @@ export function SupplierQuoteForm({
         </div>
 
         <div className="divide-y divide-paper-100">
-          {lines.map((l, i) => (
+          {lines.map((l, i) => {
+            const isQuoted = l.unitPrice.trim() !== "";
+            const isEditingDescription = !l.rfqLineItemId || editingDescIds.has(l.clientLineId);
+            return (
             <div
-              key={l.rfqLineItemId ?? `line-${i}`}
+              key={l.clientLineId}
               data-testid={`quote-line-${i}`}
-              className={`grid grid-cols-2 gap-x-3 gap-y-3 px-4 py-4 bg-white ${LINE_GRID}`}
+              className={`grid grid-cols-2 gap-x-3 gap-y-3 px-4 py-4 bg-white ${LINE_GRID} ${
+                multiProductRfq && l.rfqLineItemId && !isQuoted ? "opacity-60" : ""
+              }`}
             >
               <div className="col-span-2 sm:col-span-1 min-w-0">
                 <span className="sm:sr-only text-[10px] uppercase tracking-wider text-zinc-400">Product</span>
-                {l.rfqLineItemId ? (
-                  <p
-                    data-testid={`quote-line-${i}-description`}
-                    className="text-sm font-medium text-ink-900 leading-snug sm:mt-0 mt-0.5"
-                    title={l.description}
-                  >
-                    {l.description}
-                  </p>
-                ) : (
+                {isEditingDescription ? (
                   <Input
                     data-testid={`quote-line-${i}-description`}
                     className="h-10 mt-0.5 sm:mt-0"
                     value={l.description}
-                    placeholder="Product description"
+                    placeholder="e.g. Olive Oil — 500 ml"
                     onChange={(e) => updateLine(i, { description: e.target.value })}
                   />
+                ) : (
+                  <div className="flex items-start gap-2 min-w-0 sm:mt-0 mt-0.5">
+                    <p
+                      data-testid={`quote-line-${i}-description`}
+                      className="text-sm font-medium text-ink-900 leading-snug flex-1 min-w-0"
+                      title={l.description}
+                    >
+                      {l.description}
+                    </p>
+                    <button
+                      type="button"
+                      data-testid={`quote-line-${i}-edit-description`}
+                      onClick={() => toggleDescriptionEdit(l.clientLineId)}
+                      className="shrink-0 h-8 w-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-accent-900 hover:bg-accent-50"
+                      aria-label={`Edit description for line ${i + 1}`}
+                      title="Edit product label"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
+                {l.rfqLineItemId && isEditingDescription && (
+                  <button
+                    type="button"
+                    className="mt-1 text-[11px] text-zinc-500 hover:text-ink-900 underline"
+                    onClick={() => toggleDescriptionEdit(l.clientLineId)}
+                  >
+                    Done editing
+                  </button>
                 )}
               </div>
 
@@ -490,7 +694,7 @@ export function SupplierQuoteForm({
                 <input
                   data-testid={`quote-line-${i}-unit-price`}
                   className={`${lineInputClass} mt-1 sm:mt-0 text-right`}
-                  placeholder="0.00"
+                  placeholder={multiProductRfq && l.rfqLineItemId ? "Skip — no quote" : "0.00"}
                   value={l.unitPrice}
                   inputMode="decimal"
                   onChange={(e) => updateLine(i, { unitPrice: e.target.value })}
@@ -512,29 +716,64 @@ export function SupplierQuoteForm({
                 <button
                   type="button"
                   data-testid={`quote-line-${i}-remove`}
-                  disabled={lines.length <= 1 || !!l.rfqLineItemId}
+                  disabled={quotedLines.length <= 1 && isQuoted}
                   onClick={() => setLines((rows) => rows.filter((_, idx) => idx !== i))}
                   className="h-10 w-10 flex items-center justify-center rounded-lg text-zinc-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-30 disabled:hover:bg-transparent"
                   aria-label={`Remove line ${i + 1}`}
+                  title={l.rfqLineItemId ? "Remove product from this quote" : "Remove line"}
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>
             </div>
-          ))}
+          );
+          })}
         </div>
 
-        <div className="px-4 py-3 bg-paper-50 border-t border-paper-200">
-          <button
-            type="button"
-            data-testid="quote-add-line"
-            onClick={() =>
-              setLines((rows) => [...rows, { position: rows.length + 1, description: "", quantity: "1", uom: "piece", unitPrice: "" }])
-            }
-            className="text-sm font-medium text-accent-900 hover:text-accent-700 inline-flex items-center gap-1.5"
-          >
-            <Plus className="h-4 w-4" /> Add line
-          </button>
+        <div className="px-4 py-3 bg-paper-50 border-t border-paper-200 flex flex-wrap items-center gap-3">
+          {multiProductRfq && quotableLineItems.length > 0 && (
+            <label className="inline-flex items-center gap-2 text-sm text-ink-900">
+              <Plus className="h-4 w-4 text-accent-900 shrink-0" aria-hidden />
+              <span className="text-zinc-500">Add product</span>
+              <select
+                data-testid="quote-add-rfq-line"
+                defaultValue=""
+                className={`${fieldSelectClass} w-auto min-w-[12rem]`}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  if (!id) return;
+                  const li = quotableLineItems.find((x) => x.id === id);
+                  if (li) addRfqLineItem(li);
+                  e.target.value = "";
+                }}
+              >
+                <option value="">— Select —</option>
+                {quotableLineItems.map((li) => (
+                  <option key={li.id} value={li.id}>{li.description}</option>
+                ))}
+              </select>
+            </label>
+          )}
+          {!multiProductRfq && hasProductScope && soleQuotableLineId && (
+            <button
+              type="button"
+              data-testid="quote-add-line"
+              onClick={() => addRfqLineItem(quotableLineItems[0]!)}
+              className="text-sm font-medium text-accent-900 hover:text-accent-700 inline-flex items-center gap-1.5"
+            >
+              <Plus className="h-4 w-4" /> Add variation
+            </button>
+          )}
+          {!multiProductRfq && !hasProductScope && (
+            <button
+              type="button"
+              data-testid="quote-add-line"
+              onClick={() => setLines((rows) => [...rows, blankCustomLine(rows.length + 1)])}
+              className="text-sm font-medium text-accent-900 hover:text-accent-700 inline-flex items-center gap-1.5"
+            >
+              <Plus className="h-4 w-4" /> Add line
+            </button>
+          )}
         </div>
       </div>
 
@@ -554,7 +793,7 @@ export function SupplierQuoteForm({
             />
           </label>
           <label className="block">
-            <span className="text-[11px] uppercase tracking-wider text-zinc-500">MOQ</span>
+            <span className="text-[11px] uppercase tracking-wider text-zinc-500">POQ</span>
             <Input
               data-testid="quote-moq"
               value={moq}
@@ -615,7 +854,7 @@ export function SupplierQuoteForm({
         </div>
       </div>
 
-      {/* ── Footer: validation + total + actions ─────────────────────── */}
+      {/* ── Footer: validation + actions ─────────────────────────────── */}
       <div className="mt-4 mx-5 sm:mx-6 mb-5 sm:mb-6 rounded-xl border border-paper-200 bg-paper-50 px-4 py-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="text-sm min-w-0">
@@ -631,19 +870,7 @@ export function SupplierQuoteForm({
             )}
           </div>
 
-          <div className="flex flex-col-reverse sm:flex-row sm:items-center gap-4 sm:gap-6">
-            <div className="text-right sm:text-right">
-              <div className="text-[10px] uppercase tracking-wider text-zinc-500">Grand total</div>
-              <div
-                data-testid="quote-grand-total"
-                className="text-2xl font-semibold tabular-nums text-ink-900 leading-tight"
-              >
-                {totals.grand.toFixed(2)}{" "}
-                <span className="text-base font-medium text-zinc-500">{quoteCurrency}</span>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 sm:ml-auto">
               {mode === "compose" ? (
                 <Button
                   data-testid="quote-submit"
@@ -667,8 +894,9 @@ export function SupplierQuoteForm({
                     loading={revise.isPending}
                     onClick={runRevise}
                   >
-                    Submit revision
+                    {adminMode ? "Save supplier revision" : "Submit revision"}
                   </Button>
+                  {!adminMode && (
                   <Button
                     data-testid="quote-withdraw"
                     variant="ghost"
@@ -677,13 +905,14 @@ export function SupplierQuoteForm({
                   >
                     Withdraw quotation
                   </Button>
+                  )}
                 </>
               )}
-            </div>
           </div>
         </div>
       </div>
 
+      {!adminMode && (
       <Modal
         open={withdrawOpen}
         onClose={() => setWithdrawOpen(false)}
@@ -716,6 +945,7 @@ export function SupplierQuoteForm({
           className="mt-1"
         />
       </Modal>
+      )}
     </section>
   );
 }

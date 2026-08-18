@@ -10,11 +10,13 @@ export const ExceptionType = [
   "Customs Issue",
   "Container Roll-over",
   "Carrier Update",
-  "Order/Shipment Mismatch",
   "Payment Pending",
   "PO Pending",
   "Inspection Issue",
   "Contract Issue",
+  // Produced by exception-hub and the v2 exception engine; `exception_type` is a text
+  // column, so the value was already reaching clients that could not type it.
+  "Order/Shipment Mismatch",
   "Manual Exception",
 ] as const;
 export type ExceptionType = (typeof ExceptionType)[number];
@@ -104,6 +106,7 @@ export interface ExceptionHubDetail extends ExceptionHubRow {
   closedAt: string | null;
   relatedDocuments: Array<{ id: string; name: string; status: string; url: string }>;
   timeline: Array<{ id: string; label: string; createdAt: string; actorName: string | null }>;
+  /** Order/Shipment orchestrator suggestion for this exception, when one was produced. */
   orchestratorRecommendation?: {
     id: string;
     mode: string;

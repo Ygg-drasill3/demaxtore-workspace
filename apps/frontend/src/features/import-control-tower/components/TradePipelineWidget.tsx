@@ -1,12 +1,14 @@
 import type { TradePipelineStage } from "@dmx/contracts/import-control-tower";
 import { ChevronDown } from "lucide-react";
+import { useT } from "@/i18n/useT";
 
 export function TradePipelineWidget({ stages }: { stages: TradePipelineStage[] }) {
+  const { t } = useT();
   const max = Math.max(...stages.map((s) => s.count), 1);
 
   return (
     <section data-testid="ict-pipeline" className="dmx-card p-5">
-      <h2 className="text-sm font-semibold text-ink-900 mb-4">Trade Status Overview</h2>
+      <h2 className="text-sm font-semibold text-ink-900 mb-4">{t("importTower.pipeline.title")}</h2>
       <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-2">
         {stages.map((stage, i) => (
           <div key={stage.key} className="flex sm:flex-col items-center gap-2 sm:flex-1 min-w-0">

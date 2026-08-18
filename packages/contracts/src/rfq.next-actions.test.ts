@@ -93,6 +93,35 @@ describe("computeRfqNextActions — role + participant gating", () => {
     expect(out.map((a) => a.action)).toContain("reopen_quotations");
   });
 
+  it("ADMIN in SUPPLIERS_ASSIGNED can return to review", () => {
+    const out = computeRfqNextActions({
+      state: "SUPPLIERS_ASSIGNED", actorRole: "ADMIN", isOwner: false, isCounterparty: false,
+    });
+    expect(out.map((a) => a.action)).toContain("return_to_review");
+    expect(out.map((a) => a.action)).toContain("publish_rfq");
+  });
+
+  it("ADMIN in RFQ_OPEN can unpublish when rolling back", () => {
+    const out = computeRfqNextActions({
+      state: "RFQ_OPEN", actorRole: "ADMIN", isOwner: false, isCounterparty: false,
+    });
+    expect(out.map((a) => a.action)).toContain("unpublish_rfq");
+  });
+
+  it("ADMIN in RFQ_OPEN can invite additional suppliers while collecting quotations", () => {
+    const out = computeRfqNextActions({
+      state: "RFQ_OPEN", actorRole: "ADMIN", isOwner: false, isCounterparty: false,
+    });
+    expect(out.map((a) => a.action)).toContain("add_more_suppliers");
+  });
+
+  it("ADMIN in RFQ_OPEN can extend assigned supplier product scopes", () => {
+    const out = computeRfqNextActions({
+      state: "RFQ_OPEN", actorRole: "ADMIN", isOwner: false, isCounterparty: false,
+    });
+    expect(out.map((a) => a.action)).toContain("update_supplier_scopes");
+  });
+
   it("destructive variants flag requiresConfirmation", () => {
     const out = computeRfqNextActions({
       state: "RFQ_DRAFT", actorRole: "BUYER", isOwner: true, isCounterparty: false,
@@ -101,6 +130,13 @@ describe("computeRfqNextActions — role + participant gating", () => {
     expect(cancel.variant).toBe("destructive");
     expect(cancel.requiresConfirmation).toBe(true);
     expect(cancel.requiresReason).toBe(true);
+  });
+
+  it("PARTIALLY_AWARDED exposes PO + close actions without line-scoped duplicates", () => {
+    const out = computeRfqNextActions({
+      state: "PARTIALLY_AWARDED", actorRole: "BUYER", isOwner: true, isCounterparty: false,
+    }).map((a) => a.action);
+    expect(out).toEqual(["issue_supplier_po", "close_rfq_awards"]);
   });
 
   it("never returns SYSTEM-only transitions", () => {

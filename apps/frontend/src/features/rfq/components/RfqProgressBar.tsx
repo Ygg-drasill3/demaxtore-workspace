@@ -4,6 +4,7 @@
 // Sub-state pill renders below the current step bubble for bundled steps.
 // Terminal states show a humanised banner instead of the rail.
 //
+import type { ReactNode } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { STORYLINE_STEPS, STATE_TO_STORYLINE_STEP, storylineSubLabel, terminalReason } from "../lib/state-labels";
@@ -19,9 +20,11 @@ interface Props {
     proformaSlaDaysLeft?:  number;
     terminalReason?:       string;
   };
+  /** Rendered directly below the storyline (e.g. admin workflow controls). */
+  belowStoryline?: ReactNode;
 }
 
-export function RfqProgressBar({ state, meta }: Props) {
+export function RfqProgressBar({ state, meta, belowStoryline }: Props) {
   const rfqState = state as RfqState;
   const stepIdx = STATE_TO_STORYLINE_STEP[rfqState];
   const reason  = terminalReason(rfqState);
@@ -35,6 +38,7 @@ export function RfqProgressBar({ state, meta }: Props) {
             <span className="text-zinc-500"> {meta.terminalReason}</span>
           )}
         </div>
+        {belowStoryline}
       </div>
     );
   }
@@ -48,7 +52,7 @@ export function RfqProgressBar({ state, meta }: Props) {
   });
 
   return (
-    <div data-testid="rfq-progress-bar" className="dmx-card p-4 sm:p-5">
+    <div data-testid="rfq-progress-bar" data-guide="rfq-story-bar" className="dmx-card p-4 sm:p-5">
       <ol className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto dmx-thin-scroll">
         {STORYLINE_STEPS.map((s, idx) => {
           const done    = idx < stepIdx;
@@ -91,6 +95,8 @@ export function RfqProgressBar({ state, meta }: Props) {
           </span>
         </div>
       )}
+
+      {belowStoryline}
     </div>
   );
 }

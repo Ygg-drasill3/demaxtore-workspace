@@ -1,16 +1,18 @@
 import { useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { bulkCatalogApi, bulkContainerApi } from "../lib/bulk-container.api";
 import { SpecCard } from "../components/SpecCard";
 import { AddBulkLineModal } from "../components/AddBulkLineModal";
 import type { BulkCatalogProductCardDTO } from "../lib/bulk-container.api";
 import { Input } from "@/components/ui/Input";
+import { useBulkContainerSession } from "../lib/useBulkContainerSession";
+import { toast } from "@/store/toast.store";
 
 export default function BulkCatalogProductsPage() {
   const { category } = useParams<{ category: string }>();
-  const [params] = useSearchParams();
-  const containerId = params.get("containerId") ?? undefined;
+  const nav = useNavigate();
+  const { ensureContainer, withContainerId } = useBulkContainerSession();
   const qc = useQueryClient();
   const [selected, setSelected] = useState<BulkCatalogProductCardDTO | null>(null);
   const [search, setSearch] = useState("");
@@ -32,21 +34,27 @@ export default function BulkCatalogProductsPage() {
     quantityMt: number,
     specValues: Record<string, string | number>,
   ) => {
-    let targetId = containerId;
-    if (!targetId) {
-      const bc = await bulkContainerApi.create({ currency: "USD" });
-      targetId = bc.id;
+    try {
+      const targetId = await ensureContainer();
+      await bulkContainerApi.addLine(targetId, { catalogProductId: productId, packingTypeId, quantityMt, specValues });
+      await qc.invalidateQueries({ queryKey: ["bc-container", targetId] });
+      setSelected(null);
+      nav(`/buyer/bulk-container/requests/${targetId}`);
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { error?: { code?: string; message?: string } } } };
+      const code = err.response?.data?.error?.code;
+      if (code === "CONTAINER_FULL" || code === "CONTAINER_CAPACITY_EXCEEDED") {
+        toast.warning("Container full", "This container is at capacity. Start a new container from the builder.");
+        return;
+      }
+      throw e;
     }
-    await bulkContainerApi.addLine(targetId!, { catalogProductId: productId, packingTypeId, quantityMt, specValues });
-    await qc.invalidateQueries({ queryKey: ["bc-container", targetId] });
-    setSelected(null);
-    window.location.href = `/buyer/bulk-container/requests/${targetId}`;
   };
 
   return (
-    <div data-testid="bc-catalog-products" className="max-w-[1200px] mx-auto space-y-6 animate-fade-in">
+    <div data-testid="bc-catalog-products" data-guide="bc-catalog-products" className="max-w-[1200px] mx-auto space-y-6 animate-fade-in">
       <header>
-        <Link to="/buyer/bulk-container/catalog" className="text-xs text-zinc-500 hover:underline">← Categories</Link>
+        <Link to={withContainerId("/buyer/bulk-container/catalog")} className="text-xs text-zinc-500 hover:underline">← Categories</Link>
         <h1 className="font-display text-4xl font-semibold tracking-tight mt-1 capitalize">
           {category?.replace(/-/g, " ")}
         </h1>

@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import type { AttentionRequiredItem } from "@dmx/contracts/import-control-tower";
 import { cn } from "@/lib/utils";
+import { useT } from "@/i18n/useT";
 
 const PRIORITY_STYLES = {
   Critical: "border-red-200 bg-red-50/60 text-red-900",
@@ -10,14 +11,15 @@ const PRIORITY_STYLES = {
 };
 
 export function AttentionRequiredCard({ items }: { items: AttentionRequiredItem[] }) {
+  const { t } = useT();
   return (
     <section data-testid="ict-attention" className="dmx-card overflow-hidden">
       <div className="border-b border-zinc-100 px-5 py-3 bg-zinc-50/80">
-        <h2 className="text-sm font-semibold text-ink-900">Attention Required</h2>
+        <h2 className="text-sm font-semibold text-ink-900">{t("importTower.attention.title")}</h2>
       </div>
       <div className="p-4 space-y-2 max-h-[420px] overflow-y-auto dmx-thin-scroll">
         {items.length === 0 ? (
-          <p className="text-sm text-zinc-500">No immediate actions required.</p>
+          <p className="text-sm text-zinc-500">{t("importTower.attention.empty")}</p>
         ) : (
           items.map((item) => (
             <Link

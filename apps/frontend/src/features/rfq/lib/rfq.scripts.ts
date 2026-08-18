@@ -5,6 +5,51 @@
 // Variable substitutions happen at render time using `formatScript()`.
 //
 import type { RfqState, RfqAction } from "@dmx/contracts/rfq.fsm";
+import { countLinesByStatus, type RfqLineAwardStatus } from "@dmx/contracts/rfq-split-award";
+
+export interface RfqLineForAwardScript {
+  id: string;
+  awardStatus?: RfqLineAwardStatus | string;
+  award?: { supplierUserId?: string; poIssued?: boolean } | null;
+}
+
+/** Template vars for PARTIALLY_AWARDED / FULLY_AWARDED hero copy. */
+export function rfqAwardScriptVars(
+  lineItems: RfqLineForAwardScript[] | undefined | null,
+  supplierPoSpawns?: Array<{ supplierUserId?: string }> | null,
+): {
+  totalLines: number;
+  awardedLines: number;
+  openLines: number;
+  awardedSuppliers: number;
+  posIssued: number;
+} {
+  const lines = lineItems ?? [];
+  const counts = countLinesByStatus(
+    lines.map((li) => ({
+      rfqLineItemId: li.id,
+      status: (li.awardStatus ?? "OPEN") as RfqLineAwardStatus,
+    })),
+  );
+  const awardedSupplierIds = new Set(
+    lines
+      .filter((li) => li.awardStatus === "AWARDED" && li.award?.supplierUserId)
+      .map((li) => li.award!.supplierUserId!),
+  );
+  const posIssued =
+    supplierPoSpawns?.length
+    ?? [...awardedSupplierIds].filter((id) =>
+      lines.some((li) => li.awardStatus === "AWARDED" && li.award?.supplierUserId === id && li.award?.poIssued),
+    ).length;
+
+  return {
+    totalLines: lines.length,
+    awardedLines: counts.AWARDED,
+    openLines: counts.OPEN,
+    awardedSuppliers: awardedSupplierIds.size,
+    posIssued,
+  };
+}
 
 export type ScriptMood = "active" | "waiting" | "action" | "returned" | "terminal-plus" | "terminal-minus";
 
@@ -42,6 +87,24 @@ export function formatScript<T extends Record<string, string | number | null | u
     const v = vars[k as keyof T];
     return v == null ? `{{${k}}}` : String(v);
   });
+}
+
+const SCRIPT_PLACEHOLDER_RE = /\{\{\w+\}\}/;
+
+/** True when `formatScript` left one or more `{{key}}` tokens unresolved. */
+export function hasUnresolvedScriptPlaceholders(text: string): boolean {
+  return SCRIPT_PLACEHOLDER_RE.test(text);
+}
+
+/** Resolve an internal route href; returns null when placeholders or path are invalid. */
+export function resolveScriptHref<T extends Record<string, string | number | null | undefined>>(
+  href: string,
+  vars: T,
+): string | null {
+  const resolved = formatScript(href, vars).trim();
+  if (!resolved.startsWith("/")) return null;
+  if (hasUnresolvedScriptPlaceholders(resolved)) return null;
+  return resolved;
 }
 
 export const RFQ_SCRIPTS: Record<RfqState, RfqScript> = {
@@ -111,6 +174,30 @@ export const RFQ_SCRIPTS: Record<RfqState, RfqScript> = {
     primaryAction: "select_supplier",
   },
 
+  PARTIALLY_AWARDED: {
+    mood: "active",
+    past:   "{{awardedLines}} of {{totalLines}} products awarded",
+    future: "Award remaining products or issue POs per supplier",
+    statL:  { label: "Award progress", value: "{{awardedLines}}/{{totalLines}} lines" },
+    statR:  { label: "Open lines", value: "{{openLines}} still open" },
+    primaryAction: "issue_supplier_po",
+    primaryLabel: "Issue PO",
+    promotedSecondaryActions: ["close_rfq_awards"],
+    fallbackPrimary: { label: "Open order workspace", href: "/workspace/order/{{orderId}}", tone: "secondary" },
+  },
+
+  FULLY_AWARDED: {
+    mood: "action",
+    past:   "All products resolved",
+    future: "Issue purchase orders per supplier",
+    statL:  { label: "Suppliers", value: "{{awardedSuppliers}} with awards" },
+    statR:  { label: "PO status", value: "{{posIssued}}/{{awardedSuppliers}} POs issued" },
+    primaryAction: "issue_supplier_po",
+    primaryLabel: "Issue PO",
+    promotedSecondaryActions: ["close_rfq_awards"],
+    fallbackPrimary: { label: "Open order workspace", href: "/workspace/order/{{orderId}}", tone: "secondary" },
+  },
+
   SUPPLIER_SELECTED: {
     mood: "active",
     past:   "{{selectedSupplier}} selected",
@@ -159,10 +246,10 @@ export const RFQ_SCRIPTS: Record<RfqState, RfqScript> = {
 
   CLOSED: {
     mood: "terminal-plus",
-    past:   "Order completed",
+    past:   "RFQ closed",
     future: "This RFQ is complete.",
-    statL:  { label: "Outcome", value: "Order closed" },
-    statR:  { label: "Status", value: "Fulfilled" },
+    statL:  { label: "Outcome", value: "RFQ closed" },
+    statR:  { label: "Status", value: "Complete" },
     primaryAction: null,
     fallbackPrimary: { label: "Open order workspace", href: "/workspace/order/{{orderId}}", tone: "secondary" },
   },
@@ -366,6 +453,34 @@ export const ADMIN_RFQ_SCRIPTS: Partial<Record<RfqState, RfqScript>> = {
     statR:  { label: "Next", value: "Publish RFQ" },
     primaryAction: "publish_rfq",
     primaryLabel: "Publish RFQ",
+    promotedSecondaryActions: ["return_to_review"],
+  },
+  RFQ_OPEN: {
+    mood: "action",
+    past:   "RFQ published to suppliers",
+    future: "Monitor supplier activity or roll back if published prematurely",
+    statL:  { label: "Received", value: "{{quoted}}/{{invited}} quotations" },
+    statR:  { label: "Deadline", value: "{{deadlineCountdown}}" },
+    primaryAction: null,
+    promotedSecondaryActions: ["unpublish_rfq", "extend_deadline", "reopen_quotations"],
+  },
+  QUOTATIONS_CLOSED: {
+    mood: "action",
+    past:   "Quotation window closed",
+    future: "Buyer evaluates — or reopen / roll back evaluation if needed",
+    statL:  { label: "Quotations", value: "{{quoted}} received" },
+    statR:  { label: "Admin", value: "Workflow control" },
+    primaryAction: "reopen_quotations",
+    primaryLabel: "Reopen quotations",
+  },
+  UNDER_EVALUATION: {
+    mood: "action",
+    past:   "Buyer is evaluating quotations",
+    future: "Revert to quotes closed if evaluation started too early",
+    statL:  { label: "Quotations", value: "{{quoted}} to compare" },
+    statR:  { label: "Admin", value: "Workflow control" },
+    primaryAction: null,
+    promotedSecondaryActions: ["revert_evaluation", "reopen_quotations"],
   },
 };
 

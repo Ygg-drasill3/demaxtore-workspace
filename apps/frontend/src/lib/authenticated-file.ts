@@ -23,10 +23,18 @@ export async function fetchAuthenticatedBlob(url: string, opts?: { signal?: Abor
 }
 
 export async function openAuthenticatedDocument(url: string): Promise<void> {
-  const blob = await fetchAuthenticatedBlob(url);
-  const blobUrl = URL.createObjectURL(blob);
-  window.open(blobUrl, "_blank", "noopener,noreferrer");
-  window.setTimeout(() => URL.revokeObjectURL(blobUrl), 120_000);
+  const popup = window.open("about:blank", "_blank");
+  if (!popup) throw new Error("POPUP_BLOCKED");
+  try {
+    popup.opener = null;
+    const blob = await fetchAuthenticatedBlob(url);
+    const blobUrl = URL.createObjectURL(blob);
+    popup.location.replace(blobUrl);
+    window.setTimeout(() => URL.revokeObjectURL(blobUrl), 120_000);
+  } catch (err) {
+    popup.close();
+    throw err;
+  }
 }
 
 export async function downloadAuthenticatedDocument(url: string, fileName: string): Promise<void> {

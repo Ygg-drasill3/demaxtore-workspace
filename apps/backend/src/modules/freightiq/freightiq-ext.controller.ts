@@ -29,6 +29,10 @@ const COMM_ACTION_MAP: Record<string, "send" | "intake" | "responded"> = {
 };
 
 export const freightiqExtController = {
+  async myPortfolio(req: Request, res: Response) {
+    res.json(await freightIq.getMyPortfolio(req.user!));
+  },
+
   async enrichedSummary(req: Request, res: Response) {
     const orderId = req.params.orderId;
     if (!(await canAccessFreightForOrder(prisma, req.user!, orderId))) {

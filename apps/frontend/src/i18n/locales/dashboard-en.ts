@@ -128,6 +128,15 @@ const dashboardEn: TranslationDict = {
   "dash.opportunity.title": "Opportunity Center",
   "dash.teamWorkload.title": "Team Workload",
   "dash.shipmentCenter.title": "Shipment Command Center",
+
+  "s43.hero.eyebrow": "Import Operating System",
+  "s43.hero.ctaFreight": "Get freight quote",
+  "s43.hero.ctaStartImport": "Start import",
+  "s43.hero.pill.actions": "action required",
+  "s43.hero.pill.inTransit": "in transit",
+  "s43.hero.subtitle.firstTrade": "Manage freight, customs and your import journey in one place.",
+  "s43.hero.subtitle.standard": "Manage freight, customs and your import journey in one place.",
+  "s43.hero.subtitle.power": "Manage freight, customs and your import journey in one place.",
 };
 
 export default dashboardEn;

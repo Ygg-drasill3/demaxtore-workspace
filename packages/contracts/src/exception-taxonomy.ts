@@ -27,7 +27,13 @@ export type ShipmentExceptionCategory = (typeof SHIPMENT_EXCEPTION_CATEGORIES)[n
 
 /**
  * When a shipment EXCEPTION is reported, whether the orchestrator should suggest
- * opening an Order DISPUTED (Faz 2). Faz 1: contract only — no auto-sync.
+ * opening an Order DISPUTED. This only ever produces a recommendation — the order
+ * FSM is never mutated from a shipment exception.
+ *
+ * Only DELIVERY_DELAY mirrors: it is the one operational category with a direct
+ * commercial counterpart against the supplier (Order dispute category DELAY).
+ * Carrier- or authority-side events (vessel delay, port congestion, customs hold)
+ * are not in themselves grounds for a commercial dispute, so they stay "none".
  */
 export const SHIPMENT_EXCEPTION_TO_ORDER_MIRROR: Record<
   ShipmentExceptionCategory,

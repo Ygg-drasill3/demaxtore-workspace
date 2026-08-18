@@ -53,3 +53,11 @@ export async function redisIncrWindow(
   if (count === 1) await redis.expire(key, windowSec);
   return count;
 }
+
+/** Read a window's current count without consuming budget. */
+export async function redisWindowCount(key: string): Promise<number> {
+  const redis = await getRedisClient();
+  const raw = await redis.get(key);
+  const parsed = raw === null ? 0 : parseInt(raw, 10);
+  return Number.isFinite(parsed) ? parsed : 0;
+}

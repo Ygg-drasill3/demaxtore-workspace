@@ -91,7 +91,9 @@ export function mapConversationDetail(
 }
 
 export function mapMessage(row: MessageRow): UnifiedMessageDto {
-  return {
+  // `failureReason` is persisted and served to clients, but not yet declared on
+  // UnifiedMessageDto in @dmx/contracts; keep emitting it until the contract adds it.
+  const dto: UnifiedMessageDto & { failureReason: string | null } = {
     id: row.id,
     conversationId: row.conversationId,
     senderUserId: row.authorUserId,
@@ -109,7 +111,9 @@ export function mapMessage(row: MessageRow): UnifiedMessageDto {
     deliveredAt: row.deliveredAt?.toISOString() ?? null,
     readAt: row.readAt?.toISOString() ?? null,
     failedAt: row.failedAt?.toISOString() ?? null,
+    failureReason: row.failureReason ?? null,
   };
+  return dto;
 }
 
 export function filterMessagesForUser(

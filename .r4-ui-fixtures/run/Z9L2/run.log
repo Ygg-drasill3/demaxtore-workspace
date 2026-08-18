@@ -1,0 +1,63 @@
+R4 Golden Path → MVP-UI17-R4-20260814-Z9L2
+
+[PASS] BUYER_LOGIN — https://workspace.demaxtore.com/buyer/control-tower
+[PASS] PRODUCT_CREATION — FLOUR-UI17R4-Z9L2
+[PASS] DIRECT_PO — PO-MST3ZF10-3E0BC90A
+[PASS] PRODUCT_TO_PO — https://workspace.demaxtore.com/workspace/order/1819b59c-25a6-435c-a542-fc36c69f370f
+[PASS] DEPOSIT_CONFIRMATION — Admin recorded DEPOSIT_PAID
+[PASS] FREIGHT_REQUEST — Admin created freight request
+[PASS] FREIGHT_OFFER — 2100 USD offer published
+[PASS] OFFER_SELECTION
+[PASS] OFFER_TO_BOOKING
+[PASS] BOOKING_TO_SHIPMENT — https://workspace.demaxtore.com/workspace/shipment/36fd6847-f46b-4a11-a6ff-c5d042062285
+[PASS] BOOKING_LIFECYCLE — MSCBK-R4-Z9L2
+[PASS] LINE_ALLOCATION — 90 PCS
+[PASS] CONTAINER — MSKU17R4Z9L2
+[PASS] TRACKING
+[PASS] SHIPMENT_TO_CUSTOMS
+[PASS] BROKER_ASSIGNMENT
+[PASS] DOCUMENT_READINESS — Trade docs uploaded via UI
+[PASS] BROKER_CASE_DISCOVERY
+[PASS] BROKER_EXECUTION — Start review
+[DEAD END] R4_ABORT — locator.click: Timeout 10000ms exceeded.
+Call log:
+  - waiting for getByTestId('verify-classification')
+    - locator resolved to <button disabled type="button" data-testid="verify-classification" class="rounded-lg border px-3 py-1.5 text-sm">Verify classification</button>
+  - attempting click action
+    2 × waiting for element to be visible, enabled and stable
+      - element is not enabled
+    - retrying click action
+    - waiting 20ms
+    2 × waiting for element to be visible, enabled and stable
+      - element is not enabled
+    - retrying click action
+      - waiting 100ms
+    15 × waiting for element to be visible, enabled and stable
+       - element is not enabled
+     - retrying click action
+       - waiting 500ms
+
+
+=== R4 SUMMARY ===
+Marker: MVP-UI17-R4-20260814-Z9L2
+Fresh Transaction: FAIL
+Blocker: UNHANDLED — locator.click: Timeout 10000ms exceeded.
+Call log:
+  - waiting for getByTestId('verify-classification')
+    - locator resolved to <button disabled type="button" data-testid="verify-classification" class="rounded-lg border px-3 py-1.5 text-sm">Verify classification</button>
+  - attempting click action
+    2 × waiting for element to be visible, enabled and stable
+      - element is not enabled
+    - retrying click action
+    - waiting 20ms
+    2 × waiting for element to be visible, enabled and stable
+      - element is not enabled
+    - retrying click action
+      - waiting 100ms
+    15 × waiting for element to be visible, enabled and stable
+       - element is not enabled
+     - retrying click action
+       - waiting 500ms
+
+Unexpected 5xx: 0
+Evidence: /var/www/demaxtore/DemaxtoreSolitions-main/.r4-ui-fixtures/run/Z9L2/evidence.json

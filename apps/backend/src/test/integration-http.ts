@@ -10,11 +10,21 @@ export function getTestApiBase(): string {
   ).replace(/\/$/, "");
 }
 
+/**
+ * The suite logs in hundreds of times from one IP, which would otherwise exhaust the
+ * credential rate limit. This is what `E2E_TEST_SECRET` is for — carry it so production
+ * can keep a tight login budget instead of the limit being raised to accommodate tests.
+ */
+function bypassHeaders(): Record<string, string> {
+  const secret = process.env.E2E_TEST_SECRET;
+  return secret ? { "x-e2e-test-secret": secret } : {};
+}
+
 export async function testApiLogin(email: string, password = "Passw0rd!"): Promise<string> {
   const base = getTestApiBase();
   const res = await fetch(`${base}/api/auth/login`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...bypassHeaders() },
     body: JSON.stringify({ email, password }),
   });
   if (!res.ok) {
@@ -35,6 +45,7 @@ export async function testApiFetch(
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
+      ...bypassHeaders(),
       ...(init.headers ?? {}),
     },
   });

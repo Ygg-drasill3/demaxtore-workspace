@@ -17,6 +17,7 @@ const ACTION_MAP: Record<string, FreightAction> = {
   "withdraw-offer": "withdraw_offer",
   "select-offer": "select_offer",
   "cancel-request": "cancel_request",
+  "proceed-to-booking": "proceed_to_booking",
 };
 
 export const freightiqController = {

@@ -31,6 +31,10 @@ export const bulkContainerController = {
     res.status(201).json(await service.create(input, actor(req)));
   },
 
+  ensureActiveBuilding: async (req: Request, res: Response) => {
+    res.json(await service.ensureActiveBuilding(actor(req)));
+  },
+
   get: async (req: Request, res: Response) => {
     const ok = await canAccessBulkContainer(prisma, actor(req), req.params.id);
     if (!ok) throw new AppError(403, "FORBIDDEN");

@@ -22,7 +22,7 @@ export async function autoAcknowledgePoOnSupplierConfirm(
   });
   if (!po) return false;
   if (po.acknowledgements.some((a) => a.status === "ACCEPTED")) return false;
-  if (!["ISSUED", "AMENDMENT_REQUESTED"].includes(po.status)) return false;
+  if (!["SUBMITTED", "ISSUED"].includes(po.status)) return false;
 
   const pending = po.acknowledgements.find((a) => a.status === "PENDING");
   if (pending) {
@@ -43,7 +43,7 @@ export async function autoAcknowledgePoOnSupplierConfirm(
 
   await tx.purchaseOrder.update({
     where: { id: po.id },
-    data: { status: "ACKNOWLEDGED" },
+    data: { status: "APPROVED", version: { increment: 1 } },
   });
 
   const ws = await tx.workspace.findUniqueOrThrow({ where: { id: orderId }, select: { state: true } });

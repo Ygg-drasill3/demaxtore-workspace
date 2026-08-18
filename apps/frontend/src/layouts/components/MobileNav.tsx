@@ -5,16 +5,18 @@ import { LogOut, X } from "lucide-react";
 import { m, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/store/auth.store";
 import { useUi } from "@/store/ui.store";
-import { NAV_GROUPS_BY_ROLE } from "@/routes/navigation";
+import { navGroupsForRole } from "@/routes/navigation";
 import { translateNavGroups } from "@/i18n/translateNav";
 import { useT } from "@/i18n/useT";
 import { NavMenu } from "./NavMenu";
 import { useNavBadges } from "@/layouts/hooks/useNavBadges";
 import { leftDrawerPanelVariants, modalBackdropVariants, reducedVariants } from "@/motion/tokens";
 import { useReducedMotion } from "@/motion/hooks/useReducedMotion";
+import { BrandLogo } from "./BrandLogo";
 
 export function MobileNav() {
   const role = useAuth((s) => s.user?.role);
+  const buyerOperatingModel = useAuth((s) => s.user?.buyerOperatingModel);
   const logout = useAuth((s) => s.logout);
   const open = useUi((s) => s.mobileMenuOpen);
   const closeMobileMenu = useUi((s) => s.closeMobileMenu);
@@ -33,7 +35,7 @@ export function MobileNav() {
 
   if (!role) return null;
 
-  const groups = translateNavGroups(NAV_GROUPS_BY_ROLE[role] ?? [], t);
+  const groups = translateNavGroups(navGroupsForRole(role, buyerOperatingModel), t);
 
   return (
     <AnimatePresence>
@@ -56,20 +58,8 @@ export function MobileNav() {
             animate="visible"
             exit="exit"
           >
-            <div className="flex h-14 shrink-0 items-center justify-between border-b border-white/[0.06] px-4">
-              <div className="flex items-center gap-3">
-                <div className="relative grid h-9 w-9 place-items-center rounded-[10px] bg-white font-display text-sm font-bold text-ink-950 shadow-sm">
-                  D
-                </div>
-                <div>
-                  <span className="block font-display text-[15px] font-semibold leading-tight text-white">
-                    DeMaxtore
-                  </span>
-                  <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-zinc-500">
-                    Trade OS
-                  </span>
-                </div>
-              </div>
+            <div className="flex h-14 shrink-0 items-center justify-between border-b border-white/[0.06] px-3">
+              <BrandLogo className="max-w-[160px]" />
               <button
                 type="button"
                 data-testid="mobile-nav-close"

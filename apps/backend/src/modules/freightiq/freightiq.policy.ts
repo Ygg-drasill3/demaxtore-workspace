@@ -21,6 +21,7 @@ export function assertFreightActionRole(action: FreightAction, role: AuthUser["r
     withdraw_offer: ["ADMIN", "SUPPLIER"],
     select_offer: ["BUYER", "ADMIN"],
     cancel_request: ["BUYER", "ADMIN"],
+    proceed_to_booking: ["BUYER", "ADMIN"],
   };
   if (!rules[action].includes(role)) {
     throw new Error("FORBIDDEN_ROLE");

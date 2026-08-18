@@ -107,7 +107,7 @@ export default function ShipmentPortfolioPage() {
   const totalPages = Math.max(1, Math.ceil(data.total / limit));
 
   return (
-    <div data-testid="shipment-portfolio" className="max-w-[1600px] mx-auto space-y-6 animate-fade-in pb-10">
+    <div data-testid="shipment-portfolio" data-guide="shipment-portfolio" className="max-w-[1600px] mx-auto space-y-6 animate-fade-in pb-10">
       <header className="rounded-2xl border border-zinc-200 bg-gradient-to-br from-ink-950 via-[#0f1528] to-ink-800 text-white p-6 sm:p-8 shadow-lg">
         <div className="flex items-start gap-4">
           <div className="h-12 w-12 rounded-xl bg-white/10 grid place-items-center">

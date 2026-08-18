@@ -4,6 +4,7 @@ import { canAccessTradeTimeline } from "./trade-timeline.policy.js";
 import { AppError } from "../../utils/httpErrors.js";
 import {
   collectTradeGraph,
+  findDirectOrderRoots,
   resolveTradeRoot,
   tradeRefFromRoot,
 } from "../trade/trade.resolver.js";
@@ -284,11 +285,15 @@ export class TradeTimelineService {
 
   private async findUserTradeRoots(actor: AuthUser) {
     if (actor.role === "ADMIN") {
-      return this.db.workspace.findMany({
-        where: { type: { in: ["RFQ", "COMMODITYBID", "MIXED_CONTAINER", "BULK_CONTAINER"] } },
-        take: 200,
-        orderBy: { updatedAt: "desc" },
-      });
+      const [rooted, directOrders] = await Promise.all([
+        this.db.workspace.findMany({
+          where: { type: { in: ["RFQ", "COMMODITYBID", "MIXED_CONTAINER", "BULK_CONTAINER"] } },
+          take: 200,
+          orderBy: { updatedAt: "desc" },
+        }),
+        findDirectOrderRoots(this.db),
+      ]);
+      return [...rooted, ...directOrders];
     }
 
     const participations = await this.db.workspaceParticipant.findMany({

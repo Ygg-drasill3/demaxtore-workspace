@@ -99,6 +99,7 @@ export default function InboxWorkspaceCards({ workspaces }: Props) {
             </Link>
             <Link
               to={ws.workspaceUrl}
+              data-guide="inbox-item-link"
               className="inline-flex items-center gap-1 text-xs text-zinc-600 hover:underline"
             >
               <ExternalLink className="h-3 w-3" /> Workspace

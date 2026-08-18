@@ -1,0 +1,39 @@
+import { Router } from "express";
+import { requireAuth } from "../../middleware/auth.js";
+import { asyncHandler } from "../../middleware/asyncHandler.js";
+import { inspectionController } from "./inspection.controller.js";
+
+export const inspectionRouter = Router();
+
+inspectionRouter.get("/:id", requireAuth, asyncHandler(inspectionController.get));
+inspectionRouter.patch("/:id", requireAuth, asyncHandler(inspectionController.patch));
+inspectionRouter.post("/:id/cancel", requireAuth, asyncHandler(inspectionController.cancel));
+inspectionRouter.post("/:id/assign", requireAuth, asyncHandler(inspectionController.assign));
+inspectionRouter.delete("/:id/assign", requireAuth, asyncHandler(inspectionController.removeAssignment));
+inspectionRouter.post("/:id/schedule", requireAuth, asyncHandler(inspectionController.schedule));
+inspectionRouter.post("/:id/findings", requireAuth, asyncHandler(inspectionController.addFinding));
+inspectionRouter.patch(
+  "/:id/findings/:findingId",
+  requireAuth,
+  asyncHandler(inspectionController.patchFinding),
+);
+inspectionRouter.delete(
+  "/:id/findings/:findingId",
+  requireAuth,
+  asyncHandler(inspectionController.deleteFinding),
+);
+inspectionRouter.post("/:id/defects", requireAuth, asyncHandler(inspectionController.addDefect));
+inspectionRouter.patch(
+  "/:id/defects/:defectId",
+  requireAuth,
+  asyncHandler(inspectionController.patchDefect),
+);
+inspectionRouter.delete(
+  "/:id/defects/:defectId",
+  requireAuth,
+  asyncHandler(inspectionController.deleteDefect),
+);
+inspectionRouter.post("/:id/ncrs", requireAuth, asyncHandler(inspectionController.addNcr));
+inspectionRouter.patch("/:id/ncrs/:ncrId", requireAuth, asyncHandler(inspectionController.patchNcr));
+inspectionRouter.post("/:id/decision", requireAuth, asyncHandler(inspectionController.decision));
+inspectionRouter.get("/:id/timeline", requireAuth, asyncHandler(inspectionController.timeline));

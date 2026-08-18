@@ -3,11 +3,19 @@ import { requireAuth, requireRole } from "../auth/auth.middleware.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { mixedContainerAdminController } from "./mixed-container-admin.controller.js";
 import { mixedContainerExecutionController } from "./mixed-container-execution.controller.js";
+import { mixedContainerOrganizationAdminController } from "./mixed-container-organization-admin.controller.js";
 
 export const mixedContainerAdminRouter = Router();
 
 mixedContainerAdminRouter.get("/kpis", requireAuth, requireRole("ADMIN"), asyncHandler(mixedContainerAdminController.kpis));
 mixedContainerAdminRouter.get("/inbox", requireAuth, requireRole("ADMIN"), asyncHandler(mixedContainerAdminController.inbox));
+mixedContainerAdminRouter.get("/procurement-managers", requireAuth, requireRole("ADMIN"), asyncHandler(mixedContainerAdminController.procurementManagers));
+mixedContainerAdminRouter.get("/organization/:id", requireAuth, requireRole("ADMIN"), asyncHandler(mixedContainerOrganizationAdminController.get));
+mixedContainerAdminRouter.post("/organization/:id/actions/update-status", requireAuth, requireRole("ADMIN"), asyncHandler(mixedContainerOrganizationAdminController.updateStatus));
+mixedContainerAdminRouter.post("/organization/:id/actions/assign-manager", requireAuth, requireRole("ADMIN"), asyncHandler(mixedContainerOrganizationAdminController.assignManager));
+mixedContainerAdminRouter.post("/organization/:id/internal-notes", requireAuth, requireRole("ADMIN"), asyncHandler(mixedContainerOrganizationAdminController.addInternalNote));
+mixedContainerAdminRouter.get("/:id/procurement-request", requireAuth, requireRole("ADMIN"), asyncHandler(mixedContainerAdminController.procurementRequest));
+mixedContainerAdminRouter.post("/:id/internal-notes", requireAuth, requireRole("ADMIN"), asyncHandler(mixedContainerAdminController.addInternalNote));
 mixedContainerAdminRouter.get("/:id", requireAuth, requireRole("ADMIN"), asyncHandler(mixedContainerAdminController.get));
 mixedContainerAdminRouter.post("/:id/actions/start-procurement", requireAuth, requireRole("ADMIN"), asyncHandler(mixedContainerAdminController.startProcurement));
 mixedContainerAdminRouter.post("/:id/actions/assign-manager", requireAuth, requireRole("ADMIN"), asyncHandler(mixedContainerAdminController.assignManager));

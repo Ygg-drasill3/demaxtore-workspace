@@ -141,3 +141,17 @@ export function computeBcCapacityWarnings(currentMt: number): BcCapacityWarning[
   if (currentMt > BC_MAX_CAPACITY_MT) warnings.push("over_capacity");
   return warnings;
 }
+
+export function isBcContainerFull(currentMt: number, maxMt: number = BC_MAX_CAPACITY_MT): boolean {
+  return currentMt >= maxMt;
+}
+
+/** Throws when a line would exceed fixed container capacity or container is already full. */
+export function assertBcLineFitsCapacity(currentMt: number, addMt: number, maxMt: number = BC_MAX_CAPACITY_MT): void {
+  if (isBcContainerFull(currentMt, maxMt)) {
+    throw new Error("CONTAINER_FULL");
+  }
+  if (currentMt + addMt > maxMt + 1e-9) {
+    throw new Error("CONTAINER_CAPACITY_EXCEEDED");
+  }
+}

@@ -1,0 +1,28 @@
+R4 Golden Path → MVP-UI17-R4-20260814-M3Q8
+
+[PASS] BUYER_LOGIN — https://workspace.demaxtore.com/buyer/control-tower
+[PASS] PRODUCT_CREATION — FLOUR-UI17R4-M3Q8
+[DEAD END] R4_ABORT — locator.fill: Error: strict mode violation: getByTestId('product-search-select-input') resolved to 4 elements:
+    1) <input value="" class="dmx-input text-xs" placeholder="Search products…" data-testid="product-search-select-input"/> aka getByRole('textbox', { name: 'Search products…' })
+    2) <input value="" class="dmx-input text-xs" placeholder="Search products…" data-testid="product-search-select-input"/> aka getByRole('table').getByLabel('Product', { exact: true })
+    3) <input value="" class="dmx-input text-xs" placeholder="Search products…" data-testid="product-search-select-input"/> aka getByTestId('product-search-select-input').nth(2)
+    4) <input value="" class="dmx-input text-xs" placeholder="Search products…" data-testid="product-search-select-input"/> aka getByTestId('product-search-select-input').nth(3)
+
+Call log:
+  - waiting for getByTestId('product-search-select-input')
+
+
+=== R4 SUMMARY ===
+Marker: MVP-UI17-R4-20260814-M3Q8
+Fresh Transaction: FAIL
+Blocker: UNHANDLED — locator.fill: Error: strict mode violation: getByTestId('product-search-select-input') resolved to 4 elements:
+    1) <input value="" class="dmx-input text-xs" placeholder="Search products…" data-testid="product-search-select-input"/> aka getByRole('textbox', { name: 'Search products…' })
+    2) <input value="" class="dmx-input text-xs" placeholder="Search products…" data-testid="product-search-select-input"/> aka getByRole('table').getByLabel('Product', { exact: true })
+    3) <input value="" class="dmx-input text-xs" placeholder="Search products…" data-testid="product-search-select-input"/> aka getByTestId('product-search-select-input').nth(2)
+    4) <input value="" class="dmx-input text-xs" placeholder="Search products…" data-testid="product-search-select-input"/> aka getByTestId('product-search-select-input').nth(3)
+
+Call log:
+  - waiting for getByTestId('product-search-select-input')
+
+Unexpected 5xx: 0
+Evidence: /var/www/demaxtore/DemaxtoreSolitions-main/.r4-ui-fixtures/run/M3Q8/evidence.json

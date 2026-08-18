@@ -1,0 +1,29 @@
+R4 Golden Path → MVP-UI17-R4-20260814-H8Q3
+
+[PASS] BUYER_LOGIN — https://workspace.demaxtore.com/buyer/control-tower
+[PASS] PRODUCT_CREATION — FLOUR-UI17R4-H8Q3
+[PASS] DIRECT_PO — PO-MST4438L-538A1079
+[PASS] PRODUCT_TO_PO — https://workspace.demaxtore.com/workspace/order/d1827fb6-906f-4b14-8d1c-eb2074709625
+[PASS] DEPOSIT_CONFIRMATION — Admin recorded DEPOSIT_PAID
+[PASS] FREIGHT_REQUEST — Admin created freight request
+[PASS] FREIGHT_OFFER — 2100 USD offer published
+[PASS] OFFER_SELECTION
+[PASS] OFFER_TO_BOOKING
+[PASS] BOOKING_TO_SHIPMENT — https://workspace.demaxtore.com/workspace/shipment/88ca7476-78ce-4de5-94e4-2501a014d8ea
+[PASS] BOOKING_LIFECYCLE — MSCBK-R4-H8Q3
+[PASS] LINE_ALLOCATION — 90 PCS
+[PASS] CONTAINER — MSKU17R4H8Q3
+[PASS] TRACKING
+[PASS] SHIPMENT_TO_CUSTOMS
+[PASS] BROKER_ASSIGNMENT
+[PASS] DOCUMENT_READINESS — Trade docs uploaded via UI
+[PASS] BROKER_CASE_DISCOVERY
+[PASS] BROKER_EXECUTION — Start review
+[DEAD END] R4_ABORT — locator.selectOption: options[0].label: expected string, got object
+
+=== R4 SUMMARY ===
+Marker: MVP-UI17-R4-20260814-H8Q3
+Fresh Transaction: FAIL
+Blocker: UNHANDLED — locator.selectOption: options[0].label: expected string, got object
+Unexpected 5xx: 0
+Evidence: /var/www/demaxtore/DemaxtoreSolitions-main/.r4-ui-fixtures/run/H8Q3/evidence.json

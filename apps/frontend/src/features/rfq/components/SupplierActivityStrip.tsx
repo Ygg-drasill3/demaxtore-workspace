@@ -29,7 +29,7 @@ export function SupplierActivityStrip({ workspaceId, state }: Props) {
 
   return (
     <>
-      <section data-testid="supplier-activity-strip" className="dmx-card p-5 sm:p-6 animate-fade-in">
+      <section data-testid="supplier-activity-strip" data-guide="supplier-activity" className="dmx-card p-5 sm:p-6 animate-fade-in">
         <header className="flex items-center justify-between mb-4">
           <div className="dmx-eyebrow">Supplier activity</div>
           {data && (

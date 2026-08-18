@@ -62,7 +62,10 @@ export type ActorRole =
   | "LOGISTICS_OPERATOR"
   | "FINANCE_OPERATOR"
   | "DOCUMENT_CONTROLLER"
-  | "FORWARDER";
+  | "FORWARDER"
+  | "ORIGIN_AGENT"
+  | "CUSTOMS_BROKER"
+  | "TRUCKER";
 export type ParticipantConstraint = "OWNER" | "COUNTERPARTY" | "OPERATOR" | "OBSERVER" | "ANY";
 export type NotificationType = "INFO" | "SUCCESS" | "WARNING" | "ERROR";
 

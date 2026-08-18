@@ -1,17 +1,12 @@
 // apps/frontend/src/features/rfq/components/RfqNextActions.tsx
 //
-// Sprint 2.5 — RfqNextActions is now JUST the "More actions ⋯" trigger.
-// The primary CTA lives in WhatHappensNextCard. Everything else lives in
-// ActionDrawer. This component owns only the drawer-open trigger and the
-// "no actions" empty state, so the visual hierarchy stays consistent.
+// Secondary RFQ actions — rendered inline below the hero card so buyers
+// don't have to hunt for a hidden "More actions" menu.
 //
-import { useState } from "react";
-import { MoreHorizontal } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { ActionDrawer } from "./ActionDrawer";
 import { computeRfqNextActions } from "@dmx/contracts/rfq.next-actions";
 import { rfqHeroActions } from "../lib/rfq.scripts";
 import { toWorkspaceScriptRole } from "@dmx/contracts/workspace-scripts";
+import { ActionDrawer } from "./ActionDrawer";
 import type { RfqState, ActorRole } from "@dmx/contracts/rfq.fsm";
 
 interface Props {
@@ -28,7 +23,6 @@ interface Props {
 
 export function RfqNextActions(props: Props) {
   const { state, actor, isOwner, isCounterparty, isSelectedSupplier, hasQuotationFromUser } = props;
-  const [open, setOpen] = useState(false);
 
   const allowed = computeRfqNextActions({
     state, actorRole: actor.role, isOwner, isCounterparty, isSelectedSupplier, hasQuotationFromUser,
@@ -40,32 +34,17 @@ export function RfqNextActions(props: Props) {
   if (others.length === 0) return null;
 
   return (
-    <>
-      <div data-testid="rfq-next-actions" className="flex justify-end">
-        <Button
-          data-testid="rfq-more-actions-trigger"
-          variant="ghost"
-          size="sm"
-          onClick={() => setOpen(true)}
-        >
-          <MoreHorizontal className="h-4 w-4" />
-          More actions ({others.length})
-        </Button>
-      </div>
-
-      <ActionDrawer
-        workspaceId={props.workspaceId}
-        open={open}
-        onClose={() => setOpen(false)}
-        state={state}
-        actor={actor}
-        isOwner={isOwner}
-        isCounterparty={isCounterparty}
-        isSelectedSupplier={isSelectedSupplier}
-        hasQuotationFromUser={hasQuotationFromUser}
-        helperText={props.helperText}
-        onFocusCommunication={props.onFocusCommunication}
-      />
-    </>
+    <ActionDrawer
+      inline
+      workspaceId={props.workspaceId}
+      state={state}
+      actor={actor}
+      isOwner={isOwner}
+      isCounterparty={isCounterparty}
+      isSelectedSupplier={isSelectedSupplier}
+      hasQuotationFromUser={hasQuotationFromUser}
+      helperText={props.helperText}
+      onFocusCommunication={props.onFocusCommunication}
+    />
   );
 }

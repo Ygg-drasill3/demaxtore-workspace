@@ -27,7 +27,7 @@ test.describe.serial("Buyer exception hub (15D)", () => {
 
   test("02 — Exception dashboard loads", async ({ page }) => {
     await uiLogin(page, USERS.buyer1);
-    await page.goto("/exceptions");
+    await page.goto("/alerts");
     await expect(page.getByTestId("exception-hub")).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId("eh-kpis")).toBeVisible();
     await expect(page.getByTestId("eh-table")).toBeVisible();
@@ -35,7 +35,7 @@ test.describe.serial("Buyer exception hub (15D)", () => {
 
   test("03 — Search filter works", async ({ page }) => {
     await uiLogin(page, USERS.buyer1);
-    await page.goto("/exceptions");
+    await page.goto("/alerts");
     await expect(page.getByTestId("exception-hub")).toBeVisible({ timeout: 15_000 });
     await page.getByTestId("eh-search").fill("zzz-no-match-xyz");
     await expect(page.getByTestId("eh-empty")).toBeVisible({ timeout: 10_000 });
@@ -44,7 +44,7 @@ test.describe.serial("Buyer exception hub (15D)", () => {
   test("04 — Exception detail page works", async ({ page }) => {
     test.skip(!exceptionId, "no exceptions synced from control tower");
     await uiLogin(page, USERS.buyer1);
-    await page.goto(`/exceptions/${exceptionId}`);
+    await page.goto(`/alerts/${exceptionId}`);
     await expect(page.getByTestId("exception-detail")).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId("exception-summary")).toBeVisible();
   });

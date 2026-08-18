@@ -100,6 +100,8 @@ export const BulkContainerDTO = z.object({
   lines: z.array(BulkContainerLineDTO),
   submittedAt: z.string().nullable(),
   activeOfferId: z.string().uuid().nullable().optional(),
+  isFull: z.boolean(),
+  canCreateNewContainer: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

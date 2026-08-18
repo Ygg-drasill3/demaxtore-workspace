@@ -1,6 +1,0 @@
-import { z } from "zod";
-export const SetFreightMarginPayload = z.object({
-    internalCostUsd: z.number().nonnegative(),
-    freightiqMarginUsd: z.number(),
-});
-//# sourceMappingURL=freight-commercial.zod.js.map

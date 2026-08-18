@@ -16,6 +16,7 @@ const TYPE_HEADLINES: Partial<Record<OperationalNotificationType, string>> = {
   ACTION_REQUIRED: "Action Required",
   QUOTATION_SUBMITTED: "Quotation Submitted",
   QUOTATION_REVISED: "Quotation Revised",
+  SUPPLIER_SELECTED: "Supplier Selected",
   PURCHASE_ORDER_ISSUED: "Purchase Order Issued",
   DOCUMENT_UPLOADED: "Document Uploaded",
   INSPECTION_SCHEDULED: "Inspection Scheduled",
@@ -24,6 +25,7 @@ const TYPE_HEADLINES: Partial<Record<OperationalNotificationType, string>> = {
   ETA_UPDATED: "ETA Updated",
   SHIPMENT_DELAYED: "Shipment Delayed",
   SHIPMENT_DELIVERED: "Shipment Delivered",
+  WORKSPACE_ASSIGNED: "Workspace Assigned",
 };
 
 export function buildWhatsAppTemplateBody(ctx: WhatsAppTemplateContext): {

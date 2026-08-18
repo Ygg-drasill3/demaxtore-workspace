@@ -56,13 +56,20 @@ function normalizeQuotationRow(q: Record<string, unknown>): QuotationRowDTO | nu
   const normalizedLineItems = lineItems.length
     ? lineItems.map((li) => {
         const row = li as Record<string, unknown>;
+        const rfqLineItemId = row.rfqLineItemId != null && String(row.rfqLineItemId).trim()
+          ? String(row.rfqLineItemId)
+          : null;
         return {
           id:          String(row.id ?? ""),
+          rfqLineItemId,
           position:    Number(row.position),
           description: String(row.description ?? ""),
           quantity:    Number(row.quantity),
           unitPrice:   Number(row.unitPrice),
           total:       Number(row.total ?? Number(row.quantity) * Number(row.unitPrice)),
+          packing:     row.packing != null ? String(row.packing) : null,
+          priceUnit:   row.priceUnit != null ? String(row.priceUnit) : null,
+          moq:         row.moq != null ? Number(row.moq) : null,
         };
       })
     : undefined;
@@ -71,6 +78,8 @@ function normalizeQuotationRow(q: Record<string, unknown>): QuotationRowDTO | nu
     id,
     supplierId,
     supplierName: String(q.supplierName ?? q.supplierOrg ?? "Supplier"),
+    supplierLogoUrl: (q.supplierLogoUrl as string | null | undefined) ?? null,
+    supplierCatalogUrl: (q.supplierCatalogUrl as string | null | undefined) ?? null,
     total,
     currency:     String(q.currency ?? "USD"),
     unitPriceAvg,

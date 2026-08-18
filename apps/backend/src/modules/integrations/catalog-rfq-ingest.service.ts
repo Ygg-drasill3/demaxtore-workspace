@@ -53,14 +53,20 @@ function extractTargetMarket(description: string, intake: CatalogIntakeDTO): str
   return "International";
 }
 
-function parseLineItems(
+const LINE_ITEMS_SECTION_END =
+  /\n\n(?:Company(?: Info)?:|Phone:|Departure port:|Destination:|Delivery location:|Logistics|Request details:|Quantity:|Supplier type|DeMaxtore session_id:|System Info:|Shipping Info:)/i;
+
+/** Exported for unit tests — parses catalog RFQ description into draft line items. */
+export function parseLineItems(
   description: string,
   category: string,
   qty?: number | string,
   unit?: string,
 ) {
   const items: { description: string; quantity: number; uom: string; notes?: string }[] = [];
-  const section = description.match(/Line items:\n([\s\S]*?)(?:\n\n|$)/);
+  const section = description.match(
+    new RegExp(`Line items:\\n([\\s\\S]*?)(?=${LINE_ITEMS_SECTION_END.source}|$)`, "i"),
+  );
   if (section?.[1]) {
     for (const line of section[1].split("\n")) {
       if (!line.startsWith("- ")) continue;
@@ -148,7 +154,7 @@ function enrichIntakeFromDescription(intake: CatalogIntakeDTO, description: stri
 function supplementalBlocks(rawDescription: string): string[] {
   const desc = rawDescription.trim();
   if (!desc) return [];
-  if (/Catalog request:/i.test(desc)) {
+  if (/(?:Catalog request|Price quotation Request):/i.test(desc)) {
     const idx = desc.search(/\n\n(?:Line items:|Shipping Info:)/i);
     return idx >= 0 ? [desc.slice(idx).trim()] : [];
   }
@@ -171,7 +177,7 @@ function toDraftInput(body: CatalogRfqIngestBody): {
     200,
   );
 
-  const productDescription = /Catalog request:/i.test(rawDesc)
+  const productDescription = /(?:Catalog request|Price quotation Request):/i.test(rawDesc)
     ? clip(rawDesc, 5000)
     : clip(
         buildCatalogProductDescription(intake, supplementalBlocks(rawDesc)),
@@ -242,7 +248,7 @@ export async function ingestCatalogRfq(raw: unknown) {
   const { draft, catalogIntake } = toDraftInput(body);
   const created = (await service.createDraft(draft, actor)) as { id: string };
 
-  const productImageUrl = body.product_image?.trim() || catalogIntake.productImageUrl?.trim() || undefined;
+  const productImageUrl = body.product_image?.trim() || undefined;
   const catalogIntakeStored = productImageUrl
     ? { ...catalogIntake, productImageUrl }
     : catalogIntake;

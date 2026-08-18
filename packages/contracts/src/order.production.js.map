@@ -1,1 +1,0 @@
-{"version":3,"file":"order.production.js","sourceRoot":"","sources":["order.production.ts"],"names":[],"mappings":"AAAA,iFAAiF;AACjF,MAAM,CAAC,MAAM,2BAA2B,GAAG,GAAG,CAAC;AAE/C,MAAM,UAAU,2BAA2B,CAAC,KAAc;IACxD,MAAM,CAAC,GAAG,MAAM,CAAC,KAAK,CAAC,CAAC;IACxB,OAAO,MAAM,CAAC,QAAQ,CAAC,CAAC,CAAC,IAAI,CAAC,IAAI,2BAA2B,CAAC;AAChE,CAAC"}

@@ -3,6 +3,8 @@ import dashboardEn from "./dashboard-en";
 import launchEn from "./launch-en";
 import pagesEn from "./pages-en";
 import workspaceEn from "./workspace-en";
+import navEn from "./nav-en";
+import importOpsEn from "./import-ops-en";
 
 const coreEn: TranslationDict = {
   "common.loading": "Loading…",
@@ -77,6 +79,18 @@ const coreEn: TranslationDict = {
   "role.SUPPLIER": "Supplier",
   "role.ADMIN": "Admin",
   "role.SALES_CONTROL": "Sales Control",
+  "role.TRUCKER": "Trucker",
+  "role.CUSTOMS_BROKER": "Customs broker",
+  "role.ORIGIN_AGENT": "Origin agent",
+  "role.FORWARDER": "Forwarder",
+  "role.OPS_MANAGER": "Operations manager",
+  "role.LOGISTICS_OPERATOR": "Logistics operator",
+  "role.DOCUMENT_CONTROLLER": "Document controller",
+  "ROLE.TRUCKER": "Trucker",
+  "ROLE.CUSTOMS_BROKER": "Customs broker",
+  "ROLE.BUYER": "Buyer",
+  "ROLE.SUPPLIER": "Supplier",
+  "ROLE.ADMIN": "Admin",
 
   "salesControl.eyebrow": "Sales Control Center",
   "salesControl.title": "User accounts",
@@ -128,6 +142,8 @@ const en: TranslationDict = {
   ...launchEn,
   ...pagesEn,
   ...workspaceEn,
+  ...navEn,
+  ...importOpsEn,
   ...coreEn,
 };
 

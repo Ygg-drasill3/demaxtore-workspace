@@ -25,9 +25,10 @@ test.describe.serial("Mixed Container allocation & payment (Sprint 12D)", () => 
 
   test("01 — Setup: buyer requests pricing and admin sends offer", async ({ page }) => {
     await uiLogin(page, USERS.buyer1);
-    await page.goto("/buyer/mixed-container/catalog/rice");
-    await page.getByTestId("mc-add-to-container-MC-RICE-001").click();
+    await page.goto("/buyer/mixed-container/catalog/pulses");
+    await page.getByTestId("mc-product-card-MC-PUL-RL").click();
     await page.getByTestId("mc-add-confirm").click();
+    await page.getByTestId("mc-sidebar-review").click();
     await page.waitForURL(/\/buyer\/mixed-container\/requests\//);
     containerId = page.url().split("/").pop()!;
     await page.getByTestId("mc-request-pricing").click();
@@ -51,7 +52,7 @@ test.describe.serial("Mixed Container allocation & payment (Sprint 12D)", () => 
     await uiLogin(page, USERS.buyer1);
     await page.goto(`/buyer/mixed-container/offers/${offerId}`);
     await page.getByTestId("mc-approve-offer").click();
-    await expect(page.getByTestId("mc-offer-approved")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId("mc-proposal-approved")).toBeVisible({ timeout: 10000 });
   });
 
   test("03 — Operations creates supplier allocation", async ({ page }) => {

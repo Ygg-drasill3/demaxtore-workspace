@@ -29,7 +29,7 @@ export const ORDER_SCRIPTS: Partial<Record<OrderState, WorkspaceScript>> = {
   PRODUCTION_IN_PROGRESS: {
     mood: "waiting",
     past: "Production in progress at {{supplierName}}",
-    future: "Supplier must report 100% before the order advances to inspection or freight",
+    future: "You will be notified when production completes",
     statL: { label: "Progress", value: "{{productionPercent}}%" },
     statR: { label: "Expected", value: "{{plannedCompletion}}" },
     primaryAction: null,
@@ -143,20 +143,20 @@ const SUPPLIER_ORDER_SCRIPTS: Partial<Record<OrderState, WorkspaceScript>> = {
   PRODUCTION_STARTED: {
     mood: "action",
     past: "Production started",
-    future: "Report progress below 100% to keep the order in production; enter 100% when manufacturing is complete",
+    future: "Report progress and mark complete when finished",
     statL: { label: "Buyer", value: "{{buyerName}}" },
-    statR: { label: "Progress", value: "{{productionPercent}}%" },
+    statR: { label: "Action", value: "Update production" },
     primaryAction: "report_production_progress",
     primaryLabel: "Update production",
   },
   PRODUCTION_IN_PROGRESS: {
     mood: "action",
-    past: "Production in progress — {{productionPercent}}% reported",
-    future: "Order stays here until you report 100%. Use Update Production and enter 100 when goods are ready",
+    past: "Production in progress",
+    future: "Mark production complete when goods are ready",
     statL: { label: "Progress", value: "{{productionPercent}}%" },
     statR: { label: "Buyer waiting", value: "Yes" },
-    primaryAction: "report_production_progress",
-    primaryLabel: "Update production",
+    primaryAction: "mark_production_completed",
+    primaryLabel: "Complete production",
   },
 };
 

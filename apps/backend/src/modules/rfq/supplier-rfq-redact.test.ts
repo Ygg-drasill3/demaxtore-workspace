@@ -54,4 +54,26 @@ Phone: +230 5255 0324`;
     expect(out.lineItems?.[0]?.targetPrice).toBeUndefined();
     expect(out.productDescription).not.toContain("Secret Co");
   });
+
+  it("limits line items to supplier product scope when assigned", () => {
+    const out = redactRfqDtoForSupplier(
+      {
+        title: "Buyer — Catalog",
+        productCategory: "Pasta, Wheat Flour, Olive Oil",
+        productDescription: "Multi product RFQ",
+        ownerName: "Buyer",
+        participants: [{ userId: "sup-1", participantRole: "COUNTERPARTY" }],
+        allowedQuoteLineItemIds: ["line-pasta"],
+        lineItems: [
+          { id: "line-pasta", position: 1, description: "Pasta", quantity: 1, uom: "Piece" },
+          { id: "line-flour", position: 2, description: "Wheat Flour", quantity: 1, uom: "Piece" },
+          { id: "line-oil", position: 3, description: "Olive Oil", quantity: 1, uom: "Piece" },
+        ],
+      },
+      "sup-1",
+    );
+    expect(out.lineItems).toHaveLength(1);
+    expect(out.lineItems?.[0]?.id).toBe("line-pasta");
+    expect(out.productCategory).toBe("Pasta");
+  });
 });

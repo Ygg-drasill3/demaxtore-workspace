@@ -1,5 +1,5 @@
 import { api } from "@/lib/api";
-import type { FreightSummary } from "@dmx/contracts/freightiq";
+import type { FreightPortfolio, FreightSummary } from "@dmx/contracts/freightiq";
 import type { FreightOpsOverview } from "@dmx/contracts/freightiq";
 import type {
   ForwarderContact,
@@ -21,6 +21,9 @@ import type { FreightShipper, FreightShipperDirectory } from "@dmx/contracts/fre
 const orderBase = (orderId: string) => `/freightiq/orders/${orderId}`;
 
 export const freightiqApi = {
+  myPortfolio: () =>
+    api.get<FreightPortfolio>("/freightiq/my-portfolio").then((r) => r.data),
+
   summary: (orderId: string) =>
     api.get<FreightSummary>(orderBase(orderId)).then((r) => r.data),
 

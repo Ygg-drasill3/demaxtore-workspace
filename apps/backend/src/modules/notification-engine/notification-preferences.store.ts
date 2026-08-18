@@ -6,6 +6,7 @@ import {
   type NotificationTypePreference,
   NotificationChannelPreference,
 } from "@dmx/contracts/notification-center";
+import { isWhatsAppDeliverableType } from "@dmx/contracts/whatsapp-notification-bridge";
 
 const DATA_DIR = path.join(process.cwd(), ".data", "notification-preferences");
 
@@ -20,7 +21,11 @@ const DATA_DIR = path.join(process.cwd(), ".data", "notification-preferences");
 function defaultTypePreferences(): NotificationTypePreference[] {
   return OperationalNotificationType.options.map((type) => ({
     type,
-    channels: NotificationChannelPreference.parse({}),
+    channels: NotificationChannelPreference.parse({
+      workspace: true,
+      // Important operational events also go to WhatsApp when the user has a phone on file.
+      whatsapp: isWhatsAppDeliverableType(type),
+    }),
   }));
 }
 

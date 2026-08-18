@@ -509,7 +509,7 @@ export class ExceptionHubService {
         resolutionEta: ex.resolutionEta?.toISOString() ?? null,
         requiredAction: ex.requiredAction,
         alertId: ex.alertId,
-        detailUrl: `/exceptions/${ex.id}`,
+        detailUrl: `/alerts/${ex.id}`,
         _workspaceId: ex.workspaceId,
         _createdAt: ex.createdAt,
         _resolvedAt: ex.resolvedAt,

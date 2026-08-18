@@ -35,7 +35,7 @@ export default function MixedContainerCoordinationPage() {
   }
 
   return (
-    <div data-testid="mc-coordination-page" className="max-w-[1200px] mx-auto space-y-6 animate-fade-in">
+    <div data-testid="mc-coordination-page" data-guide="mc-coordination" className="max-w-[1200px] mx-auto space-y-6 animate-fade-in">
       <header>
         <Link to="/buyer/mixed-container/requests" className="text-xs text-zinc-500 hover:underline">← My Containers</Link>
         <h1 className="font-display text-4xl font-semibold tracking-tight mt-1">Container Coordination · {data.externalRef}</h1>

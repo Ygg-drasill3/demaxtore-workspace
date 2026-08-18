@@ -1,0 +1,42 @@
+R4 Golden Path → MVP-UI17-R4-20260814-N5K8
+
+[PASS] BUYER_LOGIN — https://workspace.demaxtore.com/buyer/control-tower
+[PASS] PRODUCT_CREATION — FLOUR-UI17R4-N5K8
+[PASS] DIRECT_PO — PO-MST4EXLR-A1F7698C
+[PASS] PRODUCT_TO_PO — https://workspace.demaxtore.com/workspace/order/05272de3-b331-4ece-83c8-979993ca3fb8
+[PASS] DEPOSIT_CONFIRMATION — Admin recorded DEPOSIT_PAID
+[PASS] FREIGHT_REQUEST — Admin created freight request
+[PASS] FREIGHT_OFFER — 2100 USD offer published
+[PASS] OFFER_SELECTION
+[PASS] OFFER_TO_BOOKING
+[PASS] BOOKING_TO_SHIPMENT — https://workspace.demaxtore.com/workspace/shipment/32e3d6c8-427e-4c77-ad94-10e16ae74d54
+[PASS] BOOKING_LIFECYCLE — MSCBK-R4-N5K8
+[PASS] LINE_ALLOCATION — 90 PCS
+[PASS] CONTAINER — MSKU17R4N5K8
+[PASS] TRACKING
+[PASS] SHIPMENT_TO_CUSTOMS
+[PASS] BROKER_ASSIGNMENT
+[PASS] DOCUMENT_READINESS — Trade docs uploaded via UI
+[PASS] BROKER_CASE_DISCOVERY
+[PASS] BROKER_EXECUTION — Start review
+[PASS] GTIP_VERIFICATION
+[PASS] DUTY_TAX
+[PASS] CUSTOMS_CLEARED
+[PASS] CLEARED_TO_INLAND
+[PASS] TRUCKER_ASSIGNMENT
+[PASS] TRUCKER_DELIVERY_DISCOVERY
+[PASS] TRUCKER_PICKUP_SCHEDULED
+[DEAD END] R4_ABORT — page.waitForSelector: Timeout 30000ms exceeded.
+Call log:
+  - waiting for locator('[data-testid="inland-delivery-page"]') to be visible
+
+
+=== R4 SUMMARY ===
+Marker: MVP-UI17-R4-20260814-N5K8
+Fresh Transaction: FAIL
+Blocker: UNHANDLED — page.waitForSelector: Timeout 30000ms exceeded.
+Call log:
+  - waiting for locator('[data-testid="inland-delivery-page"]') to be visible
+
+Unexpected 5xx: 0
+Evidence: /var/www/demaxtore/DemaxtoreSolitions-main/.r4-ui-fixtures/run/N5K8/evidence.json

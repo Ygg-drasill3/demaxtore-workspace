@@ -590,7 +590,10 @@ export class RfqService {
           actorUserId: actor.id,
           actorEmail: actor.email,
           actorRole: actor.role,
-          source: issue.mode,
+          // The PO's source is the RFQ regardless of how it was issued; `issue.mode`
+          // (auto vs manual upload) is recorded separately in `issueReason`. Passing the
+          // mode here made a manually-issued PO look DIRECT and lose its RFQ provenance.
+          source: "RFQ",
           documentUrl: issue.mode === "manual" ? (issue.poFileUrl ?? null) : null,
           documentFileName:
             issue.mode === "manual" && issue.poFileUrl

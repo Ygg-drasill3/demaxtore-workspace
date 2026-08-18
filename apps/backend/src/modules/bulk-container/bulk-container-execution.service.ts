@@ -239,6 +239,8 @@ export class BulkContainerExecutionService {
             actorUserId: actor.id,
             actorEmail: actor.email,
             actorRole: actor.role,
+            // See the SmartContainer spawn: container purchases are not RFQ-sourced.
+            source: "DIRECT",
             issueReason: `BulkContainer ${bcRef} allocation ${alloc.sortOrder + 1}`,
           });
 

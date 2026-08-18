@@ -8,6 +8,7 @@ import { logger } from "../../config/logger.js";
 import { parseInboundMessages, parseStatusUpdates } from "./whatsapp-inbox.parser.js";
 import { downloadWhatsAppMedia } from "./whatsapp-inbox.media.js";
 import { sendWhatsAppMessage, validateE164Phone } from "./whatsapp-inbox.send.js";
+import { getWhatsAppBusinessPhoneNumberId } from "./whatsapp-conversation.util.js";
 import {
   CUSTOMER_SERVICE_WINDOW_MS,
   canAccessAllWhatsAppConversations,
@@ -15,6 +16,11 @@ import {
   type ParsedStatusUpdate,
   type SendMessageInput,
 } from "./whatsapp-inbox.types.js";
+import {
+  resolveInboundWorkspaceConversation,
+  recordUnresolvedWebhook,
+} from "../whatsapp-business/whatsapp-conversation-resolver.service.js";
+import { logWhatsAppConnectionAudit } from "../whatsapp-business/whatsapp-business-audit.service.js";
 import type { AuthUser } from "../../types/auth-user.js";
 
 function previewForMessage(type: string, body: string | null, caption: string | null): string {
@@ -201,6 +207,31 @@ export class WhatsAppInboxService {
     }
 
     const phoneNumberId = item.phoneNumberId ?? "default";
+    const tenantConnection = item.phoneNumberId
+      ? await this.db.whatsAppBusinessConnection.findUnique({
+          where: { phoneNumberId: item.phoneNumberId },
+          select: { buyerId: true, status: true, id: true },
+        })
+      : null;
+
+    if (tenantConnection?.status === "DISCONNECTED") {
+      await logWhatsAppConnectionAudit(this.db, {
+        buyerId: tenantConnection.buyerId,
+        connectionId: tenantConnection.id,
+        action: "WHATSAPP_INBOUND_DISCONNECTED",
+        detail: { metaMessageId: item.metaMessageId, from: item.waId },
+      });
+      await recordUnresolvedWebhook(this.db, {
+        phoneNumberId,
+        buyerId: tenantConnection.buyerId,
+        supplierWaId: item.waId,
+        metaMessageId: item.metaMessageId,
+        reason: "CONNECTION_DISCONNECTED",
+        payload: { type: item.type },
+      });
+      return null;
+    }
+
     let conversation = await this.db.whatsAppConversation.findUnique({
       where: { contactId_phoneNumberId: { contactId: contact.id, phoneNumberId } },
       include: { contact: true },
@@ -211,6 +242,7 @@ export class WhatsAppInboxService {
         data: {
           contactId: contact.id,
           phoneNumberId,
+          userId: tenantConnection?.buyerId ?? null,
           lastInboundAt: item.timestamp,
           lastMessageAt: item.timestamp,
           lastMessagePreview: previewForMessage(item.type, item.body, item.caption),
@@ -218,6 +250,71 @@ export class WhatsAppInboxService {
         },
         include: { contact: true },
       });
+    } else if (tenantConnection?.buyerId && !conversation.userId) {
+      conversation = await this.db.whatsAppConversation.update({
+        where: { id: conversation.id },
+        data: { userId: tenantConnection.buyerId },
+        include: { contact: true },
+      });
+    } else if (!conversation.workspaceRfqId) {
+      if (tenantConnection?.buyerId) {
+        const earlyResolution = await resolveInboundWorkspaceConversation(this.db, {
+          phoneNumberId,
+          buyerId: tenantConnection.buyerId,
+          supplierWaId: item.waId,
+          replyToMetaId: item.replyToMetaId,
+          whatsappConversationId: conversation.id,
+        });
+        if (earlyResolution.kind === "resolved") {
+          const wsConv = await this.db.workspaceConversation.findUnique({
+            where: { id: earlyResolution.workspaceConversationId },
+            select: { workspaceId: true, workspaceType: true },
+          });
+          if (wsConv?.workspaceType === "RFQ") {
+            conversation = await this.db.whatsAppConversation.update({
+              where: { id: conversation.id },
+              data: { workspaceRfqId: wsConv.workspaceId },
+              include: { contact: true },
+            });
+          }
+        }
+      } else if (!tenantConnection) {
+        const supplierUserId = contact.userId;
+        if (supplierUserId) {
+          const rfqPart = await this.db.workspaceParticipant.findFirst({
+            where: {
+              userId: supplierUserId,
+              participantRole: "COUNTERPARTY",
+              leftAt: null,
+              workspace: { type: "RFQ" },
+            },
+            orderBy: { joinedAt: "desc" },
+            select: {
+              workspaceId: true,
+              workspace: {
+                select: {
+                  participants: {
+                    where: { participantRole: "OWNER", leftAt: null },
+                    take: 1,
+                    select: { userId: true },
+                  },
+                },
+              },
+            },
+          });
+          if (rfqPart) {
+            const buyerUserId = rfqPart.workspace.participants[0]?.userId ?? null;
+            conversation = await this.db.whatsAppConversation.update({
+              where: { id: conversation.id },
+              data: {
+                workspaceRfqId: rfqPart.workspaceId,
+                ...(buyerUserId && !conversation.userId ? { userId: buyerUserId } : {}),
+              },
+              include: { contact: true },
+            });
+          }
+        }
+      }
     }
 
     let replyToMessageId: string | null = null;
@@ -233,9 +330,10 @@ export class WhatsAppInboxService {
     let mimeType = item.mimeType;
     let filename = item.filename;
     if (item.mediaId) {
-      const downloaded = await downloadWhatsAppMedia(item.mediaId, {
+      const downloaded = await downloadWhatsAppMedia(this.db, item.mediaId, {
         filename: item.filename,
         mimeType: item.mimeType,
+        phoneNumberId: item.phoneNumberId,
       });
       if (downloaded) {
         mediaStorageKey = downloaded.storageKey;
@@ -285,12 +383,70 @@ export class WhatsAppInboxService {
     });
     this.emitConversationEvent(conversation.id, "whatsapp:conversation:updated", convDto);
 
-    void getMessagingWriteBridge(this.db)
+    let resolvedWorkspaceConversationId: string | undefined;
+    if (tenantConnection?.buyerId) {
+      const resolution = await resolveInboundWorkspaceConversation(this.db, {
+        phoneNumberId,
+        buyerId: tenantConnection.buyerId,
+        supplierWaId: item.waId,
+        replyToMetaId: item.replyToMetaId,
+        whatsappConversationId: conversation.id,
+      });
+
+      if (resolution.kind === "unresolved" || resolution.kind === "ambiguous") {
+        await recordUnresolvedWebhook(this.db, {
+          phoneNumberId,
+          buyerId: tenantConnection.buyerId,
+          supplierWaId: item.waId,
+          metaMessageId: item.metaMessageId,
+          reason: resolution.kind === "ambiguous" ? "AMBIGUOUS_CONVERSATION" : resolution.reason,
+          payload: {
+            candidates: resolution.kind === "ambiguous" ? resolution.candidates : undefined,
+          },
+        });
+        await logWhatsAppConnectionAudit(this.db, {
+          buyerId: tenantConnection.buyerId,
+          connectionId: tenantConnection.id,
+          action: "WHATSAPP_INBOUND_UNRESOLVED",
+          detail: { reason: resolution.kind, metaMessageId: item.metaMessageId },
+        });
+      } else if (resolution.kind === "resolved") {
+        resolvedWorkspaceConversationId = resolution.workspaceConversationId;
+        const wsConv = await this.db.workspaceConversation.findUnique({
+          where: { id: resolution.workspaceConversationId },
+          select: { id: true, metadata: true, workspaceId: true, workspaceType: true },
+        });
+        if (wsConv) {
+          const meta = (wsConv.metadata as Record<string, unknown> | null) ?? {};
+          await this.db.workspaceConversation.update({
+            where: { id: wsConv.id },
+            data: {
+              metadata: {
+                ...meta,
+                whatsappConversationId: conversation.id,
+                buyerId: tenantConnection.buyerId,
+                buyerWhatsAppPhoneNumberId: phoneNumberId,
+              },
+            },
+          });
+          if (wsConv.workspaceType === "RFQ" && conversation.workspaceRfqId !== wsConv.workspaceId) {
+            await this.db.whatsAppConversation.update({
+              where: { id: conversation.id },
+              data: { workspaceRfqId: wsConv.workspaceId },
+            });
+          }
+        }
+      }
+    }
+
+    await getMessagingWriteBridge(this.db)
       .onWhatsAppInbound({
         whatsappConversationId: conversation.id,
         messageId: msg.id,
         metaMessageId: item.metaMessageId,
+        body: item.body ?? "",
         duplicate: false,
+        workspaceConversationId: resolvedWorkspaceConversationId,
       })
       .catch(() => undefined);
 
@@ -519,10 +675,18 @@ export class WhatsAppInboxService {
         });
       }
       conversation = await this.db.whatsAppConversation.findUnique({
-        where: { contactId_phoneNumberId: { contactId: contact.id, phoneNumberId: "default" } },
+        where: {
+          contactId_phoneNumberId: {
+            contactId: contact.id,
+            phoneNumberId: getWhatsAppBusinessPhoneNumberId(),
+          },
+        },
         include: { contact: true },
       }) ?? await this.db.whatsAppConversation.create({
-        data: { contactId: contact.id, phoneNumberId: "default" },
+        data: {
+          contactId: contact.id,
+          phoneNumberId: getWhatsAppBusinessPhoneNumberId(),
+        },
         include: { contact: true },
       });
     }

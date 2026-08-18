@@ -39,8 +39,8 @@ async function ensureState(workspaceId: string, state: string): Promise<void> {
 async function seedAccounts(passwordHash: string) {
   const buyerOrg = await prisma.organisation.upsert({
     where: { id: DEMO_IDS.orgBuyer },
-    update: { name: "ABC Foods Germany" },
-    create: { id: DEMO_IDS.orgBuyer, name: "ABC Foods Germany", kind: "BUYER_ORG" },
+    update: { name: "ABC Foods Germany", buyerOperatingModel: "INTERNATIONAL" },
+    create: { id: DEMO_IDS.orgBuyer, name: "ABC Foods Germany", kind: "BUYER_ORG", buyerOperatingModel: "INTERNATIONAL" },
   });
 
   const suppliers = [

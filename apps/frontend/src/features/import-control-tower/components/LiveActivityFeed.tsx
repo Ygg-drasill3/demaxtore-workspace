@@ -1,15 +1,17 @@
 import { Link } from "react-router-dom";
 import type { LiveActivityItem } from "@dmx/contracts/import-control-tower";
+import { useT } from "@/i18n/useT";
 
 export function LiveActivityFeed({ items }: { items: LiveActivityItem[] }) {
+  const { t } = useT();
   return (
     <section data-testid="ict-activity-feed" className="dmx-card overflow-hidden">
       <div className="border-b border-zinc-100 px-5 py-3 bg-zinc-50/80">
-        <h2 className="text-sm font-semibold text-ink-900">Live Trade Activity</h2>
+        <h2 className="text-sm font-semibold text-ink-900">{t("importTower.activity.title")}</h2>
       </div>
       <ol className="p-4 space-y-3 max-h-[420px] overflow-y-auto dmx-thin-scroll">
         {items.length === 0 ? (
-          <li className="text-sm text-zinc-500">No recent activity.</li>
+          <li className="text-sm text-zinc-500">{t("importTower.activity.empty")}</li>
         ) : (
           items.map((item) => (
             <li key={item.id} data-testid={`ict-activity-${item.id}`}>

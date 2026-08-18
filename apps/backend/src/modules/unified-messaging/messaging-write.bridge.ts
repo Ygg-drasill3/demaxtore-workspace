@@ -200,6 +200,15 @@ export class MessagingWriteBridge {
     });
     if (!conv) return;
 
+    await this.syncConversationFromWorkspace(
+      conv.id,
+      input.workspaceType,
+      input.workspaceId,
+      input.auditWorkspaceId,
+    ).catch((err) => {
+      logger.warn({ err: String(err), conversationId: conv.id }, "conversation participant sync failed");
+    });
+
     const isInternal =
       input.messageType === "INTERNAL_NOTE" ||
       input.visibility === "ADMIN_ONLY";
@@ -325,6 +334,30 @@ export class MessagingWriteBridge {
     const channel = input.channel ?? (input.source === "whatsapp" ? "WHATSAPP" : "WORKSPACE");
     const legacy = { legacyId: input.messageId, legacySource: "direct_chat" };
 
+    // WhatsApp Cloud inbound is mirrored exclusively by onWhatsAppInbound.
+    // Legacy trade-chat must not create a second unified row (ghost OUTBOUND).
+    if (input.source === "whatsapp") {
+      if (unifiedConv && input.whatsappMessageId) {
+        const alreadyMirrored = await this.prisma.workspaceMessage.findFirst({
+          where: {
+            OR: [
+              { externalMessageId: input.whatsappMessageId },
+              { whatsappMessageId: input.whatsappMessageId },
+            ],
+          },
+          select: { id: true, conversationId: true },
+        });
+        if (alreadyMirrored) {
+          this.events.emit("messaging:message:new", {
+            conversationId: alreadyMirrored.conversationId,
+            messageId: alreadyMirrored.id,
+            idempotencyKey: input.whatsappMessageId,
+          });
+        }
+      }
+      return;
+    }
+
     if (unifiedConv && this.writeMode === "legacy_primary_unified_mirror") {
       try {
         await this.orchestrator.mirrorFromLegacy(
@@ -376,27 +409,34 @@ export class MessagingWriteBridge {
       where: { metadata: { path: ["whatsappConversationId"], equals: input.whatsappConversationId } },
     });
 
-    if (this.writeMode !== "legacy_only" && unifiedConv) {
-      try {
-        await this.orchestrator.createExternalMessage(input.actor, {
-          conversationId: unifiedConv.id,
-          authorUserId: input.actor.id,
-          body: "",
-          channel: "WHATSAPP",
-          legacyMirror: async () => ({
-            legacyId: input.messageId,
-            legacySource: "whatsapp",
-          }),
-        });
-      } catch {
-        /* mirror optional */
-      }
+    // Prefer emitting against an existing unified row (created by unified API or inbound mirror).
+    // Never insert a second empty WHATSAPP OUTBOUND — that caused Sent+Pending duplicates.
+    let timelineMessageId = input.messageId;
+    if (unifiedConv) {
+      const existing =
+        (input.metaMessageId
+          ? await this.prisma.workspaceMessage.findFirst({
+              where: {
+                conversationId: unifiedConv.id,
+                OR: [
+                  { externalMessageId: input.metaMessageId },
+                  { whatsappMessageId: input.metaMessageId },
+                ],
+              },
+              select: { id: true },
+            })
+          : null) ??
+        (await this.prisma.workspaceMessage.findFirst({
+          where: { legacySource: "whatsapp", legacyId: input.messageId },
+          select: { id: true },
+        }));
+      if (existing) timelineMessageId = existing.id;
     }
 
     const convId = unifiedConv?.id ?? input.whatsappConversationId;
     this.events.emit("messaging:message:new", {
       conversationId: convId,
-      messageId: input.messageId,
+      messageId: timelineMessageId,
       idempotencyKey: input.metaMessageId ?? input.messageId,
     });
   }
@@ -442,18 +482,68 @@ export class MessagingWriteBridge {
     messageId: string;
     metaMessageId?: string | null;
     duplicate?: boolean;
+    body?: string;
+    workspaceConversationId?: string;
   }) {
     registerWiredSurface("whatsapp_inbound");
     if (input.duplicate) return;
-    const unifiedConv = await this.prisma.workspaceConversation.findFirst({
-      where: { metadata: { path: ["whatsappConversationId"], equals: input.whatsappConversationId } },
+
+    const { UnifiedMessagingInboundHandler } = await import("./unified-messaging-inbound.handler.js");
+    const handler = new UnifiedMessagingInboundHandler(this.prisma);
+    const mirrored = await handler.mirrorWhatsAppInboxResult({
+      conversationId: input.whatsappConversationId,
+      messageId: input.messageId,
+      metaMessageId: input.metaMessageId,
+      direction: "INBOUND",
+      body: input.body,
+      workspaceConversationId: input.workspaceConversationId,
     });
+
+    const unifiedConv = mirrored
+      ? await this.prisma.workspaceConversation.findUnique({ where: { id: mirrored.conversationId } })
+      : await this.prisma.workspaceConversation.findFirst({
+          where: { metadata: { path: ["whatsappConversationId"], equals: input.whatsappConversationId } },
+        });
+
     const convId = unifiedConv?.id ?? input.whatsappConversationId;
+    const timelineMessageId = mirrored?.id ?? input.messageId;
     this.events.emit("messaging:message:new", {
       conversationId: convId,
-      messageId: input.messageId,
+      messageId: timelineMessageId,
       idempotencyKey: input.metaMessageId ?? `inbound:${input.messageId}`,
     });
+
+    // Fan-out to participants so buyers see supplier WhatsApp replies without refresh
+    // even if the client missed the conversation room subscribe.
+    if (unifiedConv?.id) {
+      const participants = await this.prisma.workspaceConversationParticipant.findMany({
+        where: { conversationId: unifiedConv.id, leftAt: null, userId: { not: null } },
+        select: { userId: true },
+      });
+      socketBus.scheduleEmit(() => {
+        for (const p of participants) {
+          if (!p.userId) continue;
+          socketBus.emitToUser(p.userId, "messaging:message:new", {
+            conversationId: unifiedConv.id,
+            messageId: timelineMessageId,
+            idempotencyKey: input.metaMessageId ?? `inbound:${input.messageId}`,
+          });
+        }
+      });
+
+      // Late supplier reply (>1h after buyer) → WhatsApp ping to buyer
+      if (mirrored) {
+        const { maybeNotifyBuyerOfDelayedSupplierReply } = await import(
+          "./delayed-supplier-reply.notify.js"
+        );
+        void maybeNotifyBuyerOfDelayedSupplierReply(
+          this.prisma,
+          unifiedConv.id,
+          mirrored.id,
+          mirrored.createdAt,
+        );
+      }
+    }
   }
 
   async onAttachmentCreated(input: {
@@ -483,6 +573,15 @@ export class MessagingWriteBridge {
     });
     if (!conv) return;
 
+    await this.syncConversationFromWorkspace(
+      conv.id,
+      input.workspaceType,
+      input.workspaceId,
+      input.auditWorkspaceId,
+    ).catch((err) => {
+      logger.warn({ err: String(err), conversationId: conv.id }, "conversation participant sync failed");
+    });
+
     const actor = input.actor ?? { id: "system", email: "", role: "SYSTEM" };
     const legacy = { legacyId: input.messageId, legacySource: "system_event" };
 
@@ -492,7 +591,10 @@ export class MessagingWriteBridge {
           actor,
           {
             conversationId: conv.id,
-            authorUserId: actor.id,
+            // The "system" sentinel above is only an AuthUser shape for the policy check.
+            // Writing it here put a non-uuid into `author_user_id`, so Prisma rejected every
+            // actorless system event and the mirror silently dropped it.
+            authorUserId: input.actor?.id ?? null,
             body: input.body,
             systemEventKey: input.systemEventKey,
           },
@@ -547,6 +649,82 @@ export class MessagingWriteBridge {
       messageId: input.messageId,
       idempotencyKey: `${input.messageId}:${input.status}`,
     });
+  }
+
+  private async syncConversationFromWorkspace(
+    conversationId: string,
+    workspaceType: string,
+    workspaceId: string,
+    auditWorkspaceId: string,
+  ): Promise<void> {
+    const parts = await this.prisma.workspaceParticipant.findMany({
+      where: { workspaceId: auditWorkspaceId, leftAt: null },
+      include: {
+        user: {
+          select: { id: true, email: true, displayName: true, organisationId: true },
+        },
+      },
+    });
+
+    for (const p of parts) {
+      const participantKey = participantKeyForUser(p.userId);
+      const participantRole = p.participantRole === "OWNER" ? "OWNER" : "MEMBER";
+      await this.prisma.workspaceConversationParticipant.upsert({
+        where: { conversationId_participantKey: { conversationId, participantKey } },
+        create: {
+          conversationId,
+          participantKey,
+          userId: p.userId,
+          participantType: "USER",
+          participantRole,
+          companyId: p.user.organisationId,
+          displayName: p.user.displayName,
+          email: p.user.email,
+        },
+        update: {
+          leftAt: null,
+          companyId: p.user.organisationId,
+          displayName: p.user.displayName,
+          email: p.user.email,
+        },
+      });
+    }
+
+    const hasContext = await this.prisma.conversationContext.findFirst({
+      where: { conversationId, contextType: workspaceType, contextId: workspaceId },
+    });
+    if (!hasContext) {
+      const ws = await this.prisma.workspace.findUnique({
+        where: { id: auditWorkspaceId },
+        select: {
+          externalRef: true,
+          rfqDetails: { select: { title: true } },
+          commodityBidDetails: { select: { title: true } },
+        },
+      });
+
+      await this.prisma.conversationContext.create({
+        data: {
+          conversationId,
+          contextType: workspaceType,
+          contextId: workspaceId,
+          contextReference: ws?.externalRef ?? null,
+        },
+      });
+
+      const subject = ws?.rfqDetails?.title ?? ws?.commodityBidDetails?.title ?? null;
+      if (subject) {
+        await this.prisma.workspaceConversation.updateMany({
+          where: { id: conversationId, subject: null },
+          data: { subject },
+        });
+      }
+    }
+
+    if (workspaceType === "RFQ") {
+      const { enableRfqWhatsApp } = await import("../rfq/rfq-whatsapp-enable.service.js");
+      await enableRfqWhatsApp(this.prisma, auditWorkspaceId);
+    }
   }
 
   async ensureParticipant(conversationId: string, userId: string) {

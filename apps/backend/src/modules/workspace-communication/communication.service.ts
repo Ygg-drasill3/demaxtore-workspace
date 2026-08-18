@@ -168,7 +168,6 @@ export class CommunicationService {
 
     switch (action) {
       case "create_message":
-        assertCanSendMessages(await loadUserMessagingGate(this.db, actor.id));
         await this.createMessage(
           workspaceType,
           workspaceId,

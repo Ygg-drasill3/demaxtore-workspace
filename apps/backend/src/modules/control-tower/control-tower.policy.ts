@@ -1,7 +1,7 @@
 import type { PrismaClient, Workspace } from "@prisma/client";
 import type { AuthUser } from "../order/order.policy.js";
 import { hasPortfolioVisibility } from "../../lib/staff-roles.js";
-import { collectTradeGraph, resolveTradeRoot } from "../trade/trade.resolver.js";
+import { collectTradeGraph, findDirectOrderRoots, resolveTradeRoot } from "../trade/trade.resolver.js";
 
 const ROOT_TYPES = ["RFQ", "COMMODITYBID", "MIXED_CONTAINER", "BULK_CONTAINER"] as const;
 
@@ -10,11 +10,19 @@ export async function findAccessibleTradeRoots(
   actor: AuthUser,
 ): Promise<Workspace[]> {
   if (hasPortfolioVisibility(actor.role)) {
-    return db.workspace.findMany({
-      where: { type: { in: [...ROOT_TYPES] } },
-      take: 200,
-      orderBy: { updatedAt: "desc" },
-    });
+    const [rooted, directOrders] = await Promise.all([
+      db.workspace.findMany({
+        where: { type: { in: [...ROOT_TYPES] } },
+        take: 200,
+        orderBy: { updatedAt: "desc" },
+      }),
+      findDirectOrderRoots(db),
+    ]);
+    // Callers cap this list, so interleave by recency — otherwise every direct order
+    // sorts behind the root-type page and falls outside the cap.
+    return [...rooted, ...directOrders].sort(
+      (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
+    );
   }
 
   const participations = await db.workspaceParticipant.findMany({

@@ -10,6 +10,12 @@ export const UnifiedMessagingErrors = {
     Forbidden("Internal notes cannot be sent to external channels"),
   whatsappBlocked: () =>
     Forbidden("Only EXTERNAL messages may be dispatched to WhatsApp"),
+  supplierWhatsAppRequired: () =>
+    Validation(
+      "Supplier WhatsApp number is not on file. Add whatsappPhone to the supplier profile before sending.",
+    ),
+  whatsappNotConfigured: () =>
+    Validation("WhatsApp Cloud API is not configured on this server."),
   notParticipant: () => Forbidden("You are not a participant in this conversation"),
   cannotAccessConversation: () => Forbidden("You cannot access this conversation"),
   cannotAssign: () => Forbidden("You cannot assign this conversation"),

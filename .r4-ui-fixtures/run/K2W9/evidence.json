@@ -1,0 +1,67 @@
+{
+  "marker": "MVP-UI17-R4-20260814-K2W9",
+  "sku": "FLOUR-UI17R4-K2W9",
+  "startedAt": "2026-08-14T15:28:01.036Z",
+  "stages": [
+    {
+      "name": "BUYER_LOGIN",
+      "result": "PASS",
+      "note": "https://workspace.demaxtore.com/buyer/control-tower",
+      "at": "2026-08-14T15:28:02.824Z"
+    },
+    {
+      "name": "PRODUCT_CREATION",
+      "result": "PASS",
+      "note": "FLOUR-UI17R4-K2W9",
+      "at": "2026-08-14T15:28:08.850Z"
+    },
+    {
+      "name": "DIRECT_PO",
+      "result": "PASS",
+      "note": "PO-MST3Q6LD-B50FA8F8",
+      "at": "2026-08-14T15:28:15.280Z"
+    },
+    {
+      "name": "PRODUCT_TO_PO",
+      "result": "PASS",
+      "note": "https://workspace.demaxtore.com/workspace/order/77af1fcc-32d8-40f1-8916-0dc8fd683763",
+      "at": "2026-08-14T15:28:16.382Z"
+    },
+    {
+      "name": "DEPOSIT_CONFIRMATION",
+      "result": "FRICTION",
+      "note": "No deposit gate visible",
+      "at": "2026-08-14T15:28:18.087Z"
+    },
+    {
+      "name": "FREIGHT_REQUEST",
+      "result": "FRICTION",
+      "note": "Freight request may already exist",
+      "at": "2026-08-14T15:28:33.099Z"
+    },
+    {
+      "name": "FREIGHT_OFFER",
+      "result": "DEAD END",
+      "note": "Admin offer form not available",
+      "at": "2026-08-14T15:28:35.120Z"
+    }
+  ],
+  "entities": {
+    "productSku": "FLOUR-UI17R4-K2W9",
+    "poNumber": "PO-MST3Q6LD-B50FA8F8",
+    "orderUrl": "https://workspace.demaxtore.com/workspace/order/77af1fcc-32d8-40f1-8916-0dc8fd683763",
+    "orderId": "dashboard"
+  },
+  "errors": [],
+  "network5xx": 0,
+  "blocker": {
+    "stage": "FREIGHT_OFFER",
+    "note": "Admin offer form not available",
+    "kind": "PRODUCT"
+  },
+  "completedAt": "2026-08-14T15:28:35.121Z",
+  "verdict": {
+    "controlledPaidPilot": "PENDING",
+    "selfService": "PENDING"
+  }
+}

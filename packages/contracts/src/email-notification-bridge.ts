@@ -14,20 +14,18 @@ export const EmailDeliveryStatus = z.enum([
 export type EmailDeliveryStatus = z.infer<typeof EmailDeliveryStatus>;
 
 export const EmailBridgeProviderId = z.enum([
-  "console",
   "smtp",
-  "resend",
-]);
-export type EmailBridgeProviderId = z.infer<typeof EmailBridgeProviderId>;
-
-/** Planned providers — not yet implemented at runtime. */
-export const EmailBridgeProviderIdPlanned = z.enum([
   "ses",
   "sendgrid",
   "mailgun",
   "microsoft_graph",
   "gmail_api",
+  // Two of the three values EMAIL_BRIDGE_PROVIDER actually accepts, and `console` is its
+  // default — both providers exist and were simply missing from this union.
+  "console",
+  "resend",
 ]);
+export type EmailBridgeProviderId = z.infer<typeof EmailBridgeProviderId>;
 
 /** Operational types eligible for Email bridge delivery. */
 export const EmailDeliverableNotificationType = z.enum([

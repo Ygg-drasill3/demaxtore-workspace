@@ -26,14 +26,24 @@ test.describe.serial("SmartContainer execution bridge (Sprint 12E)", () => {
     const mc = await create.json();
     containerId = mc.id;
 
-    const catalog = await req.get(`${API_BASE}/api/mixed-container/catalog/products`, {
+    const catalog = await req.get(`${API_BASE}/api/mixed-container/catalog/products?category=pulses&limit=10`, {
       headers: { Authorization: `Bearer ${buyerToken}` },
     });
-    const products = (await catalog.json()).items as Array<{ id: string; productRef: string; moqPallets: number }>;
-    const rice = products.find((p) => p.productRef === "MC-RICE-001") ?? products[0];
+    const products = (await catalog.json()).items as Array<{
+      id: string;
+      productRef: string;
+      moqPallets: number;
+      packagingOptions: Array<{ id: string; moqPallets: number }>;
+    }>;
+    const product = products.find((p) => p.productRef === "MC-PUL-RL") ?? products[0];
+    const packaging = product.packagingOptions[0];
     const lineRes = await req.post(`${API_BASE}/api/mixed-containers/${containerId}/lines`, {
       headers: { Authorization: `Bearer ${buyerToken}` },
-      data: { catalogProductId: rice.id, palletCount: rice.moqPallets ?? 1 },
+      data: {
+        catalogProductId: product.id,
+        packagingId: packaging.id,
+        palletCount: packaging.moqPallets ?? product.moqPallets ?? 1,
+      },
     });
     expect(lineRes.ok()).toBeTruthy();
     await req.post(`${API_BASE}/api/mixed-containers/${containerId}/actions/request-pricing`, {
@@ -74,7 +84,7 @@ test.describe.serial("SmartContainer execution bridge (Sprint 12E)", () => {
 
     const alloc = await req.post(`${API_BASE}/api/admin/mixed-containers/allocations/${containerId}/allocations`, {
       headers: { Authorization: `Bearer ${adminToken}` },
-      data: { containerLineId: lineId, supplierCode: "SUP-001", allocatedPallets: rice.moqPallets ?? 1, expectedExwPrice: 1000 },
+      data: { containerLineId: lineId, supplierCode: "SUP-001", allocatedPallets: packaging.moqPallets ?? product.moqPallets ?? 1, expectedExwPrice: 1000 },
     });
     expect(alloc.ok()).toBeTruthy();
     const allocData = await alloc.json() as { allocations: Array<{ id: string }> };
@@ -130,13 +140,12 @@ test.describe.serial("SmartContainer execution bridge (Sprint 12E)", () => {
     expect(links.supplierOrderCount).toBe(1);
   });
 
-  test("03 — Buyer execution dashboard", async ({ page }) => {
+  test("03 — Buyer execution route redirects to organization workspace", async ({ page }) => {
     await uiLogin(page, USERS.buyer1);
     await page.goto(`/buyer/mixed-container/execution/${containerId}`);
-    await expect(page.getByTestId("mc-execution-page")).toBeVisible();
-    await expect(page.getByText(masterOrderRef)).toBeVisible();
-    await expect(page.getByTestId("mc-exec-allocation-Allocation 1")).toBeVisible();
-    await expect(page.getByTestId("mc-exec-order-Allocation 1")).toHaveText("ORDER_CREATED");
+    await expect(page).toHaveURL(new RegExp(`/buyer/mixed-container/organization/${containerId}`));
+    await expect(page.getByTestId("mc-organization-page")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId("mc-org-modules")).toBeVisible();
   });
 
   test("04 — FreightIQ and Shipment eligibility via existing Order runtime", async () => {

@@ -3,10 +3,12 @@ import {
   BC_MAX_CAPACITY_MT,
   computeBcCapacityWarnings,
   findBcTransition,
+  isBcContainerFull,
   type BulkContainerAction,
   type BulkContainerState,
 } from "@dmx/contracts/bulk-container.fsm";
 import type { BulkSpecTemplate } from "@dmx/contracts/bulk-container-catalog";
+import { applyBulkContainerFixedOrigin } from "@dmx/contracts/bulk-container-catalog";
 import type {
   AddBulkContainerLineInput,
   CreateBulkContainerInput,
@@ -95,6 +97,7 @@ export function toBulkContainerDTO(ws: WsFull) {
   const maxCapacityMt = Number(d.maxCapacityMt);
   const fillPercent = maxCapacityMt > 0 ? Math.round((currentWeightMt / maxCapacityMt) * 100) : 0;
   const capacityWarnings = computeBcCapacityWarnings(currentWeightMt);
+  const isFull = isBcContainerFull(currentWeightMt, maxCapacityMt);
   const estValueMin = lines.reduce((s, l) => s + (l.lineValueMin ?? 0), 0) || null;
   const estValueMax = lines.reduce((s, l) => s + (l.lineValueMax ?? 0), 0) || null;
 
@@ -117,6 +120,8 @@ export function toBulkContainerDTO(ws: WsFull) {
     lines,
     submittedAt: d.submittedAt?.toISOString() ?? null,
     activeOfferId: d.activeOfferId ?? null,
+    isFull,
+    canCreateNewContainer: isFull,
     createdAt: ws.createdAt.toISOString(),
     updatedAt: ws.updatedAt.toISOString(),
   };
@@ -197,6 +202,41 @@ async function applyBcTransition(
 export class BulkContainerService {
   constructor(public readonly prisma: PrismaClient) {}
 
+  /** Buyer-owned BC_DRAFT / BC_BUILDING container that still has spare MT capacity. */
+  async findIncompleteOpenContainer(actor: AuthUser): Promise<string | null> {
+    if (actor.role !== "BUYER") return null;
+    const parts = await this.prisma.workspaceParticipant.findMany({
+      where: {
+        userId: actor.id,
+        participantRole: "OWNER",
+        workspace: { type: "BULK_CONTAINER", state: { in: ["BC_DRAFT", "BC_BUILDING"] } },
+      },
+      include: {
+        workspace: {
+          include: {
+            bulkContainerDetails: true,
+            bulkContainerLines: { where: { removedAt: null }, select: { quantityMt: true } },
+          },
+        },
+      },
+      orderBy: { joinedAt: "desc" },
+    });
+    for (const p of parts) {
+      const ws = p.workspace;
+      const d = ws.bulkContainerDetails;
+      if (!d) continue;
+      const currentMt = ws.bulkContainerLines.reduce((s, l) => s + Number(l.quantityMt), 0);
+      if (!isBcContainerFull(currentMt, Number(d.maxCapacityMt))) return ws.id;
+    }
+    return null;
+  }
+
+  async ensureActiveBuilding(actor: AuthUser) {
+    const existing = await this.findIncompleteOpenContainer(actor);
+    if (existing) return this.fetchDTO(existing);
+    return this.create({ currency: "USD" }, actor);
+  }
+
   async fetchDTO(id: string) {
     const ws = await this.prisma.workspace.findUniqueOrThrow({
       where: { id },
@@ -208,6 +248,8 @@ export class BulkContainerService {
 
   async create(input: CreateBulkContainerInput, actor: AuthUser) {
     if (actor.role !== "BUYER") throw new AppError(403, "FORBIDDEN_ROLE");
+    const openId = await this.findIncompleteOpenContainer(actor);
+    if (openId) throw new AppError(409, "OPEN_BULK_CONTAINER_EXISTS", { workspaceId: openId });
     const id = await this.prisma.$transaction(async (tx) => {
       const externalRef = await nextBcRef(tx);
       const ws = await tx.workspace.create({
@@ -322,7 +364,8 @@ export class BulkContainerService {
     });
     if (!product) throw new AppError(404, "PRODUCT_NOT_FOUND");
     const template = product.specTemplate.schema as BulkSpecTemplate;
-    validateSpecValues(template, input.specValues);
+    const specValues = applyBulkContainerFixedOrigin(input.specValues, template.parameters);
+    validateSpecValues(template, specValues);
     if (input.quantityMt < Number(product.minOrderMt)) {
       throw new AppError(400, "BELOW_MOQ", { minOrderMt: Number(product.minOrderMt) });
     }
@@ -333,6 +376,12 @@ export class BulkContainerService {
       input.packingTypeId,
     );
 
+    const current = await this.fetchDTO(id);
+    if (current.isFull) throw new AppError(409, "CONTAINER_FULL");
+    if (current.currentWeightMt + input.quantityMt > current.maxCapacityMt + 1e-9) {
+      throw new AppError(409, "CONTAINER_CAPACITY_EXCEEDED", { remainingMt: current.remainingMt });
+    }
+
     await this.prisma.$transaction(async (tx) => {
       const count = await tx.bulkContainerLine.count({ where: { workspaceId: id, removedAt: null } });
       await tx.bulkContainerLine.create({
@@ -340,7 +389,7 @@ export class BulkContainerService {
           workspaceId: id,
           catalogProductId: input.catalogProductId,
           packingTypeId: input.packingTypeId,
-          specValues: input.specValues as Prisma.InputJsonValue,
+          specValues: specValues as Prisma.InputJsonValue,
           quantityMt: input.quantityMt,
           sortOrder: count + 1,
           indicativeUnitLow: product.indicativeLow,
@@ -369,7 +418,13 @@ export class BulkContainerService {
     }
     if (input.specValues) {
       const template = line.catalogProduct.specTemplate.schema as BulkSpecTemplate;
+      input.specValues = applyBulkContainerFixedOrigin(input.specValues, template.parameters);
       validateSpecValues(template, input.specValues);
+    }
+    const current = await this.fetchDTO(id);
+    const otherMt = current.lines.filter((l) => l.id !== lineId).reduce((s, l) => s + l.quantityMt, 0);
+    if (otherMt + input.quantityMt > current.maxCapacityMt + 1e-9) {
+      throw new AppError(409, "CONTAINER_CAPACITY_EXCEEDED", { remainingMt: Math.max(0, current.maxCapacityMt - otherMt) });
     }
     await this.prisma.$transaction(async (tx) => {
       await tx.bulkContainerLine.update({

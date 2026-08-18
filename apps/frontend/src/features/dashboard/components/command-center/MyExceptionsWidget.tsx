@@ -27,13 +27,13 @@ export function MyExceptionsWidget() {
   const items = (data?.items ?? []).filter((e) => !["Resolved", "Closed"].includes(e.status));
 
   return (
-    <section data-testid="my-exceptions-widget" className="dmx-card overflow-hidden">
+    <section data-testid="my-exceptions-widget" data-guide="dashboard-alerts" className="dmx-card overflow-hidden">
       <div className="border-b border-zinc-100 px-5 py-3 flex items-center justify-between bg-zinc-50/80">
         <div>
           <span className="dmx-eyebrow text-zinc-500">{t("dash.eyebrow.exceptionHub")}</span>
           <h2 className="font-display text-lg font-semibold">{t("dash.exceptions.title")}</h2>
         </div>
-        <Link to="/exceptions" data-testid="my-exceptions-view-all" className="text-xs font-medium text-accent-900 hover:underline">
+        <Link to="/alerts" data-testid="my-exceptions-view-all" className="text-xs font-medium text-accent-900 hover:underline">
           {t("dash.common.openArrow")}
         </Link>
       </div>

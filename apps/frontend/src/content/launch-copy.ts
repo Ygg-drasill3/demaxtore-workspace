@@ -24,6 +24,27 @@ export const BUYER_ONBOARDING = {
   ctaRfq: "Create your first RFQ",
 } as const;
 
+export const TURKEY_BUYER_ONBOARDING = {
+  sectionTitle: "Your import journey",
+  sectionSubtitle: {
+    firstTrade: "Start with freight and customs, then follow the shipment through delivery and landed cost.",
+    experienced: "A short reminder of how import operations work in this workspace.",
+  },
+  welcomeTitle: "What do I do here?",
+  welcomeBody:
+    "DeMaxtore manages your freight and customs operations while you follow your import journey in one operating system. DeMaxtore Operations prepares some steps; you review, select, and track them here.",
+  steps: [
+    { key: "create_rfq", label: "Start your import", hint: "Add your purchase or import context, or request a freight quote." },
+    { key: "receive_quotation", label: "Get your freight quote", hint: "DeMaxtore Ops prepares the freight offer; review and select it in your workspace." },
+    { key: "select_supplier", label: "Follow booking and shipment", hint: "Track booking, shipment and container progress from the same import journey." },
+    { key: "issue_po", label: "Manage customs", hint: "Request DeMaxtore customs handling and follow broker, document and clearance progress." },
+    { key: "track_shipment", label: "Follow delivery", hint: "Continue from customs clearance into inland delivery and POD." },
+    { key: "complete_trade", label: "See landed cost", hint: "Review available goods, freight, customs/tax and inland cost information. Unknown values are not treated as zero." },
+  ],
+  ctaLearning: "Open Learning Center",
+  ctaRfq: "Start import",
+} as const;
+
 export const SUPPLIER_ONBOARDING = {
   sectionTitle: "Supplier workspace guide",
   sectionSubtitle: {

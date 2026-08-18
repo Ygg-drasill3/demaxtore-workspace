@@ -11,7 +11,7 @@ const SEV = {
 
 export function OperationalRiskCard({ items }: { items: OperationalRiskItem[] }) {
   return (
-    <section data-testid="ict-risks" className="dmx-card overflow-hidden">
+    <section data-testid="ict-risks" data-guide="control-tower-risks" className="dmx-card overflow-hidden">
       <div className="border-b border-zinc-100 px-5 py-3 bg-zinc-50/80">
         <h2 className="text-sm font-semibold text-ink-900">Operational Risks</h2>
       </div>

@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { Router } from "express";
+import { Router, type RequestHandler } from "express";
 import multer from "multer";
 import { createUploadFileFilter } from "../../lib/multer-file-guard.js";
 import { DEFAULT_MAX_UPLOAD_BYTES, validateUpload } from "../../lib/upload-security.js";
@@ -10,7 +10,12 @@ import { AppError } from "../../utils/httpErrors.js";
 import { writeStoredFile, storagePathFor } from "../../lib/file-storage.js";
 import { documentsController } from "./documents.controller.js";
 import { TradeDocumentsService } from "./documents.service.js";
-import { canAccessTradeWorkspace } from "./documents.policy.js";
+import { uploadLimiter } from "../../middleware/rate-limit.js";
+import {
+  assertDocumentActionRole,
+  assertTruckerUploadDocumentType,
+  canAccessTradeWorkspace,
+} from "./documents.policy.js";
 
 export const tradeDocumentsRouter = Router();
 
@@ -19,8 +24,7 @@ const upload = multer({
   limits: { fileSize: DEFAULT_MAX_UPLOAD_BYTES },
   fileFilter: createUploadFileFilter(),
 });
-
-const uploadSingle = upload.single("file");
+const uploadSingle = upload.single("file") as unknown as RequestHandler;
 const service = new TradeDocumentsService(prisma);
 
 tradeDocumentsRouter.get(
@@ -32,6 +36,7 @@ tradeDocumentsRouter.get(
 tradeDocumentsRouter.post(
   "/:workspaceType/:workspaceId/upload",
   requireAuth,
+  uploadLimiter,
   uploadSingle,
   asyncHandler(async (req, res) => {
     const workspaceType = req.params.workspaceType;
@@ -46,6 +51,17 @@ tradeDocumentsRouter.post(
     if (!file) throw new AppError(400, "FILE_REQUIRED");
     validateUpload(file);
     const documentType = String(req.body.documentType ?? "OTHER");
+    try {
+      assertDocumentActionRole("upload_document", req.user!.role);
+      assertTruckerUploadDocumentType(req.user!.role, documentType);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "FORBIDDEN_ROLE";
+      throw new AppError(403, msg);
+    }
+    const ownerRole =
+      String(req.user!.role) === "TRUCKER"
+        ? "OPERATOR"
+        : String(req.body.ownerRole ?? "SUPPLIER");
     const { storageKey: fileId } = await writeStoredFile(file.buffer, file.originalname);
     const result = await service.applyDocumentAction(
       workspaceType,
@@ -56,7 +72,7 @@ tradeDocumentsRouter.post(
         documentType,
         fileId,
         fileName: file.originalname,
-        ownerRole: String(req.body.ownerRole ?? "SUPPLIER"),
+        ownerRole,
       },
       { ip: req.ip, userAgent: req.headers["user-agent"] },
     );
@@ -90,7 +106,10 @@ tradeDocumentsRouter.get(
     if (!doc.fileId) throw new AppError(404, "FILE_NOT_AVAILABLE");
     const absPath = await storagePathFor(doc.fileId);
     const fileName = doc.fileName ?? `${doc.documentType}.pdf`;
-    res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(fileName)}"`);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${encodeURIComponent(fileName)}"`,
+    );
     fs.createReadStream(absPath).pipe(res);
   }),
 );

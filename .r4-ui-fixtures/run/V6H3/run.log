@@ -1,0 +1,62 @@
+R4 Golden Path → MVP-UI17-R4-20260814-V6H3
+
+[PASS] BUYER_LOGIN — https://workspace.demaxtore.com/buyer/control-tower
+[PASS] PRODUCT_CREATION — FLOUR-UI17R4-V6H3
+[PASS] DIRECT_PO — PO-MST3U12N-6DB50CE7
+[PASS] PRODUCT_TO_PO — https://workspace.demaxtore.com/workspace/order/66022360-86c8-4f9d-9012-98e42b74d265
+[PASS] DEPOSIT_CONFIRMATION — Admin recorded DEPOSIT_PAID
+[PASS] FREIGHT_REQUEST — Admin created freight request
+[PASS] FREIGHT_OFFER — 2100 USD offer published
+[PASS] OFFER_SELECTION
+[PASS] OFFER_TO_BOOKING
+[PASS] BOOKING_TO_SHIPMENT — https://workspace.demaxtore.com/workspace/shipment/718b927d-42a3-4f52-b781-1912f1ea9b58
+[PASS] BOOKING_LIFECYCLE — MSCBK-R4-V6H3
+[PASS] LINE_ALLOCATION — 90 PCS
+[PASS] CONTAINER — MSKU17R4V6H3
+[PASS] TRACKING
+[PASS] SHIPMENT_TO_CUSTOMS
+[PASS] BROKER_ASSIGNMENT
+[PASS] DOCUMENT_READINESS — Trade docs uploaded via UI
+[PASS] BROKER_CASE_DISCOVERY
+[DEAD END] R4_ABORT — locator.click: Timeout 30000ms exceeded.
+Call log:
+  - waiting for getByTestId('verify-classification')
+    - locator resolved to <button disabled type="button" data-testid="verify-classification" class="rounded-lg border px-3 py-1.5 text-sm">Verify classification</button>
+  - attempting click action
+    2 × waiting for element to be visible, enabled and stable
+      - element is not enabled
+    - retrying click action
+    - waiting 20ms
+    2 × waiting for element to be visible, enabled and stable
+      - element is not enabled
+    - retrying click action
+      - waiting 100ms
+    47 × waiting for element to be visible, enabled and stable
+       - element is not enabled
+     - retrying click action
+       - waiting 500ms
+
+
+=== R4 SUMMARY ===
+Marker: MVP-UI17-R4-20260814-V6H3
+Fresh Transaction: FAIL
+Blocker: UNHANDLED — locator.click: Timeout 30000ms exceeded.
+Call log:
+  - waiting for getByTestId('verify-classification')
+    - locator resolved to <button disabled type="button" data-testid="verify-classification" class="rounded-lg border px-3 py-1.5 text-sm">Verify classification</button>
+  - attempting click action
+    2 × waiting for element to be visible, enabled and stable
+      - element is not enabled
+    - retrying click action
+    - waiting 20ms
+    2 × waiting for element to be visible, enabled and stable
+      - element is not enabled
+    - retrying click action
+      - waiting 100ms
+    47 × waiting for element to be visible, enabled and stable
+       - element is not enabled
+     - retrying click action
+       - waiting 500ms
+
+Unexpected 5xx: 0
+Evidence: /var/www/demaxtore/DemaxtoreSolitions-main/.r4-ui-fixtures/run/V6H3/evidence.json

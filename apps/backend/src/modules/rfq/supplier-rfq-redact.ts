@@ -20,6 +20,7 @@ export type RfqDtoLike = Record<string, unknown> & {
   catalogIntake?: unknown;
   lineItems?: LineItemRow[];
   participants?: Array<{ userId: string; participantRole: string }>;
+  allowedQuoteLineItemIds?: string[] | null;
 };
 
 const PII_LINE =
@@ -53,16 +54,26 @@ export function redactRfqDtoForSupplier<T extends RfqDtoLike>(
   dto: T,
   supplierUserId: string,
 ): T {
-  const productCategory = String(dto.productCategory ?? "");
+  const allowed = dto.allowedQuoteLineItemIds;
+  const allLines = dto.lineItems ?? [];
+  const scopedLines = allowed?.length
+    ? allLines.filter((li) => allowed.includes(li.id))
+    : allLines;
+
+  const productCategory = allowed?.length
+    ? scopedLines.map((li) => li.description.trim()).filter(Boolean).join(", ")
+    : String(dto.productCategory ?? "");
+
   return {
     ...dto,
     title: redactRfqTitleForSupplier(String(dto.title ?? ""), productCategory),
+    productCategory,
     productDescription: stripCustomerTextFromDescription(String(dto.productDescription ?? "")),
     ownerName: "Buyer",
     ownerUserId: undefined,
     catalogIntake: null,
     participants: (dto.participants ?? []).filter((p) => p.userId === supplierUserId),
-    lineItems: (dto.lineItems ?? []).map((li) => ({
+    lineItems: scopedLines.map((li) => ({
       ...li,
       notes: li.notes ?? null,
       targetPrice: undefined,

@@ -18,6 +18,7 @@ import { socketBus } from "../../realtime/socket-bus.js";
 import { AppError } from "../../utils/httpErrors.js";
 import {
   assertDocumentActionRole,
+  assertTruckerUploadDocumentType,
   canAccessTradeWorkspace,
   type AuthUser,
 } from "./documents.policy.js";
@@ -43,12 +44,38 @@ export class TradeDocumentsService {
         take: 100,
       }),
     ]);
-    const compliance = computeComplianceFromRows(requirements, documents);
+
+    // Shipment requirements (CI/PL/BL) must reflect approved order-lineage docs when
+    // the shipment workspace itself has no copy — one readiness truth for Ops/Buyer.
+    let docsForCompliance = documents;
+    if (workspaceType === "SHIPMENT") {
+      const ship = await this.db.shipmentWorkspace.findUnique({
+        where: { workspaceId },
+        select: { orderWorkspaceId: true },
+      });
+      if (ship?.orderWorkspaceId) {
+        const orderDocs = await this.db.tradeDocument.findMany({
+          where: { workspaceType: "ORDER", workspaceId: ship.orderWorkspaceId },
+        });
+        const byType = new Map(documents.map((d) => [d.documentType, d]));
+        for (const od of orderDocs) {
+          const existing = byType.get(od.documentType);
+          if (!existing) {
+            byType.set(od.documentType, od);
+          } else if (existing.status !== "APPROVED" && od.status === "APPROVED") {
+            byType.set(od.documentType, od);
+          }
+        }
+        docsForCompliance = [...byType.values()];
+      }
+    }
+
+    const compliance = computeComplianceFromRows(requirements, docsForCompliance);
     return {
       workspaceType,
       workspaceId,
       requirements: requirements.map(mapReq),
-      documents: documents.map(mapDoc),
+      documents: docsForCompliance.map(mapDoc),
       reviews: reviews.map(mapReview),
       compliance,
     };
@@ -67,8 +94,12 @@ export class TradeDocumentsService {
     }
     try {
       assertDocumentActionRole(action, actor.role);
-    } catch {
-      throw new AppError(403, "FORBIDDEN_ROLE");
+      if (action === "upload_document") {
+        assertTruckerUploadDocumentType(actor.role, String(payload.documentType ?? ""));
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "FORBIDDEN_ROLE";
+      throw new AppError(403, msg === "TRUCKER_POD_ONLY" ? "TRUCKER_POD_ONLY" : "FORBIDDEN_ROLE");
     }
 
     await this.ensureRequirements(workspaceType, workspaceId);

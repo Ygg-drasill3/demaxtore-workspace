@@ -127,16 +127,19 @@ export default function MixedContainerOfferPage() {
               </tr>
             </thead>
             <tbody>
-              {offer.lines.map((line) => (
+              {offer.lines.map((line) => {
+                const ext = line as typeof line & { originCountry?: string | null; palletCount?: number | null };
+                return (
                 <tr key={line.id} data-testid={`mc-offer-line-${line.productRef}`} className="border-t border-zinc-100">
                   <td className="py-3 font-medium">{line.productName}</td>
                   <td className="py-3 text-zinc-600">{line.packaging}</td>
-                  <td className="py-3">{line.originCountry ?? "—"}</td>
-                  <td className="py-3">{line.palletCount}</td>
+                  <td className="py-3">{ext.originCountry ?? "—"}</td>
+                  <td className="py-3">{ext.palletCount ?? "—"}</td>
                   <td className="py-3">{fmtMoney(line.unitPrice)}</td>
                   <td className="py-3">{fmtMoney(line.lineTotal)}</td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
           <p className="text-[10px] text-zinc-400 mt-3">Supplier identities are not disclosed — product, packaging, price, and origin only.</p>
@@ -145,11 +148,11 @@ export default function MixedContainerOfferPage() {
         <div className="dmx-card p-5 space-y-3" data-testid="mc-offer-totals">
           <h2 className="font-medium">Offer Total</h2>
           <div className="flex justify-between text-sm"><span>Products</span><span data-testid="mc-offer-subtotal">{fmtMoney(offer.productSubtotal)}</span></div>
-          <div className="flex justify-between text-sm"><span>Export execution fee</span><span>{fmtMoney(offer.exportExecutionFee)}</span></div>
-          <div className="flex justify-between text-sm"><span>Estimated freight</span><span>{fmtMoney(offer.estimatedFreight)}</span></div>
+          <div className="flex justify-between text-sm"><span>Export execution fee</span><span>{fmtMoney((offer as typeof offer & { exportExecutionFee?: number }).exportExecutionFee ?? 0)}</span></div>
+          <div className="flex justify-between text-sm"><span>Estimated freight</span><span>{fmtMoney((offer as typeof offer & { estimatedFreight?: number }).estimatedFreight ?? 0)}</span></div>
           <div className="flex justify-between font-semibold text-lg pt-2 border-t">
             <span>Total</span>
-            <span data-testid="mc-offer-total">{fmtMoney(offer.offerTotal)}</span>
+            <span data-testid="mc-offer-total">{fmtMoney((offer as typeof offer & { offerTotal?: number }).offerTotal ?? offer.productSubtotal)}</span>
           </div>
           {offer.offerNotes && <p className="text-sm text-zinc-600 pt-2">{offer.offerNotes}</p>}
         </div>

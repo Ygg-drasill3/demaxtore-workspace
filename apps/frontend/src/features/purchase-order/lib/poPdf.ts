@@ -22,7 +22,7 @@ async function buildPoPdf(summary: PurchaseOrderSummary) {
   const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
   const po = summary.purchaseOrder;
-  const total = summary.lines.reduce((s, l) => s + l.lineTotal, 0);
+  const total = summary.lines.reduce((s, l) => s + (l.lineTotal ?? 0), 0);
   let y = MARGIN;
 
   const addText = (text: string, size: number, style: "normal" | "bold" = "normal", color: [number, number, number] = [15, 23, 42]) => {
@@ -140,8 +140,8 @@ async function buildPoPdf(summary: PurchaseOrderSummary) {
       line.sku ?? "—",
       line.description,
       String(line.quantity),
-      fmtMoney(line.unitPrice, po.currency),
-      fmtMoney(line.lineTotal, po.currency),
+      fmtMoney(line.unitPrice ?? 0, po.currency),
+      fmtMoney(line.lineTotal ?? 0, po.currency),
     ];
     let rowH = 8;
     const wrapped: string[][] = [];
@@ -185,7 +185,7 @@ async function buildPoPdf(summary: PurchaseOrderSummary) {
 
 function uploadedPoDocument(summary: PurchaseOrderSummary) {
   const po = summary.purchaseOrder;
-  if (po.source === "manual" && po.documentUrl) {
+  if (po.source === "DIRECT" && po.documentUrl) {
     return {
       url: po.documentUrl,
       fileName: po.documentFileName ?? `DeMaxtore-PO-${po.poNumber}.pdf`,

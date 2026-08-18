@@ -12,21 +12,23 @@ test.describe.serial("Packing standardization (Sprint 13B.1)", () => {
     buyerToken = await apiLogin(req, USERS.buyer1);
   });
 
-  test("01 — SmartContainer catalog shows packing types on product card", async ({ page }) => {
+  test("01 — SmartContainer catalog shows packaging options on product card", async ({ page }) => {
     await uiLogin(page, USERS.buyer1);
-    await page.goto("/buyer/mixed-container/catalog/rice");
-    await expect(page.getByTestId("mc-packing-types-MC-RICE-001")).toBeVisible();
-    await expect(page.getByTestId("mc-packing-types-MC-RICE-001")).not.toHaveText("");
+    await page.goto("/buyer/mixed-container/catalog/pulses");
+    await expect(page.getByTestId("mc-packaging-options-MC-PUL-RL")).toBeVisible();
+    await expect(page.getByTestId("mc-packaging-options-MC-PUL-RL")).not.toHaveText("");
   });
 
-  test("02 — SmartContainer packing type selector mandatory in add modal", async ({ page }) => {
+  test("02 — SmartContainer packaging selector mandatory on product detail", async ({ page }) => {
     await uiLogin(page, USERS.buyer1);
-    await page.goto("/buyer/mixed-container/catalog/rice");
-    await page.getByTestId("mc-add-to-container-MC-RICE-001").click();
-    await expect(page.getByTestId("mc-packing-type-selector")).toBeVisible();
-    await expect(page.getByTestId("mc-packing-option-PT-MC-PULSE-5KG")).toBeVisible();
-    await page.getByTestId("mc-packing-option-PT-MC-PULSE-1KG").click();
+    await page.goto("/buyer/mixed-container/catalog/pulses");
+    await page.getByTestId("mc-product-card-MC-PUL-RL").click();
+    await expect(page.getByTestId("mc-packaging-selector")).toBeVisible();
+    await expect(page.getByTestId("mc-packaging-option-5-kg")).toBeVisible();
+    await page.getByTestId("mc-packaging-option-1-kg").click();
     await page.getByTestId("mc-add-confirm").click();
+    await expect(page.getByTestId("mc-sidebar")).toBeVisible({ timeout: 10000 });
+    await page.getByTestId("mc-sidebar-review").click();
     await page.waitForURL(/\/buyer\/mixed-container\/requests\//, { timeout: 15000 });
     mcContainerId = page.url().split("/").pop()!;
     await expect(page.getByTestId("mc-builder-page")).toBeVisible();
@@ -64,7 +66,7 @@ test.describe.serial("Packing standardization (Sprint 13B.1)", () => {
       data: { containerType: "CONTAINER_40FT", currency: "USD" },
     });
     const mcId = (await mc.json()).id;
-    const products = await req.get(`${API_BASE}/api/mixed-container/catalog/products?category=rice&limit=1`, {
+    const products = await req.get(`${API_BASE}/api/mixed-container/catalog/products?category=pulses&limit=1`, {
       headers: { Authorization: `Bearer ${buyerToken}` },
     });
     const productId = (await products.json()).items[0].id;
@@ -79,7 +81,7 @@ test.describe.serial("Packing standardization (Sprint 13B.1)", () => {
     await uiLogin(page, USERS.admin);
     await page.goto("/admin/packing-types");
     await expect(page.getByTestId("packing-admin-page")).toBeVisible();
-    await expect(page.getByTestId("packing-row-PT-MC-PASTA-500G")).toBeVisible();
+    await expect(page.getByTestId("packing-row-PT-MC-PASTA-500GR")).toBeVisible();
     await expect(page.getByTestId("packing-row-PT-BC-FLOUR-25KG")).toBeVisible();
     await expect(page.getByTestId("packing-create-btn")).toBeVisible();
   });
@@ -92,15 +94,15 @@ test.describe.serial("Packing standardization (Sprint 13B.1)", () => {
     await expect(page.getByText(/Product ≠ Commercial SKU/i)).toBeVisible();
   });
 
-  test("08 — Catalog API includes packingTypes array", async () => {
+  test("08 — Catalog API includes packagingOptions array", async () => {
     const req = await newRequest();
-    const res = await req.get(`${API_BASE}/api/mixed-container/catalog/products?category=rice&limit=1`, {
+    const res = await req.get(`${API_BASE}/api/mixed-container/catalog/products?category=pulses&limit=1`, {
       headers: { Authorization: `Bearer ${buyerToken}` },
     });
     expect(res.ok()).toBeTruthy();
     const item = (await res.json()).items[0];
-    expect(item.packingTypes).toBeTruthy();
-    expect(item.packingTypes.length).toBeGreaterThan(0);
-    expect(item.packingTypes[0].name).toBeTruthy();
+    expect(item.packagingOptions).toBeTruthy();
+    expect(item.packagingOptions.length).toBeGreaterThan(0);
+    expect(item.packagingOptions[0].name).toBeTruthy();
   });
 });

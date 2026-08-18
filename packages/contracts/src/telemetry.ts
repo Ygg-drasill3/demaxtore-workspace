@@ -11,6 +11,32 @@ export const TelemetryEventName = z.enum([
   "clarification.opened",
   "document.downloaded",
   "next_action.clicked",
+  // ── Workspace Academy (educational layer — payloads never contain
+  //    commercial data; only guide/article/task ids, role, locale, route). ──
+  "academy.opened",
+  "academy.search_used",
+  "academy.article_viewed",
+  "academy.process_overview_started",
+  "academy.process_overview_completed",
+  "academy.welcome_viewed",
+  "academy.welcome_completed",
+  "academy.welcome_dismissed",
+  "academy.guide_started",
+  "academy.guide_step_viewed",
+  "academy.guide_completed",
+  "academy.guide_skipped",
+  "academy.guide_dismissed",
+  "academy.guide_restarted",
+  "academy.checklist_opened",
+  "academy.checklist_minimized",
+  "academy.checklist_dismissed",
+  "academy.checklist_task_completed",
+  "academy.help_center_opened",
+  "academy.contextual_help_opened",
+  "academy.empty_state_action_used",
+  // Academy progress failed to persist. Emitted instead of discarding the rejection,
+  // so a broken academy endpoint is observable rather than silently degrading.
+  "academy.persist_failed",
 ]);
 export type TelemetryEventName = z.infer<typeof TelemetryEventName>;
 
