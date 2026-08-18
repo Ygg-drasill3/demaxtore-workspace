@@ -1,4 +1,3 @@
-.deploy-last-good
 apps/frontend/dist-backup-*/
 
 # Nested git metadata (not source)
