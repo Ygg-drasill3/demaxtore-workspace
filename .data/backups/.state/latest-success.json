@@ -1,0 +1,8 @@
+{
+  "backupId": "20260818-020001",
+  "status": "SUCCESS",
+  "completedAt": "2026-08-18T02:00:20+00:00",
+  "outDir": "/var/www/demaxtore/DemaxtoreSolitions-main/.data/backups/20260818-020001",
+  "databaseArtifact": "dmx.dump",
+  "uploadsArtifact": "uploads.tar.gz"
+}

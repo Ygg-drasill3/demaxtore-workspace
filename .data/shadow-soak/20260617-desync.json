@@ -1,0 +1,33 @@
+{
+  "generatedAt": "2026-06-17T13:26:21.684Z",
+  "ordersScanned": 121,
+  "desyncCount": 1,
+  "undocumentedDesyncCount": 0,
+  "documentedExceptionCount": 1,
+  "desyncPairs": [
+    {
+      "orderId": "06a3f2e8-dd6d-4f2a-958f-316811b519db",
+      "orderRef": "ORD-RFQ-2026-0055-78c8680d",
+      "orderState": "IN_TRANSIT",
+      "shipmentId": "aa0ed303-1f17-48f2-b855-b70ca22838e8",
+      "shipmentRef": "SHP-ORD-RFQ-2026-0055-78c8680d",
+      "shipmentState": "SHIPMENT_CREATED",
+      "severity": "critical",
+      "rule": "ORDER_IN_TRANSIT_SHIPMENT_PRE_TRANSIT",
+      "laggingEntity": "SHIPMENT"
+    }
+  ],
+  "documentedExceptions": [
+    {
+      "orderId": "06a3f2e8-dd6d-4f2a-958f-316811b519db",
+      "shipmentId": "aa0ed303-1f17-48f2-b855-b70ca22838e8",
+      "orderRef": "ORD-RFQ-2026-0055-78c8680d",
+      "rule": "ORDER_IN_TRANSIT_SHIPMENT_PRE_TRANSIT",
+      "reason": "legacy_manual_order_transition_without_shipment_mirror",
+      "documentedAt": "2026-06-17",
+      "remediation": "Shipment-led catch-up via fsm-desync-remediation-dry-run.mjs before P2 auto-apply, or cancel both workspaces if E2E residue",
+      "blocksP2AutoApply": true
+    }
+  ],
+  "metadataStamped": false
+}

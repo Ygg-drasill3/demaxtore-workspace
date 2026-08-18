@@ -1,0 +1,19 @@
+{
+  "backupId": "20260815-080853",
+  "startedAt": "2026-08-15T08:08:53+00:00",
+  "completedAt": "2026-08-15T08:08:53+00:00",
+  "status": "FAILED",
+  "databaseArtifact": "dmx.dump",
+  "databaseSizeBytes": ,
+  "databaseSha256": "",
+  "databaseValidation": "FAILED",
+  "uploadsArtifact": "uploads.tar.gz",
+  "uploadsSizeBytes": ,
+  "uploadsSha256": "",
+  "uploadsValidation": "FAILED",
+  "storageDir": "/tmp/demaxtore-backup-invalid-storage-20260815-080853",
+  "r4PodCanary": "1a62dab4-57b6-4150-bc21-b9cb4e1f3ca8.pdf",
+  "r4Marker": "MVP-UI17-R4-20260814-R2M5",
+  "offHostStatus": "not_configured",
+  "applicationRoot": "/var/www/demaxtore/DemaxtoreSolitions-main"
+}

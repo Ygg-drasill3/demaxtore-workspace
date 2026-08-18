@@ -1,6 +1,3 @@
-# GitHub rejects files over 100MB. These trees contain such binaries.
-.data/
-.tools/
 .deploy-last-good
 apps/frontend/dist-backup-*/
 

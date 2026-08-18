@@ -1,0 +1,10 @@
+{
+  "backupId": "20260815-080856",
+  "startedAt": "2026-08-15T08:08:56+00:00",
+  "completedAt": "2026-08-15T08:09:00+00:00",
+  "status": "FAILED",
+  "storageDir": "/var/www/demaxtore/DemaxtoreSolitions-main/apps/backend/.data/uploads",
+  "offHostStatus": "not_configured",
+  "failureReason": "Simulated uploads failure (BACKUP_TEST_SKIP_UPLOADS=1)",
+  "applicationRoot": "/var/www/demaxtore/DemaxtoreSolitions-main"
+}

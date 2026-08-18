@@ -1,0 +1,31 @@
+{
+  "generatedAt": "2026-06-17T13:26:20.492Z",
+  "totals": {
+    "activeOrders": 121,
+    "activeShipments": 47,
+    "recommendations": 0,
+    "recommendationsByMode": {},
+    "matchedShadowMirrors": 0,
+    "mirrorMismatches": 0,
+    "desyncPairs": 1,
+    "exceptionsLast7d": 175,
+    "duplicateProcessedEventGroups": 0
+  },
+  "mismatches": [],
+  "desyncPairs": [
+    {
+      "orderId": "06a3f2e8-dd6d-4f2a-958f-316811b519db",
+      "orderState": "IN_TRANSIT",
+      "shipmentState": "SHIPMENT_CREATED",
+      "severity": "critical",
+      "rule": "ORDER_IN_TRANSIT_SHIPMENT_PRE_TRANSIT",
+      "laggingEntity": "SHIPMENT"
+    }
+  ],
+  "duplicateProcessedEvents": [],
+  "rollbackTestChecklist": {
+    "disableOrchestrator": "FSM_ORCHESTRATOR_ENABLED=false + backend restart",
+    "verifyManualOrderLogistics": "Order workspace shows logistics CTAs",
+    "verifyShipmentFlow": "06-shipment-flow E2E 9/9"
+  }
+}

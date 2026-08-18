@@ -1,0 +1,19 @@
+{
+  "backupId": "20260815-080756",
+  "startedAt": "2026-08-15T08:07:56+00:00",
+  "completedAt": "2026-08-15T08:08:10+00:00",
+  "status": "SUCCESS",
+  "databaseArtifact": "dmx.dump",
+  "databaseSizeBytes": 34981387,
+  "databaseSha256": "811eb6bfa5d68c76a9e5d8303682761e38f2432fe27d10a1240d16ae3c78dc73",
+  "databaseValidation": "SUCCESS",
+  "uploadsArtifact": "uploads.tar.gz",
+  "uploadsSizeBytes": 121720119,
+  "uploadsSha256": "dd8268986af520178c45a164f3113ebfa92e2a68f552535c09749a4d09b2ed4e",
+  "uploadsValidation": "SUCCESS",
+  "storageDir": "/var/www/demaxtore/DemaxtoreSolitions-main/apps/backend/.data/uploads",
+  "r4PodCanary": "1a62dab4-57b6-4150-bc21-b9cb4e1f3ca8.pdf",
+  "r4Marker": "MVP-UI17-R4-20260814-R2M5",
+  "offHostStatus": "not_configured",
+  "applicationRoot": "/var/www/demaxtore/DemaxtoreSolitions-main"
+}
