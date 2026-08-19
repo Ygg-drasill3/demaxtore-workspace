@@ -1958,164 +1958,272 @@ CREATE UNIQUE INDEX IF NOT EXISTS "workspace_messages_legacy_source_legacy_id_ke
 CREATE UNIQUE INDEX IF NOT EXISTS "workspaces_slug_key" ON "workspaces"("slug");
 
 -- AddForeignKey
-ALTER TABLE "phone_verification_requests" ADD CONSTRAINT "phone_verification_requests_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "phone_verification_requests" ADD CONSTRAINT "phone_verification_requests_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "rfq_line_awards" ADD CONSTRAINT "rfq_line_awards_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "rfq_line_awards" ADD CONSTRAINT "rfq_line_awards_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "rfq_line_awards" ADD CONSTRAINT "rfq_line_awards_rfq_line_item_id_fkey" FOREIGN KEY ("rfq_line_item_id") REFERENCES "rfq_line_items"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "rfq_line_awards" ADD CONSTRAINT "rfq_line_awards_rfq_line_item_id_fkey" FOREIGN KEY ("rfq_line_item_id") REFERENCES "rfq_line_items"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "rfq_line_awards" ADD CONSTRAINT "rfq_line_awards_quotation_id_fkey" FOREIGN KEY ("quotation_id") REFERENCES "quotations"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "rfq_line_awards" ADD CONSTRAINT "rfq_line_awards_quotation_id_fkey" FOREIGN KEY ("quotation_id") REFERENCES "quotations"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "rfq_line_awards" ADD CONSTRAINT "rfq_line_awards_supplier_po_spawn_id_fkey" FOREIGN KEY ("supplier_po_spawn_id") REFERENCES "rfq_supplier_po_spawns"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "rfq_line_awards" ADD CONSTRAINT "rfq_line_awards_supplier_po_spawn_id_fkey" FOREIGN KEY ("supplier_po_spawn_id") REFERENCES "rfq_supplier_po_spawns"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "rfq_supplier_po_spawns" ADD CONSTRAINT "rfq_supplier_po_spawns_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "rfq_supplier_po_spawns" ADD CONSTRAINT "rfq_supplier_po_spawns_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "inspection_findings" ADD CONSTRAINT "inspection_findings_inspection_workspace_id_fkey" FOREIGN KEY ("inspection_workspace_id") REFERENCES "inspection_workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "inspection_findings" ADD CONSTRAINT "inspection_findings_inspection_workspace_id_fkey" FOREIGN KEY ("inspection_workspace_id") REFERENCES "inspection_workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "inspection_defects" ADD CONSTRAINT "inspection_defects_inspection_workspace_id_fkey" FOREIGN KEY ("inspection_workspace_id") REFERENCES "inspection_workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "inspection_defects" ADD CONSTRAINT "inspection_defects_inspection_workspace_id_fkey" FOREIGN KEY ("inspection_workspace_id") REFERENCES "inspection_workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "inspection_ncrs" ADD CONSTRAINT "inspection_ncrs_inspection_workspace_id_fkey" FOREIGN KEY ("inspection_workspace_id") REFERENCES "inspection_workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "inspection_ncrs" ADD CONSTRAINT "inspection_ncrs_inspection_workspace_id_fkey" FOREIGN KEY ("inspection_workspace_id") REFERENCES "inspection_workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "inland_deliveries" ADD CONSTRAINT "inland_deliveries_shipment_workspace_id_fkey" FOREIGN KEY ("shipment_workspace_id") REFERENCES "shipment_workspaces"("workspace_id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "inland_deliveries" ADD CONSTRAINT "inland_deliveries_shipment_workspace_id_fkey" FOREIGN KEY ("shipment_workspace_id") REFERENCES "shipment_workspaces"("workspace_id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "inland_delivery_events" ADD CONSTRAINT "inland_delivery_events_inland_delivery_id_fkey" FOREIGN KEY ("inland_delivery_id") REFERENCES "inland_deliveries"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "inland_delivery_events" ADD CONSTRAINT "inland_delivery_events_inland_delivery_id_fkey" FOREIGN KEY ("inland_delivery_id") REFERENCES "inland_deliveries"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "transaction_costs" ADD CONSTRAINT "transaction_costs_shipment_workspace_id_fkey" FOREIGN KEY ("shipment_workspace_id") REFERENCES "shipment_workspaces"("workspace_id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "transaction_costs" ADD CONSTRAINT "transaction_costs_shipment_workspace_id_fkey" FOREIGN KEY ("shipment_workspace_id") REFERENCES "shipment_workspaces"("workspace_id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "landed_cost_calculations" ADD CONSTRAINT "landed_cost_calculations_shipment_workspace_id_fkey" FOREIGN KEY ("shipment_workspace_id") REFERENCES "shipment_workspaces"("workspace_id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "landed_cost_calculations" ADD CONSTRAINT "landed_cost_calculations_shipment_workspace_id_fkey" FOREIGN KEY ("shipment_workspace_id") REFERENCES "shipment_workspaces"("workspace_id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "landed_cost_components" ADD CONSTRAINT "landed_cost_components_calculation_id_fkey" FOREIGN KEY ("calculation_id") REFERENCES "landed_cost_calculations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "landed_cost_components" ADD CONSTRAINT "landed_cost_components_calculation_id_fkey" FOREIGN KEY ("calculation_id") REFERENCES "landed_cost_calculations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "operational_task_comments" ADD CONSTRAINT "operational_task_comments_task_id_fkey" FOREIGN KEY ("task_id") REFERENCES "operational_tasks"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "operational_task_comments" ADD CONSTRAINT "operational_task_comments_task_id_fkey" FOREIGN KEY ("task_id") REFERENCES "operational_tasks"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "customs_cases" ADD CONSTRAINT "customs_cases_shipment_workspace_id_fkey" FOREIGN KEY ("shipment_workspace_id") REFERENCES "shipment_workspaces"("workspace_id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "customs_cases" ADD CONSTRAINT "customs_cases_shipment_workspace_id_fkey" FOREIGN KEY ("shipment_workspace_id") REFERENCES "shipment_workspaces"("workspace_id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "customs_case_events" ADD CONSTRAINT "customs_case_events_customs_case_id_fkey" FOREIGN KEY ("customs_case_id") REFERENCES "customs_cases"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "customs_case_events" ADD CONSTRAINT "customs_case_events_customs_case_id_fkey" FOREIGN KEY ("customs_case_id") REFERENCES "customs_cases"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "duty_tax_calculations" ADD CONSTRAINT "duty_tax_calculations_customs_case_id_fkey" FOREIGN KEY ("customs_case_id") REFERENCES "customs_cases"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "duty_tax_calculations" ADD CONSTRAINT "duty_tax_calculations_customs_case_id_fkey" FOREIGN KEY ("customs_case_id") REFERENCES "customs_cases"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "duty_tax_calculation_lines" ADD CONSTRAINT "duty_tax_calculation_lines_calculation_id_fkey" FOREIGN KEY ("calculation_id") REFERENCES "duty_tax_calculations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "duty_tax_calculation_lines" ADD CONSTRAINT "duty_tax_calculation_lines_calculation_id_fkey" FOREIGN KEY ("calculation_id") REFERENCES "duty_tax_calculations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "shipment_milestones" ADD CONSTRAINT "shipment_milestones_shipment_workspace_id_fkey" FOREIGN KEY ("shipment_workspace_id") REFERENCES "shipment_workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "shipment_milestones" ADD CONSTRAINT "shipment_milestones_shipment_workspace_id_fkey" FOREIGN KEY ("shipment_workspace_id") REFERENCES "shipment_workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "shipment_containers" ADD CONSTRAINT "shipment_containers_shipment_workspace_id_fkey" FOREIGN KEY ("shipment_workspace_id") REFERENCES "shipment_workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "shipment_containers" ADD CONSTRAINT "shipment_containers_shipment_workspace_id_fkey" FOREIGN KEY ("shipment_workspace_id") REFERENCES "shipment_workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "shipment_line_allocations" ADD CONSTRAINT "shipment_line_allocations_purchase_order_line_id_fkey" FOREIGN KEY ("purchase_order_line_id") REFERENCES "purchase_order_lines"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "shipment_line_allocations" ADD CONSTRAINT "shipment_line_allocations_purchase_order_line_id_fkey" FOREIGN KEY ("purchase_order_line_id") REFERENCES "purchase_order_lines"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "shipment_line_allocations" ADD CONSTRAINT "shipment_line_allocations_shipment_container_id_fkey" FOREIGN KEY ("shipment_container_id") REFERENCES "shipment_containers"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "shipment_line_allocations" ADD CONSTRAINT "shipment_line_allocations_shipment_container_id_fkey" FOREIGN KEY ("shipment_container_id") REFERENCES "shipment_containers"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "purchase_order_lines" ADD CONSTRAINT "purchase_order_lines_rfq_line_item_id_fkey" FOREIGN KEY ("rfq_line_item_id") REFERENCES "rfq_line_items"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "purchase_order_lines" ADD CONSTRAINT "purchase_order_lines_rfq_line_item_id_fkey" FOREIGN KEY ("rfq_line_item_id") REFERENCES "rfq_line_items"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "purchase_order_lines" ADD CONSTRAINT "purchase_order_lines_quotation_line_id_fkey" FOREIGN KEY ("quotation_line_id") REFERENCES "quotation_line_items"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "purchase_order_lines" ADD CONSTRAINT "purchase_order_lines_quotation_line_id_fkey" FOREIGN KEY ("quotation_line_id") REFERENCES "quotation_line_items"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "purchase_order_lines" ADD CONSTRAINT "purchase_order_lines_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "purchase_order_lines" ADD CONSTRAINT "purchase_order_lines_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "products" ADD CONSTRAINT "products_organisation_id_fkey" FOREIGN KEY ("organisation_id") REFERENCES "organisations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "products" ADD CONSTRAINT "products_organisation_id_fkey" FOREIGN KEY ("organisation_id") REFERENCES "organisations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "product_supplier_references" ADD CONSTRAINT "product_supplier_references_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "product_supplier_references" ADD CONSTRAINT "product_supplier_references_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "product_change_events" ADD CONSTRAINT "product_change_events_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "product_change_events" ADD CONSTRAINT "product_change_events_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "purchase_order_commercial_documents" ADD CONSTRAINT "purchase_order_commercial_documents_purchase_order_id_fkey" FOREIGN KEY ("purchase_order_id") REFERENCES "purchase_orders"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "purchase_order_commercial_documents" ADD CONSTRAINT "purchase_order_commercial_documents_purchase_order_id_fkey" FOREIGN KEY ("purchase_order_id") REFERENCES "purchase_orders"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "workspace_conversation_participants" ADD CONSTRAINT "workspace_conversation_participants_conversation_id_fkey" FOREIGN KEY ("conversation_id") REFERENCES "workspace_conversations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "workspace_conversation_participants" ADD CONSTRAINT "workspace_conversation_participants_conversation_id_fkey" FOREIGN KEY ("conversation_id") REFERENCES "workspace_conversations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "workspace_conversation_participants" ADD CONSTRAINT "workspace_conversation_participants_whatsapp_contact_id_fkey" FOREIGN KEY ("whatsapp_contact_id") REFERENCES "whatsapp_contacts"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "workspace_conversation_participants" ADD CONSTRAINT "workspace_conversation_participants_whatsapp_contact_id_fkey" FOREIGN KEY ("whatsapp_contact_id") REFERENCES "whatsapp_contacts"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "conversation_contexts" ADD CONSTRAINT "conversation_contexts_conversation_id_fkey" FOREIGN KEY ("conversation_id") REFERENCES "workspace_conversations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "conversation_contexts" ADD CONSTRAINT "conversation_contexts_conversation_id_fkey" FOREIGN KEY ("conversation_id") REFERENCES "workspace_conversations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "whatsapp_conversations" ADD CONSTRAINT "whatsapp_conversations_contact_id_fkey" FOREIGN KEY ("contact_id") REFERENCES "whatsapp_contacts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "whatsapp_conversations" ADD CONSTRAINT "whatsapp_conversations_contact_id_fkey" FOREIGN KEY ("contact_id") REFERENCES "whatsapp_contacts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "whatsapp_messages" ADD CONSTRAINT "whatsapp_messages_conversation_id_fkey" FOREIGN KEY ("conversation_id") REFERENCES "whatsapp_conversations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "whatsapp_messages" ADD CONSTRAINT "whatsapp_messages_conversation_id_fkey" FOREIGN KEY ("conversation_id") REFERENCES "whatsapp_conversations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "whatsapp_messages" ADD CONSTRAINT "whatsapp_messages_reply_to_message_id_fkey" FOREIGN KEY ("reply_to_message_id") REFERENCES "whatsapp_messages"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "whatsapp_messages" ADD CONSTRAINT "whatsapp_messages_reply_to_message_id_fkey" FOREIGN KEY ("reply_to_message_id") REFERENCES "whatsapp_messages"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "whatsapp_message_statuses" ADD CONSTRAINT "whatsapp_message_statuses_message_id_fkey" FOREIGN KEY ("message_id") REFERENCES "whatsapp_messages"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "whatsapp_message_statuses" ADD CONSTRAINT "whatsapp_message_statuses_message_id_fkey" FOREIGN KEY ("message_id") REFERENCES "whatsapp_messages"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "whatsapp_business_connections" ADD CONSTRAINT "whatsapp_business_connections_buyer_id_fkey" FOREIGN KEY ("buyer_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "whatsapp_business_connections" ADD CONSTRAINT "whatsapp_business_connections_buyer_id_fkey" FOREIGN KEY ("buyer_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "whatsapp_connection_templates" ADD CONSTRAINT "whatsapp_connection_templates_connection_id_fkey" FOREIGN KEY ("connection_id") REFERENCES "whatsapp_business_connections"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "whatsapp_connection_templates" ADD CONSTRAINT "whatsapp_connection_templates_connection_id_fkey" FOREIGN KEY ("connection_id") REFERENCES "whatsapp_business_connections"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "whatsapp_connection_audit_logs" ADD CONSTRAINT "whatsapp_connection_audit_logs_connection_id_fkey" FOREIGN KEY ("connection_id") REFERENCES "whatsapp_business_connections"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "whatsapp_connection_audit_logs" ADD CONSTRAINT "whatsapp_connection_audit_logs_connection_id_fkey" FOREIGN KEY ("connection_id") REFERENCES "whatsapp_business_connections"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "catalog_categories" ADD CONSTRAINT "catalog_categories_industry_id_fkey" FOREIGN KEY ("industry_id") REFERENCES "catalog_industries"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "catalog_categories" ADD CONSTRAINT "catalog_categories_industry_id_fkey" FOREIGN KEY ("industry_id") REFERENCES "catalog_industries"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "organisation_category_interests" ADD CONSTRAINT "organisation_category_interests_organisation_id_fkey" FOREIGN KEY ("organisation_id") REFERENCES "organisations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "organisation_category_interests" ADD CONSTRAINT "organisation_category_interests_organisation_id_fkey" FOREIGN KEY ("organisation_id") REFERENCES "organisations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "organisation_category_interests" ADD CONSTRAINT "organisation_category_interests_catalog_category_id_fkey" FOREIGN KEY ("catalog_category_id") REFERENCES "catalog_categories"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "organisation_category_interests" ADD CONSTRAINT "organisation_category_interests_catalog_category_id_fkey" FOREIGN KEY ("catalog_category_id") REFERENCES "catalog_categories"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "catalog_packaging" ADD CONSTRAINT "catalog_packaging_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "catalog_products"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "catalog_packaging" ADD CONSTRAINT "catalog_packaging_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "catalog_products"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "catalog_packaging" ADD CONSTRAINT "catalog_packaging_packing_type_id_fkey" FOREIGN KEY ("packing_type_id") REFERENCES "packing_types"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "catalog_packaging" ADD CONSTRAINT "catalog_packaging_packing_type_id_fkey" FOREIGN KEY ("packing_type_id") REFERENCES "packing_types"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "mc_organization_status_history" ADD CONSTRAINT "mc_organization_status_history_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "mc_organization_status_history" ADD CONSTRAINT "mc_organization_status_history_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "mc_organization_events" ADD CONSTRAINT "mc_organization_events_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "mc_organization_events" ADD CONSTRAINT "mc_organization_events_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "mc_procurement_status_history" ADD CONSTRAINT "mc_procurement_status_history_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "mc_procurement_status_history" ADD CONSTRAINT "mc_procurement_status_history_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "mc_internal_notes" ADD CONSTRAINT "mc_internal_notes_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "mc_internal_notes" ADD CONSTRAINT "mc_internal_notes_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "container_lines" ADD CONSTRAINT "container_lines_catalog_packaging_id_fkey" FOREIGN KEY ("catalog_packaging_id") REFERENCES "catalog_packaging"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "container_lines" ADD CONSTRAINT "container_lines_catalog_packaging_id_fkey" FOREIGN KEY ("catalog_packaging_id") REFERENCES "catalog_packaging"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "workspace_academy_profiles" ADD CONSTRAINT "workspace_academy_profiles_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "workspace_academy_profiles" ADD CONSTRAINT "workspace_academy_profiles_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "workspace_academy_guide_progress" ADD CONSTRAINT "workspace_academy_guide_progress_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "workspace_academy_guide_progress" ADD CONSTRAINT "workspace_academy_guide_progress_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "workspace_academy_task_progress" ADD CONSTRAINT "workspace_academy_task_progress_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "workspace_academy_task_progress" ADD CONSTRAINT "workspace_academy_task_progress_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- AddForeignKey
-ALTER TABLE "workspace_academy_article_views" ADD CONSTRAINT "workspace_academy_article_views_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "workspace_academy_article_views" ADD CONSTRAINT "workspace_academy_article_views_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
