@@ -394,6 +394,9 @@ function PerfTable({
       </table>
     </div>
 
+  );
+}
+
 // ─── Ops prioritized work queue (truthful UI: only real alert fields) ─────────
 const SEVERITY_RANK: Record<string, number> = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3, INFO: 4 };
 
@@ -480,8 +483,5 @@ function OpsWorkQueue({
         </ul>
       )}
     </section>
-  );
-}
-
   );
 }

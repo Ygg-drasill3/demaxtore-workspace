@@ -15,6 +15,7 @@ import { ShipmentContainersPanel } from "@/features/shipment/components/Shipment
 import { TurkeyCustomsPanel } from "@/features/customs/components/TurkeyCustomsPanel";
 import { InlandDeliveryPanel } from "@/features/inland/components/InlandDeliveryPanel";
 import { LandedCostPanel } from "@/features/landed-cost/components/LandedCostPanel";
+import type { ShipmentState } from "@dmx/contracts/shipment.fsm";
 
 /**
  * Turkey Importer — customer-facing Import Workspace (spec §11 "One Workspace").
@@ -172,7 +173,7 @@ export default function ImportWorkspacePage() {
         {tab === "journey" && (
           <>
             <ShipmentJourneyMap
-              state={shipment.state}
+              state={shipment.state as ShipmentState}
               eta={eta ?? undefined}
               isDelayed={shipment.hasOpenException || shipment.state === "EXCEPTION"}
             />
