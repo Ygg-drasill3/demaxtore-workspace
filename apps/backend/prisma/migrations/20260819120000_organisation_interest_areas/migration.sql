@@ -1,6 +1,52 @@
--- Schema drift fix: add columns that exist in schema.prisma but were missing
--- from any migration file (interest_areas, catalog_external_url).
+-- Schema drift fix: columns/enums that exist in schema.prisma but were missing
+-- from migration files. This migration is safe to run multiple times (IF NOT EXISTS / guards).
 
+-- ── Enums ──────────────────────────────────────────────────────────────────────
+DO $$ BEGIN
+  CREATE TYPE "OrderWorkspaceOrigin" AS ENUM ('RFQ','DIRECT_PO','REORDER','API','LEGACY','COMMODITY_BID');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE TYPE "PurchaseOrderSource" AS ENUM ('RFQ','DIRECT','REORDER','API','LEGACY','COMMODITY_BID');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- ── organisations: add missing columns ─────────────────────────────────────────
 ALTER TABLE "organisations"
-ADD COLUMN IF NOT EXISTS "interest_areas"      TEXT[] NOT NULL DEFAULT '{}',
+ADD COLUMN IF NOT EXISTS "interest_areas"       TEXT[] NOT NULL DEFAULT '{}',
 ADD COLUMN IF NOT EXISTS "catalog_external_url" TEXT;
+
+-- ── order_workspaces: add origin column (Sprint 27 dual-entry) ─────────────────
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'order_workspaces' AND column_name = 'origin'
+  ) THEN
+    ALTER TABLE "order_workspaces"
+      ADD COLUMN "origin" "OrderWorkspaceOrigin" NOT NULL DEFAULT 'RFQ';
+    -- Also make parent columns nullable if they were made NOT NULL in the original migration
+    ALTER TABLE "order_workspaces"
+      ALTER COLUMN "parent_workspace_id" DROP NOT NULL,
+      ALTER COLUMN "parent_workspace_type" DROP NOT NULL;
+  END IF;
+END $$;
+
+-- ── purchase_orders: upgrade source column to enum (Sprint 27) ─────────────────
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_enum e ON t.oid = e.enumtypid
+    WHERE t.typname = 'PurchaseOrderSource' AND e.enumlabel = 'DIRECT'
+  ) THEN NULL; END IF;
+
+  -- Only alter if column is still TEXT type
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'purchase_orders'
+      AND column_name = 'source' AND data_type = 'character varying'
+  ) THEN
+    ALTER TABLE "purchase_orders"
+      ALTER COLUMN "source" TYPE "PurchaseOrderSource"
+        USING "source"::"PurchaseOrderSource";
+  END IF;
+END $$;
