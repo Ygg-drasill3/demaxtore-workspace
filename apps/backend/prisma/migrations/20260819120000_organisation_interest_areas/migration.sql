@@ -26,6 +26,21 @@ ALTER TABLE "organisations"
 ADD COLUMN IF NOT EXISTS "interest_areas"       TEXT[] NOT NULL DEFAULT '{}',
 ADD COLUMN IF NOT EXISTS "catalog_external_url" TEXT;
 
+-- ── purchase_orders: po_manual_upload columns skipped because table didn't exist yet ─
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='purchase_orders') THEN
+    ALTER TABLE purchase_orders
+      ADD COLUMN IF NOT EXISTS source VARCHAR(16) NOT NULL DEFAULT 'auto',
+      ADD COLUMN IF NOT EXISTS document_url TEXT,
+      ADD COLUMN IF NOT EXISTS document_file_name VARCHAR(500);
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='rfq_details') THEN
+    ALTER TABLE rfq_details
+      ADD COLUMN IF NOT EXISTS po_file_url TEXT;
+  END IF;
+END $$;
+
 -- ── order_workspaces: add origin column (Sprint 27 dual-entry) ─────────────────
 DO $$
 BEGIN
