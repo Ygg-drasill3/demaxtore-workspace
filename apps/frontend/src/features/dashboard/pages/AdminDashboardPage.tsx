@@ -47,6 +47,7 @@ export default function AdminDashboardPage() {
       <OperationsKpiRow kpis={data?.kpis} loading={isLoading} />
       <PendingPhoneVerificationsWidget />
       <OperationsActionInbox actions={data?.actions} loading={isLoading} />
+      <ControlTowerPanel groups={data?.alertGroups} loading={isLoading} />
       <TradeOperationsBoard rows={data?.tradeBoard} loading={isLoading} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -56,10 +57,9 @@ export default function AdminDashboardPage() {
 
       <OperationsShipmentCenter rows={data?.shipments} loading={isLoading} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <DocumentControlCenter rows={data?.documents} loading={isLoading} />
         <CommunicationMonitor rows={data?.communications} loading={isLoading} />
-        <ControlTowerPanel groups={data?.alertGroups} loading={isLoading} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">

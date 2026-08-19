@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { CheckCircle2 } from "lucide-react";
+import type { ControlTowerAlert } from "@dmx/contracts/control-tower";
 import { EmptyState } from "@/components/ui/EmptyState";
 import {
   useControlTowerOpsDashboard,
@@ -75,6 +76,9 @@ export default function OperationsPage() {
           </p>
         )}
       </header>
+
+      {/* Work-first: prioritized queue of open operational work (real alert data). */}
+      <OpsWorkQueue alerts={open} onResolve={handleResolve} resolving={resolve.isPending} />
 
       <PoOverviewWidget />
 
@@ -389,5 +393,95 @@ function PerfTable({
         </tbody>
       </table>
     </div>
+
+// ─── Ops prioritized work queue (truthful UI: only real alert fields) ─────────
+const SEVERITY_RANK: Record<string, number> = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3, INFO: 4 };
+
+function ageLabel(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  const h = Math.floor(ms / 3_600_000);
+  if (h < 1) return "just now";
+  if (h < 24) return `${h}h old`;
+  return `${Math.floor(h / 24)}d old`;
+}
+
+function OpsWorkQueue({
+  alerts,
+  onResolve,
+  resolving,
+}: {
+  alerts: ControlTowerAlert[];
+  onResolve: (id: string) => void;
+  resolving: boolean;
+}) {
+  const queue = [...alerts].sort((a, b) => {
+    const s = (SEVERITY_RANK[a.severity] ?? 9) - (SEVERITY_RANK[b.severity] ?? 9);
+    return s !== 0 ? s : new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+  });
+
+  return (
+    <section data-testid="ops-work-queue-section" className="dmx-card p-5">
+      <div className="flex items-center justify-between gap-2 mb-4">
+        <div>
+          <span className="dmx-eyebrow text-zinc-500">Work queue</span>
+          <h2 className="font-display text-xl font-semibold mt-0.5">What needs action now</h2>
+        </div>
+        <span data-testid="ops-work-queue-count" className="text-sm font-medium text-zinc-600">{queue.length} open</span>
+      </div>
+      {queue.length === 0 ? (
+        <div data-testid="ops-work-queue-empty" className="flex items-center gap-2 text-sm text-emerald-700">
+          <CheckCircle2 className="h-4 w-4" /> All clear — no open operational work.
+        </div>
+      ) : (
+        <ul className="space-y-2">
+          {queue.slice(0, 12).map((a) => {
+            const href = workspacePath(a.workspaceType, a.workspaceId);
+            const critical = a.severity === "CRITICAL";
+            return (
+              <li
+                key={a.id}
+                data-testid={`ops-wq-${a.id}`}
+                className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-xl border border-zinc-100 hover:bg-zinc-50/70 transition-colors"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded border ${critical ? "bg-red-50 text-red-700 border-red-200" : "bg-amber-50 text-amber-800 border-amber-200"}`}>
+                      {a.severity}
+                    </span>
+                    <span className="text-[10px] uppercase tracking-wide text-zinc-400 border border-zinc-200 rounded px-1.5 py-0.5">
+                      {a.category.replace(/_/g, " ")}
+                    </span>
+                    <span className="text-sm font-medium text-ink-900 truncate">{a.title}</span>
+                  </div>
+                  <p className="text-xs text-zinc-500 mt-1 line-clamp-1">{a.description}</p>
+                  <p className="text-[11px] text-zinc-400 mt-0.5">
+                    {ageLabel(a.createdAt)}{a.workspaceRef ? ` · ${a.workspaceRef}` : ""}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
+                  {href && (
+                    <Link to={href} data-testid={`ops-wq-open-${a.id}`} className="text-xs px-2.5 py-1.5 rounded border border-zinc-200 hover:bg-white">
+                      Open
+                    </Link>
+                  )}
+                  <button
+                    type="button"
+                    data-testid={`ops-wq-resolve-${a.id}`}
+                    disabled={resolving}
+                    onClick={() => onResolve(a.id)}
+                    className="text-xs px-2.5 py-1.5 rounded border border-zinc-200 hover:bg-zinc-50 disabled:opacity-50"
+                  >
+                    Resolve
+                  </button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
+}
+
   );
 }
