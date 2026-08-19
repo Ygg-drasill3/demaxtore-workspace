@@ -10,6 +10,17 @@ DO $$ BEGIN
   CREATE TYPE "PurchaseOrderSource" AS ENUM ('RFQ','DIRECT','REORDER','API','LEGACY','COMMODITY_BID');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
+-- Add new Role values (schema drift: ORIGIN_AGENT, CUSTOMS_BROKER, TRUCKER)
+DO $$ BEGIN
+  ALTER TYPE "Role" ADD VALUE IF NOT EXISTS 'ORIGIN_AGENT';
+EXCEPTION WHEN others THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TYPE "Role" ADD VALUE IF NOT EXISTS 'CUSTOMS_BROKER';
+EXCEPTION WHEN others THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TYPE "Role" ADD VALUE IF NOT EXISTS 'TRUCKER';
+EXCEPTION WHEN others THEN NULL; END $$;
+
 -- ── organisations: add missing columns ─────────────────────────────────────────
 ALTER TABLE "organisations"
 ADD COLUMN IF NOT EXISTS "interest_areas"       TEXT[] NOT NULL DEFAULT '{}',
