@@ -47,8 +47,9 @@ describe("Sprint 43R international buyer navigation", () => {
 
   it("selects Turkey nav only for explicit TURKEY_IMPORTER", () => {
     const groups = navGroupsForRole("BUYER", "TURKEY_IMPORTER");
-    expect(groups.some((g) => g.id === "import-ops")).toBe(true);
-    expect(quickActionsForRole("BUYER", "TURKEY_IMPORTER")[0]?.testId).toBe("qa-freight-quote");
+    expect(groups.map((g) => g.id)).toEqual(["home", "operations", "control"]);
+    expect(groups.some((g) => g.id === "sourcing")).toBe(false);
+    expect(quickActionsForRole("BUYER", "TURKEY_IMPORTER")[0]?.testId).toBe("qa-start-import");
   });
 
   it("default flat BUYER nav is International (existing customers)", () => {

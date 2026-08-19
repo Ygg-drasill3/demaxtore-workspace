@@ -1,4 +1,6 @@
 // Sprint 10A.2 — Buyer Command Center Dashboard
+// Turkey Importer branch = simplified customer command center (spec §7):
+// 5-KPI strip + Attention Required + Active Imports. International branch unchanged.
 import { Link } from "react-router-dom";
 import type { ReactNode } from "react";
 import { useAuth } from "@/store/auth.store";
@@ -68,44 +70,22 @@ export default function BuyerDashboardPage() {
 
       {turkey ? (
         <>
+          {/* Command center — 5 primary import KPIs (spec §7). */}
           <div className="space-y-4">
             <SectionLabel>{t("s43.dashboard.section.importOps", "Import operations")}</SectionLabel>
-            <ImportExecutionKpiRow kpis={kpis} timelineKpis={timelineKpis} loading={kpiLoading} />
-            <TimelineKpiRow kpis={timelineKpis} loading={kpiLoading} />
-            <BookingKpiRow kpis={kpis} loading={kpiLoading} />
+            <ImportExecutionKpiRow kpis={kpis} timelineKpis={timelineKpis} loading={kpiLoading} max={5} />
           </div>
 
+          {/* Attention required — prioritized real actions. */}
           <div className="space-y-4">
-            <SectionLabel>{t("dash.buyer.section.priority")}</SectionLabel>
+            <SectionLabel>{t("dash.buyer.section.priority", "Attention required")}</SectionLabel>
             <ActionInbox actions={data?.requiredActions} loading={isLoading} />
           </div>
 
+          {/* Active imports — open the Import Workspace directly. */}
           <div className="space-y-4">
             <SectionLabel>{t("s43.dashboard.section.activeImports", "Active imports")}</SectionLabel>
             <ActiveImportsWidget />
-          </div>
-
-          <div className="space-y-4">
-            <SectionLabel>{t("dash.buyer.section.trades")}</SectionLabel>
-            <ActiveTradesTable rows={data?.activeTrades} loading={isLoading} />
-          </div>
-
-          <div className="space-y-4">
-            <SectionLabel>{t("s43.dashboard.section.sourcing", "Sourcing (optional)")}</SectionLabel>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              <LiveAuctionsWidget rows={data?.liveAuctions} loading={isLoading} />
-              <MyShipmentsWidget />
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <SectionLabel>{t("dash.buyer.section.monitoring")}</SectionLabel>
-            <MyExceptionsWidget />
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-              <DocumentStatusWidget rows={data?.documents} loading={isLoading} />
-              <CommunicationCenter rows={data?.communications} loading={isLoading} />
-              <UpcomingEventsWidget events={data?.upcomingEvents} loading={isLoading} />
-            </div>
           </div>
         </>
       ) : (

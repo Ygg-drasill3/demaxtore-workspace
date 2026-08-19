@@ -126,6 +126,7 @@ const LandedCostDetailPage = lazy(() => import("@/features/landed-cost/pages/Lan
 const StartImportPage = lazy(() => import("@/features/import-ops/pages/StartImportPage"));
 const FreightQuoteRequestPage = lazy(() => import("@/features/import-ops/pages/FreightQuoteRequestPage"));
 const ActiveImportsPage = lazy(() => import("@/features/import-ops/pages/ActiveImportsPage"));
+const ImportWorkspacePage = lazy(() => import("@/features/import-ops/pages/ImportWorkspacePage"));
 const PasswordlessConversationPage = lazy(() =>
   import("@/features/passwordless-access/pages/PasswordlessConversationPage"),
 );
@@ -235,6 +236,7 @@ export function AppRoutes() {
             <Route path="/buyer/dashboard"          element={<LazyPage><BuyerDashboardPage /></LazyPage>} />
             <Route path="/buyer/imports"            element={<LazyPage><ActiveImportsPage /></LazyPage>} />
             <Route path="/buyer/imports/new"        element={<LazyPage><StartImportPage /></LazyPage>} />
+            <Route path="/buyer/imports/:id"        element={<LazyPage><ImportWorkspacePage /></LazyPage>} />
             <Route path="/buyer/freightiq/request"  element={<LazyPage><FreightQuoteRequestPage /></LazyPage>} />
             <Route path="/buyer/control-tower"       element={<LazyPage><ControlTowerDashboardPage /></LazyPage>} />
             <Route path="/buyer/rfq"                element={<LazyPage><RfqListPage /></LazyPage>} />

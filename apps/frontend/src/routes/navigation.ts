@@ -37,74 +37,47 @@ function flat(groups: NavGroup[]): NavItem[] {
 
 // ─── Buyer — Import Operations first (Sprint 43 Turkey GTM) ─────────────────
 
+// Turkey Master Spec v1.0 §Navigation — aggressively simplified customer IA:
+// HOME / OPERATIONS / CONTROL (3 groups, 10 items). Sourcing (RFQ / CommodityBid /
+// CB Workspaces / Mixed & Bulk Container), Orders, Products, Purchase Orders,
+// Exceptions and Learning are intentionally NOT permanent sidebar items — they are
+// reached contextually (Start Import, Import Workspace, Dashboard attention). Backend
+// modules are preserved (hide ≠ delete) and remain available to International Buyer
+// and to any future Turkey sourcing entitlement.
 export const BUYER_NAV_GROUPS: NavGroup[] = [
   {
     id: "home", label: "Home", testId: "nav-group-home",
     items: [
       { to: "/buyer/dashboard", label: "Dashboard", icon: LayoutDashboard, testId: "buyer-dashboard", end: true },
-      { to: "/messages", label: "Workspace Inbox", icon: Inbox, testId: "buyer-inbox" },
+      { to: "/buyer/imports", label: "My Imports", icon: PackageSearch, testId: "buyer-imports" },
+      { to: "/messages", label: "Inbox", icon: Inbox, testId: "buyer-inbox" },
     ],
   },
   {
-    id: "import-ops", label: "Import Operations", testId: "nav-group-import-ops",
+    id: "operations", label: "Operations", testId: "nav-group-operations",
     items: [
-      { to: "/buyer/imports", label: "My Imports", icon: PackageSearch, testId: "buyer-imports" },
       { to: "/buyer/freightiq", label: "Freight", icon: Route, testId: "buyer-freightiq" },
       { to: "/buyer/shipments", label: "Shipments", icon: Ship, testId: "buyer-shipments" },
       { to: "/buyer/customs", label: "Customs", icon: ShieldCheck, testId: "buyer-customs" },
       { to: "/buyer/inland", label: "Deliveries", icon: Truck, testId: "buyer-inland" },
+    ],
+  },
+  {
+    id: "control", label: "Control", testId: "nav-group-control",
+    items: [
+      { to: "/buyer/control-tower", label: "Control Tower", icon: Radar, testId: "buyer-control-tower" },
+      { to: "/documents", label: "Documents", icon: FileCheck, testId: "buyer-documents" },
       { to: "/buyer/landed-cost", label: "Landed Cost", icon: Receipt, testId: "buyer-landed-cost" },
-      { to: "/buyer/purchase-orders", label: "Purchase Orders", icon: ClipboardList, testId: "buyer-purchase-orders" },
-      { to: "/buyer/products", label: "Products", icon: Boxes, testId: "buyer-products" },
-      { to: "/buyer/control-tower", label: "Import Control Tower", icon: Radar, testId: "buyer-control-tower" },
-      { to: "/exceptions", label: "Exceptions", icon: AlertTriangle, testId: "buyer-exceptions" },
-    ],
-  },
-  {
-    id: "sourcing", label: "Sourcing", testId: "nav-group-sourcing",
-    items: [
-      { to: "/buyer/rfq",          label: "RFQs",           icon: FileText, testId: "buyer-rfq" },
-      { to: "/buyer/commoditybid", label: "Commodity Bids", icon: Workflow, testId: "buyer-commoditybid" },
-      { to: "/buyer/commoditybid/list", label: "CB Workspaces", icon: Gavel, testId: "buyer-commoditybid-list" },
-      { to: "/buyer/mixed-container", label: "Mixed Container", icon: Container, testId: "buyer-mixed-container" },
-      { to: "/buyer/bulk-container", label: "Bulk Container", icon: Scale, testId: "buyer-bulk-container" },
-    ],
-  },
-  {
-    id: "execution-legacy", label: "Orders", testId: "nav-group-execution-legacy",
-    items: [
-      { to: "/buyer/orders", label: "Orders", icon: Package, testId: "buyer-orders" },
-    ],
-  },
-  {
-    id: "collaboration", label: "Collaboration", testId: "nav-group-collaboration",
-    items: [
-      { to: "/messages",  label: "Messages",      icon: MessageSquare, testId: "buyer-messages" },
-      { to: "/notifications",   label: "Notifications", icon: Bell,          testId: "buyer-notifications" },
-    ],
-  },
-  {
-    id: "documents", label: "Documents", testId: "nav-group-documents",
-    items: [
-      { to: "/documents",            label: "Documents",       icon: FileCheck, testId: "buyer-documents" },
-      { to: "/buyer/trade-documents", label: "Compliance",      icon: FileCheck, testId: "buyer-trade-documents" },
-    ],
-  },
-  {
-    id: "knowledge", label: "Knowledge", testId: "nav-group-knowledge",
-    items: [
-      { to: "/learning", label: "Learning Center", icon: GraduationCap, testId: "buyer-learning" },
     ],
   },
 ];
 
 export const BUYER_QUICK_ACTIONS: QuickAction[] = [
-  { label: "Get Freight Quote", to: "/buyer/freightiq/request", testId: "qa-freight-quote", icon: Route },
-  { label: "Start Import",      to: "/buyer/imports/new",       testId: "qa-start-import",  icon: Plus },
-  { label: "My Shipments",      to: "/buyer/shipments",         testId: "qa-view-shipments", icon: Ship },
-  { label: "Customs",           to: "/buyer/customs",           testId: "qa-customs",         icon: ShieldCheck },
-  { label: "Landed Cost",       to: "/buyer/landed-cost",       testId: "qa-landed-cost",     icon: Receipt },
-  { label: "New RFQ",           to: "/buyer/rfq/new",           testId: "qa-new-rfq",         icon: FileText },
+  { label: "Start Import",      to: "/buyer/imports/new",       testId: "qa-start-import",   icon: Plus },
+  { label: "Get Freight Quote", to: "/buyer/freightiq/request", testId: "qa-freight-quote",  icon: Route },
+  { label: "My Imports",        to: "/buyer/imports",           testId: "qa-view-imports",   icon: PackageSearch },
+  { label: "Customs",           to: "/buyer/customs",           testId: "qa-customs",        icon: ShieldCheck },
+  { label: "Landed Cost",       to: "/buyer/landed-cost",       testId: "qa-landed-cost",    icon: Receipt },
 ];
 
 /** Pre-Sprint-43 International Buyer navigation — sourcing-first. */

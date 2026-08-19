@@ -37,7 +37,7 @@ export function ActiveImportsWidget() {
             {items.map((s) => (
               <li key={s.shipmentId}>
                 <Link
-                  to={`/workspace/shipment/${s.shipmentId}`}
+                  to={`/buyer/imports/${s.shipmentId}`}
                   className="block rounded-lg border border-paper-100 px-3 py-2.5 hover:border-paper-200 hover:bg-paper-50/80"
                   data-testid={`active-imports-widget-${s.shipmentId}`}
                 >

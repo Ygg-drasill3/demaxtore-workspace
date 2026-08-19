@@ -3,11 +3,18 @@ import { cn } from "@/lib/utils";
 import { useT } from "@/i18n/useT";
 import type { RequiredAction } from "../../lib/buyer-command-center";
 
+// Severity presentation derived from the real backend action priority. We only
+// render fields the backend actually provides (spec §8 "where supported by real
+// data") — no invented owner or automation.
 const PRIORITY_STYLES = {
   high: "bg-red-50 text-red-800 border-red-200",
   medium: "bg-amber-50 text-amber-900 border-amber-200",
   low: "bg-zinc-50 text-zinc-700 border-zinc-200",
 };
+
+function humanizeKind(kind: string): string {
+  return kind.replace(/[._-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 export function ActionInbox({ actions, loading }: { actions?: RequiredAction[]; loading?: boolean }) {
   const { t } = useT();
@@ -16,47 +23,52 @@ export function ActionInbox({ actions, loading }: { actions?: RequiredAction[]; 
     <section id="cc-action-inbox" data-testid="cc-action-inbox" data-guide="dashboard-pending-actions" className="dmx-card p-5">
       <div className="flex items-center justify-between gap-2 mb-4">
         <div>
-          <span className="dmx-eyebrow text-zinc-500">{t("dash.eyebrow.priority")}</span>
-          <h2 className="font-display text-xl font-semibold mt-0.5">{t("dash.actionInbox.title")}</h2>
+          <span className="dmx-eyebrow text-zinc-500">{t("dash.eyebrow.priority", "Attention required")}</span>
+          <h2 className="font-display text-xl font-semibold mt-0.5">{t("dash.actionInbox.title", "What needs your attention today")}</h2>
         </div>
         {!loading && actions && (
           <span data-testid="cc-action-count" className="text-sm font-medium text-zinc-600">
-            {actions.length} {actions.length !== 1 ? t("dash.common.items") : t("dash.common.item")}
+            {actions.length} {actions.length !== 1 ? t("dash.common.items", "items") : t("dash.common.item", "item")}
           </span>
         )}
       </div>
       {loading ? (
-        <p className="text-sm text-zinc-500">{t("dash.common.loadingActions")}</p>
+        <p className="text-sm text-zinc-500">{t("dash.common.loadingActions", "Loading…")}</p>
       ) : !actions?.length ? (
         <p data-testid="cc-action-empty" className="text-sm text-zinc-500">
-          {t("dash.actionInbox.empty")}
+          {t("dash.actionInbox.empty", "Nothing needs your attention right now.")}
         </p>
       ) : (
-        <ul className="space-y-2">
+        <ul className="space-y-2.5">
           {actions.map((a) => (
             <li
               key={a.id}
               data-testid={`cc-action-${a.kind}`}
-              className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 p-3 rounded-lg border border-zinc-100 hover:bg-zinc-50/80"
+              className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-3.5 rounded-xl border border-zinc-100 hover:bg-zinc-50/80 transition-colors"
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded border ${PRIORITY_STYLES[a.priority]}`}>
-                    {t(`priority.${a.priority}`)}
+                    {t(`priority.${a.priority}`, a.priority)}
                   </span>
-                  <span className="text-sm font-medium text-ink-900">{a.title}</span>
+                  <span className="text-[10px] uppercase tracking-wide text-zinc-400 border border-zinc-200 rounded px-1.5 py-0.5">
+                    {humanizeKind(a.kind)}
+                  </span>
+                  <span className="text-sm font-medium text-ink-900 truncate">{a.title}</span>
                 </div>
-                <p className={cn(
-                  "text-xs mt-1",
-                  a.priority === "high" ? "text-red-600 font-medium" : "text-zinc-500",
-                )}>
-                  {a.priority === "high" ? t("dash.common.urgent") : ""}{a.dueLabel}
-                </p>
+                {a.dueLabel && (
+                  <p className={cn(
+                    "text-xs mt-1.5",
+                    a.priority === "high" ? "text-red-600 font-medium" : "text-zinc-500",
+                  )}>
+                    {a.priority === "high" ? `${t("dash.common.urgent", "Urgent · ")} ` : ""}{a.dueLabel}
+                  </p>
+                )}
               </div>
               <Link
                 to={a.workspaceUrl}
                 data-testid={`cc-action-btn-${a.id}`}
-                className="dmx-btn-primary text-sm shrink-0 self-start sm:self-center"
+                className="dmx-btn-primary text-sm shrink-0 self-start sm:self-center whitespace-nowrap"
               >
                 {a.actionLabel}
               </Link>

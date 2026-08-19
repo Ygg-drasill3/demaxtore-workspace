@@ -33,10 +33,13 @@ export function ImportExecutionKpiRow({
   kpis,
   timelineKpis,
   loading,
+  max,
 }: {
   kpis?: ImportExecutionKpis;
   timelineKpis?: TradeTimelineKpiDto;
   loading?: boolean;
+  /** Turkey command center shows the 5 primary KPIs (spec §7). */
+  max?: number;
 }) {
   const { t } = useT();
 
@@ -49,13 +52,15 @@ export function ImportExecutionKpiRow({
     return typeof v === "number" ? v : null;
   };
 
+  const visibleKpis = typeof max === "number" ? KPIS.slice(0, max) : KPIS;
+
   return (
     <section
       data-testid="cc-import-kpi-row"
       data-guide="dashboard-import-kpis"
-      className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3"
+      className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3"
     >
-      {KPIS.map(({ key, labelKey, fallback, to, icon: Icon, testId, tone }) => {
+      {visibleKpis.map(({ key, labelKey, fallback, to, icon: Icon, testId, tone }) => {
         const raw = resolveValue(key);
         const display = loading || raw === null ? "—" : raw;
         const hasValue = !loading && raw !== null && raw > 0;
