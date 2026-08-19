@@ -89,6 +89,7 @@ export async function launchCommodityBidCreateEmbedTour(
     let settled = false;
     let started = false;
     embedTourActive = true;
+    // eslint-disable-next-line prefer-const
     let kickTimer: number | undefined;
 
     const finish = (ok: boolean) => {
