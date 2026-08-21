@@ -268,7 +268,11 @@ export default function RfqWorkspacePage() {
 
   const isSupplier = user.role === "SUPPLIER";
   const isPureWaitingState = !!waitingScriptFor(state, actor.role);
-  const youAre = isOwner ? "Owner" : isCounterparty ? "Counterparty" : "Observer";
+  const youAre = isOwner
+    ? (isSupplier ? "You’re quoting" : "You’re buying")
+    : isCounterparty
+      ? (isSupplier ? "You’re quoting" : "You’re invited")
+      : null;
 
   return (
     <div data-testid="rfq-workspace" className="space-y-5 max-w-[1400px] mx-auto animate-fade-in pb-12">
@@ -278,8 +282,12 @@ export default function RfqWorkspacePage() {
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-zinc-500">
               <span>{rfq.externalRef ?? rfq.id.slice(0, 8)}</span>
-              <span className="text-zinc-300">·</span>
-              <Badge tone="neutral" data-testid="you-are-pill">You are: {youAre}</Badge>
+              {youAre && (
+                <>
+                  <span className="text-zinc-300">·</span>
+                  <Badge tone="neutral" data-testid="you-are-pill">{youAre}</Badge>
+                </>
+              )}
             </div>
             <h1 className="font-display text-3xl font-semibold tracking-tight text-ink-900 mt-2">
               {rfq.title}
@@ -356,7 +364,7 @@ export default function RfqWorkspacePage() {
       {user.role === "ADMIN" && (state === "PO_ISSUED" || state === "CLOSED") && id && (
         <section data-testid="rfq-freight-intake-link" className="dmx-card p-4 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <span className="dmx-eyebrow text-zinc-500">FreightIQ</span>
+            <span className="dmx-eyebrow text-zinc-500">Freight</span>
             <p className="text-sm font-medium mt-0.5">{t("freightiq.intake.addOffersFromRfq")}</p>
           </div>
           <Link

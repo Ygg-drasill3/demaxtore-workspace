@@ -13,6 +13,10 @@ import EmbedShellLayout from "@/layouts/EmbedShellLayout";
 import PasswordlessLayout from "@/layouts/PasswordlessLayout";
 import { RequireAuth } from "./guards/RequireAuth";
 import { RequireRole } from "./guards/RequireRole";
+import {
+  RequireTurkeyFreightOrOrderScope,
+  RequireTurkeyImporter,
+} from "./guards/RequireBuyerOperatingModel";
 
 const AdminMixedContainerInboxPage = lazy(() => import("@/features/mixed-container/pages/AdminMixedContainerInboxPage"));
 const AdminMixedContainerProcurementPage = lazy(() => import("@/features/mixed-container/pages/AdminMixedContainerProcurementPage"));
@@ -68,11 +72,6 @@ const CommodityBidEmbedPage = lazy(() => import("@/features/commoditybid/pages/C
 const CommodityBidCreateEmbedPage = lazy(() =>
   import("@/features/commoditybid/pages/CommodityBidEmbedPage").then((m) => ({
     default: m.CommodityBidCreateEmbedPage,
-  })),
-);
-const CommodityBidListEmbedPage = lazy(() =>
-  import("@/features/commoditybid/pages/CommodityBidEmbedPage").then((m) => ({
-    default: m.CommodityBidListEmbedPage,
   })),
 );
 const CommodityBidWorkspacePage = lazy(() => import("@/features/commoditybid/pages/CommodityBidWorkspacePage"));
@@ -178,8 +177,9 @@ export function AppRoutes() {
         {/* Tam ekran harici panel embed (FreightIQ dashboard) */}
         <Route element={<EmbedShellLayout />}>
           <Route element={<RequireRole allow={["BUYER"]} />}>
-            <Route path="/buyer/freightiq" element={<LazyPage><FreightIqEmbedPage /></LazyPage>} />
-            <Route path="/buyer/commoditybid" element={<LazyPage><CommodityBidListEmbedPage /></LazyPage>} />
+            <Route element={<RequireTurkeyFreightOrOrderScope />}>
+              <Route path="/buyer/freightiq" element={<LazyPage><FreightIqEmbedPage /></LazyPage>} />
+            </Route>
             <Route path="/buyer/commoditybid/new" element={<LazyPage><CommodityBidCreateEmbedPage /></LazyPage>} />
           </Route>
           <Route element={<RequireRole allow={["SUPPLIER"]} />}>
@@ -234,14 +234,23 @@ export function AppRoutes() {
           {/* Buyer */}
           <Route element={<RequireRole allow={["BUYER"]} />}>
             <Route path="/buyer/dashboard"          element={<LazyPage><BuyerDashboardPage /></LazyPage>} />
-            <Route path="/buyer/imports"            element={<LazyPage><ActiveImportsPage /></LazyPage>} />
-            <Route path="/buyer/imports/new"        element={<LazyPage><StartImportPage /></LazyPage>} />
-            <Route path="/buyer/imports/:id"        element={<LazyPage><ImportWorkspacePage /></LazyPage>} />
-            <Route path="/buyer/freightiq/request"  element={<LazyPage><FreightQuoteRequestPage /></LazyPage>} />
+            <Route element={<RequireTurkeyImporter />}>
+              <Route path="/buyer/imports"            element={<LazyPage><ActiveImportsPage /></LazyPage>} />
+              <Route path="/buyer/imports/new"        element={<LazyPage><StartImportPage /></LazyPage>} />
+              <Route path="/buyer/imports/:id"        element={<LazyPage><ImportWorkspacePage /></LazyPage>} />
+              <Route path="/buyer/freightiq/request"  element={<LazyPage><FreightQuoteRequestPage /></LazyPage>} />
+              <Route path="/buyer/customs" element={<LazyPage><CustomsListPage /></LazyPage>} />
+              <Route path="/buyer/customs/:id" element={<LazyPage><CustomsCasePage /></LazyPage>} />
+              <Route path="/buyer/inland" element={<LazyPage><InlandListPage /></LazyPage>} />
+              <Route path="/buyer/inland/:id" element={<LazyPage><InlandDeliveryPage /></LazyPage>} />
+              <Route path="/buyer/landed-cost" element={<LazyPage><LandedCostListPage /></LazyPage>} />
+              <Route path="/buyer/landed-cost/:id" element={<LazyPage><LandedCostDetailPage /></LazyPage>} />
+            </Route>
             <Route path="/buyer/control-tower"       element={<LazyPage><ControlTowerDashboardPage /></LazyPage>} />
             <Route path="/buyer/rfq"                element={<LazyPage><RfqListPage /></LazyPage>} />
             <Route path="/buyer/rfq/new"            element={<LazyPage><RfqCreatePage /></LazyPage>} />
-            <Route path="/buyer/commoditybid/list"  element={<LazyPage><CommodityBidListPage /></LazyPage>} />
+            <Route path="/buyer/commoditybid"       element={<LazyPage><CommodityBidListPage /></LazyPage>} />
+            <Route path="/buyer/commoditybid/list"  element={<Navigate to="/buyer/commoditybid" replace />} />
             <Route path="/buyer/commoditybid/panel" element={<LazyPage><CommodityBidEmbedPage /></LazyPage>} />
             <Route path="/buyer/orders"             element={<LazyPage><OrdersListPage /></LazyPage>} />
             <Route path="/buyer/purchase-orders"    element={<LazyPage><PoListPage /></LazyPage>} />
@@ -271,12 +280,6 @@ export function AppRoutes() {
             <Route path="/buyer/bulk-container/offers/:id" element={<LazyPage><BulkContainerOfferPage /></LazyPage>} />
             <Route path="/buyer/bulk-container/coordination/:id" element={<LazyPage><BulkContainerCoordinationPage /></LazyPage>} />
             <Route path="/buyer/bulk-container/execution/:id" element={<LazyPage><BulkContainerExecutionPage /></LazyPage>} />
-            <Route path="/buyer/customs" element={<LazyPage><CustomsListPage /></LazyPage>} />
-            <Route path="/buyer/customs/:id" element={<LazyPage><CustomsCasePage /></LazyPage>} />
-            <Route path="/buyer/inland" element={<LazyPage><InlandListPage /></LazyPage>} />
-            <Route path="/buyer/inland/:id" element={<LazyPage><InlandDeliveryPage /></LazyPage>} />
-            <Route path="/buyer/landed-cost" element={<LazyPage><LandedCostListPage /></LazyPage>} />
-            <Route path="/buyer/landed-cost/:id" element={<LazyPage><LandedCostDetailPage /></LazyPage>} />
           </Route>
 
           {/* Supplier */}

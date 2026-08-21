@@ -30,7 +30,7 @@ export default function BulkContainerExecutionPage() {
       <header>
         <Link to="/buyer/bulk-container/requests" className="text-xs text-zinc-500 hover:underline">← My Bulk Requests</Link>
         <h1 className="font-display text-4xl font-semibold tracking-tight mt-1">
-          BulkContainer Order · {data.masterOrderRef ?? data.containerExternalRef}
+          Bulk load · {data.masterOrderRef ?? data.containerExternalRef}
         </h1>
         <p className="text-sm text-zinc-500 mt-1">
           Status: {BC_STATE_LABELS[data.state as keyof typeof BC_STATE_LABELS] ?? data.state} · One master order across {data.supplierOrderCount} allocation{data.supplierOrderCount === 1 ? "" : "s"}.
@@ -50,7 +50,7 @@ export default function BulkContainerExecutionPage() {
       {data.state === "BC_EXECUTION_COMPLETE" && (
         <div data-testid="bc-execution-complete-banner" className="dmx-card p-5 bg-green-50 border-green-200">
           <h2 className="font-medium text-green-900">Execution Complete</h2>
-          <p className="text-sm text-green-800 mt-1">All linked shipments have been delivered. Your BulkContainer transaction is complete.</p>
+          <p className="text-sm text-green-800 mt-1">All linked shipments have been delivered. This bulk load is complete.</p>
         </div>
       )}
 
@@ -79,7 +79,7 @@ export default function BulkContainerExecutionPage() {
                 <th className="text-left pb-2">Allocation</th>
                 <th className="text-left pb-2">Product</th>
                 <th className="text-left pb-2">Order</th>
-                <th className="text-left pb-2">FreightIQ</th>
+                <th className="text-left pb-2">Freight</th>
                 <th className="text-left pb-2">Shipment</th>
                 <th className="text-left pb-2">Docs</th>
               </tr>
@@ -98,7 +98,7 @@ export default function BulkContainerExecutionPage() {
             </tbody>
           </table>
         )}
-        <p className="text-[10px] text-zinc-400 mt-3">Supplier identities are not disclosed. Execution uses standard Order, FreightIQ, and Shipment workflows.</p>
+        <p className="text-[10px] text-zinc-400 mt-3">Supplier identities are not disclosed. Execution uses standard order, freight, and shipment steps.</p>
       </section>
 
       {data.documents.length > 0 && (

@@ -97,7 +97,7 @@ export function TaskDrawer({
                 <Link className="text-sm underline" to={`/workspace/shipment/${task.relatedEntityId}`}>Open Shipment</Link>
               )}
               {task.relatedEntityType === "INSPECTION" && task.relatedEntityId && (
-                <Link className="text-sm underline" to={`/workspace/inspection/${task.relatedEntityId}`}>Open Inspection</Link>
+                <span className="text-sm text-zinc-600">Inspection linked · open the order for status</span>
               )}
             </div>
 

@@ -1,11 +1,15 @@
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { isTurkeyImporterOperatingModel } from "@dmx/contracts/buyer-operating-model";
+import { useAuth } from "@/store/auth.store";
 import { landedCostApi } from "../lib/landed-cost.api";
 import { toast } from "@/store/toast.store";
 
 /** Compact Shipment Workspace landed cost panel. */
 export function LandedCostPanel({ shipmentWorkspaceId }: { shipmentWorkspaceId: string }) {
   const qc = useQueryClient();
+  const user = useAuth((s) => s.user);
+  const turkey = isTurkeyImporterOperatingModel(user?.buyerOperatingModel);
   const { data, isLoading } = useQuery({
     queryKey: ["landed-cost", "shipment", shipmentWorkspaceId],
     queryFn: () => landedCostApi.byShipment(shipmentWorkspaceId),
@@ -34,7 +38,7 @@ export function LandedCostPanel({ shipmentWorkspaceId }: { shipmentWorkspaceId: 
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-wide text-zinc-500">True Landed Cost</p>
+          <p className="text-xs uppercase tracking-wide text-zinc-500">Landed cost</p>
           <h2 className="text-lg font-semibold text-zinc-900">
             {data?.displayLabel ?? "Landed cost"}
           </h2>
@@ -50,13 +54,13 @@ export function LandedCostPanel({ shipmentWorkspaceId }: { shipmentWorkspaceId: 
           >
             {data ? "Recalculate" : "Calculate"}
           </button>
-          {data && (
+          {data && turkey && (
             <Link
               to={`/buyer/landed-cost/${data.id}`}
               className="rounded-lg border px-3 py-1.5 text-sm"
               data-testid="view-landed-cost"
             >
-              View Breakdown
+              View breakdown
             </Link>
           )}
         </div>

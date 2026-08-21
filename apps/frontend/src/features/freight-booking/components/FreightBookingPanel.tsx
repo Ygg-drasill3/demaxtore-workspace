@@ -37,7 +37,7 @@ export function FreightBookingPanel({
   if (isLoading) {
     return (
       <div data-testid="freight-booking-panel-loading" className="dmx-card p-5 animate-pulse text-sm text-zinc-500">
-        Loading FreightIQ booking…
+        Loading freight booking…
       </div>
     );
   }
@@ -54,7 +54,7 @@ export function FreightBookingPanel({
     return (
       <section data-testid="freight-booking-panel" className="dmx-card overflow-hidden">
         <div className="px-5 py-4 border-b border-zinc-100 flex items-center justify-between">
-          <h3 className="font-semibold text-ink-900">FreightIQ Booking</h3>
+          <h3 className="font-semibold text-ink-900">Freight booking</h3>
           {"bookingStatus" in (data ?? {}) && (
             <BookingStatusBadge status={(data as { bookingStatus?: string }).bookingStatus} />
           )}
@@ -72,7 +72,7 @@ export function FreightBookingPanel({
   return (
     <section data-testid="freight-booking-panel" className="dmx-card overflow-hidden">
       <div className="px-5 py-4 border-b border-zinc-100 flex items-center justify-between gap-2">
-        <h3 className="font-semibold text-ink-900">FreightIQ Booking Engine</h3>
+        <h3 className="font-semibold text-ink-900">Freight booking</h3>
         <BookingStatusBadge status={panel.booking?.status} />
       </div>
       <div className="p-5 space-y-5">

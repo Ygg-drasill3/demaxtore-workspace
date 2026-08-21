@@ -47,7 +47,7 @@ function displayTitle(title: string) {
 }
 
 function cleanBullet(raw: string, preserveDetail = false) {
-  const text = raw.replace(/^-\s*/, "").trim();
+  let text = raw.replace(/^-\s*/, "").trim();
   if (preserveDetail) return text.replace(/\s+/g, " ");
   return text
     .replace(/\s*\(product_id:\s*[^)]+\)/i, "")

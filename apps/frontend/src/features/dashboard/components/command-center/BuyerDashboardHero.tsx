@@ -67,21 +67,21 @@ function InternationalBuyerHero({ firstName, mode, kpis, loading }: Omit<Props, 
             <div className="mt-5 flex flex-wrap gap-2">
               <StatusPill
                 icon={AlertCircle}
-                label={t("dash.buyer.pill.actions")}
+                label={t(pendingActions === 1 ? "dash.buyer.pill.action" : "dash.buyer.pill.actions")}
                 value={loading ? "—" : pendingActions}
                 highlight={!loading && pendingActions > 0}
                 testId="hero-pill-actions"
               />
               <StatusPill
                 icon={Gavel}
-                label={t("dash.buyer.pill.auctions")}
+                label={t(liveAuctions === 1 ? "dash.buyer.pill.auction" : "dash.buyer.pill.auctions")}
                 value={loading ? "—" : liveAuctions}
                 highlight={!loading && liveAuctions > 0}
                 testId="hero-pill-auctions"
               />
               <StatusPill
                 icon={MessageSquare}
-                label={t("dash.buyer.pill.messages")}
+                label={t(unreadMessages === 1 ? "dash.buyer.pill.message" : "dash.buyer.pill.messages")}
                 value={loading ? "—" : unreadMessages}
                 highlight={!loading && unreadMessages > 0}
                 testId="hero-pill-messages"
@@ -141,7 +141,7 @@ function TurkeyImporterHero({ firstName, mode, kpis, loading }: Omit<Props, "buy
                 <LayoutDashboard className="h-4 w-4 text-white/90" />
               </span>
               <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/50">
-                {t("s43.hero.eyebrow", "Import Operating System")}
+                {t("s43.hero.eyebrow", "Import operations")}
               </span>
             </div>
 
@@ -169,7 +169,7 @@ function TurkeyImporterHero({ firstName, mode, kpis, loading }: Omit<Props, "buy
               />
               <StatusPill
                 icon={MessageSquare}
-                label={t("dash.buyer.pill.messages")}
+                label={t(unreadMessages === 1 ? "dash.buyer.pill.message" : "dash.buyer.pill.messages")}
                 value={loading ? "—" : unreadMessages}
                 highlight={!loading && unreadMessages > 0}
                 testId="hero-pill-messages"

@@ -24,7 +24,7 @@ export default function CatalogCategoriesPage() {
     <div data-testid="mc-catalog-categories" data-guide="mc-catalog-categories" className="space-y-6">
       <header>
         <Link to="/buyer/mixed-container" className="text-xs text-zinc-500 hover:underline">
-          ← SmartContainer
+          ← Mixed container
         </Link>
         <h1 className="font-display text-3xl font-semibold tracking-tight mt-2">Browse Categories</h1>
         <p className="text-sm text-zinc-500 mt-1">

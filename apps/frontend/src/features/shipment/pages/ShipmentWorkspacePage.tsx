@@ -28,6 +28,7 @@ import { LandedCostPanel } from "@/features/landed-cost/components/LandedCostPan
 import { ShipmentBookingPanel } from "../components/ShipmentBookingPanel";
 import { ShipmentContainersPanel } from "../components/ShipmentContainersPanel";
 import { RelatedLogisticsPanel } from "@/features/trade-lineage/components/RelatedLogisticsPanel";
+import { displayRef } from "@/features/dashboard/lib/display-ref";
 import { ShipmentLineAllocationPanel } from "@/features/trade-lineage/components/ShipmentLineAllocationPanel";
 import {
   WorkspaceActionModal,
@@ -252,9 +253,9 @@ export default function ShipmentWorkspacePage() {
 
       {shipment.spawnedFrom && (
         <p data-testid="shipment-freightiq-handoff" className="text-sm text-zinc-600 dmx-card px-4 py-3">
-          Booked via FreightIQ ·{" "}
+          Booked from freight selection ·{" "}
           <Link className="text-accent-900 hover:underline font-medium" to={`/workspace/order/${shipment.spawnedFrom.id}#order-freightiq-section`}>
-            View freight selection on order {shipment.spawnedFrom.externalRef}
+            View freight details on order {displayRef(shipment.spawnedFrom.externalRef)}
           </Link>
         </p>
       )}

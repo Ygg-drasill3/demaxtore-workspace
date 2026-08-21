@@ -117,7 +117,7 @@ export default function ShipmentPortfolioPage() {
             <div className="text-[11px] uppercase tracking-[0.16em] text-white/50">Shipment Visibility</div>
             <h1 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight mt-1">My Shipments</h1>
             <p className="text-sm text-white/70 mt-2 max-w-2xl">
-              Monitor all active shipments — status, delays, arrivals, and alerts from one portfolio view.
+              Monitor all active shipments — status, delays, arrivals, and alerts in one place.
             </p>
           </div>
         </div>

@@ -22,10 +22,7 @@ export function ActionInbox({ actions, loading }: { actions?: RequiredAction[]; 
   return (
     <section id="cc-action-inbox" data-testid="cc-action-inbox" data-guide="dashboard-pending-actions" className="dmx-card p-5">
       <div className="flex items-center justify-between gap-2 mb-4">
-        <div>
-          <span className="dmx-eyebrow text-zinc-500">{t("dash.eyebrow.priority", "Attention required")}</span>
-          <h2 className="font-display text-xl font-semibold mt-0.5">{t("dash.actionInbox.title", "What needs your attention today")}</h2>
-        </div>
+        <h2 className="font-display text-xl font-semibold">{t("dash.actionInbox.title", "What needs your attention today")}</h2>
         {!loading && actions && (
           <span data-testid="cc-action-count" className="text-sm font-medium text-zinc-600">
             {actions.length} {actions.length !== 1 ? t("dash.common.items", "items") : t("dash.common.item", "item")}

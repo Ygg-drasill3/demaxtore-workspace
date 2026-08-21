@@ -1,5 +1,5 @@
 /**
- * Sprint 33 — FreightIQ Execution summary (derived from canonical entities).
+ * Sprint 33 — Freight execution summary (derived from canonical entities).
  */
 import { Link } from "react-router-dom";
 import type { FreightIqExecutionSummary } from "@dmx/contracts/freightiq-execution";
@@ -41,7 +41,7 @@ export function FreightExecutionPanel({ execution, busy, onProceedToBooking }: P
     <section data-testid="freightiq-execution" className="dmx-card p-5 space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <span className="dmx-eyebrow">FreightIQ Execution</span>
+          <span className="dmx-eyebrow">Freight execution</span>
           <h3 className="font-display text-lg font-semibold mt-0.5" data-testid="freightiq-execution-state">
             {state.replace(/_/g, " ")}
           </h3>

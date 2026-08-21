@@ -2,7 +2,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard, FileText, Package, Bell, Workflow, Mail, Radar, GraduationCap, Route,
-  ClipboardList, Ship, FileCheck, MessageSquare, Plus, Gavel, Inbox, Activity, AlertTriangle, Container, Scale, UserPlus, Users, Phone, Boxes,
+  ClipboardList, Ship, FileCheck, MessageSquare, Plus, Gavel, Inbox, Activity, AlertTriangle, Container, Scale, UserPlus, Users, Phone,
   ShieldCheck, Truck, Receipt, PackageSearch,
 } from "lucide-react";
 import type { Role } from "@dmx/contracts/auth";
@@ -80,7 +80,16 @@ export const BUYER_QUICK_ACTIONS: QuickAction[] = [
   { label: "Landed Cost",       to: "/buyer/landed-cost",       testId: "qa-landed-cost",    icon: Receipt },
 ];
 
-/** Pre-Sprint-43 International Buyer navigation — sourcing-first. */
+// International Buyer navigation — sourcing-first, trimmed to one entry per job
+// to be done. Removed from the permanent sidebar (routes and backend modules are
+// untouched, and each stays reachable from its parent surface):
+//   CB Workspaces  → Commodity Bids list
+//   Products       → Purchase Orders / RFQ line items
+//   Orders         → Purchase Orders
+//   Control Tower  → dashboard "Open Import Control Tower" link
+//   Messages       → duplicate of Inbox (same /messages route)
+//   Notifications  → header bell
+//   Learning Center→ header help menu
 export const BUYER_NAV_GROUPS_INTERNATIONAL: NavGroup[] = [
   {
     id: "home", label: "Home", testId: "nav-group-home",
@@ -94,7 +103,6 @@ export const BUYER_NAV_GROUPS_INTERNATIONAL: NavGroup[] = [
     items: [
       { to: "/buyer/rfq",          label: "RFQs",           icon: FileText, testId: "buyer-rfq" },
       { to: "/buyer/commoditybid", label: "Commodity Bids", icon: Workflow, testId: "buyer-commoditybid" },
-      { to: "/buyer/commoditybid/list", label: "CB Workspaces", icon: Gavel, testId: "buyer-commoditybid-list" },
       { to: "/buyer/mixed-container", label: "Mixed Container", icon: Container, testId: "buyer-mixed-container" },
       { to: "/buyer/bulk-container", label: "Bulk Container", icon: Scale, testId: "buyer-bulk-container" },
     ],
@@ -103,19 +111,8 @@ export const BUYER_NAV_GROUPS_INTERNATIONAL: NavGroup[] = [
     id: "execution", label: "Execution", testId: "nav-group-execution",
     items: [
       { to: "/buyer/purchase-orders", label: "Purchase Orders", icon: ClipboardList, testId: "buyer-purchase-orders" },
-      { to: "/buyer/products", label: "Products", icon: Boxes, testId: "buyer-products" },
-      { to: "/buyer/orders",          label: "Orders",          icon: Package,       testId: "buyer-orders" },
-      { to: "/buyer/freightiq",       label: "Freight",         icon: Route,         testId: "buyer-freightiq" },
-      { to: "/buyer/shipments",      label: "My Shipments",    icon: Ship,          testId: "buyer-shipments" },
-      { to: "/buyer/control-tower",  label: "Import Control Tower", icon: Radar,    testId: "buyer-control-tower" },
+      { to: "/buyer/shipments",      label: "Shipments",       icon: Ship,          testId: "buyer-shipments" },
       { to: "/exceptions",           label: "Exceptions",      icon: AlertTriangle, testId: "buyer-exceptions" },
-    ],
-  },
-  {
-    id: "collaboration", label: "Collaboration", testId: "nav-group-collaboration",
-    items: [
-      { to: "/messages",  label: "Messages",      icon: MessageSquare, testId: "buyer-messages" },
-      { to: "/notifications",   label: "Notifications", icon: Bell,          testId: "buyer-notifications" },
     ],
   },
   {
@@ -123,12 +120,6 @@ export const BUYER_NAV_GROUPS_INTERNATIONAL: NavGroup[] = [
     items: [
       { to: "/documents",            label: "Documents",       icon: FileCheck, testId: "buyer-documents" },
       { to: "/buyer/trade-documents", label: "Compliance",      icon: FileCheck, testId: "buyer-trade-documents" },
-    ],
-  },
-  {
-    id: "knowledge", label: "Knowledge", testId: "nav-group-knowledge",
-    items: [
-      { to: "/learning", label: "Learning Center", icon: GraduationCap, testId: "buyer-learning" },
     ],
   },
 ];

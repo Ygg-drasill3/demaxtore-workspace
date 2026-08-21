@@ -131,7 +131,7 @@ describe("<WhatHappensNextCard />", () => {
         vars={{ orderId: "ord-123" }}
       />,
     );
-    expect(screen.getByTestId("whn-fallback-cta")).toHaveTextContent(/open order workspace/i);
+    expect(screen.getByTestId("whn-fallback-cta")).toHaveTextContent(/open order/i);
   });
 
   it("shows open order alongside Issue PO when orderId is present @ PARTIALLY_AWARDED", () => {
@@ -143,6 +143,6 @@ describe("<WhatHappensNextCard />", () => {
       />,
     );
     expect(screen.getByTestId("whn-primary-cta-issue_supplier_po")).toHaveTextContent(/issue po/i);
-    expect(screen.getByTestId("whn-fallback-cta")).toHaveTextContent(/open order workspace/i);
+    expect(screen.getByTestId("whn-fallback-cta")).toHaveTextContent(/open order/i);
   });
 });

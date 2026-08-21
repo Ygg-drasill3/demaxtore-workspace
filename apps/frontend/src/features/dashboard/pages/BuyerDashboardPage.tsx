@@ -2,12 +2,13 @@
 // Turkey Importer branch = simplified customer command center (spec §7):
 // 5-KPI strip + Attention Required + Active Imports. International branch unchanged.
 import { Link } from "react-router-dom";
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { useAuth } from "@/store/auth.store";
 import { useT } from "@/i18n/useT";
 import { isTurkeyImporterOperatingModel } from "@dmx/contracts/buyer-operating-model";
 import { useBuyerCommandCenter } from "../hooks/useBuyerCommandCenter";
 import { useBuyerDashboardQuick } from "../hooks/useBuyerDashboardQuick";
+import { useDashboardShipments } from "../hooks/useDashboardShipments";
 import { BuyerDashboardHero } from "../components/command-center/BuyerDashboardHero";
 import { ImportExecutionKpiRow } from "../components/command-center/ImportExecutionKpiRow";
 import { ActiveImportsWidget } from "../components/command-center/ActiveImportsWidget";
@@ -27,7 +28,7 @@ import { TradePipelineSnippet } from "../components/command-center/TradePipeline
 
 function SectionLabel({ children }: { children: ReactNode }) {
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex flex-1 items-center gap-3">
       <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400">{children}</h2>
       <span className="h-px flex-1 bg-gradient-to-r from-paper-200 to-transparent" />
     </div>
@@ -40,8 +41,23 @@ export default function BuyerDashboardPage() {
   const turkey = isTurkeyImporterOperatingModel(user?.buyerOperatingModel);
   const { data, isLoading, isError, refetch } = useBuyerCommandCenter();
   const { data: quick, isLoading: quickLoading } = useBuyerDashboardQuick();
+  const shipments = useDashboardShipments();
   const firstName = user?.displayName?.split(" ")[0] ?? "Buyer";
-  const kpis = quick?.kpis ?? data?.kpis;
+
+  // The quick fetch cannot compute shipments / messages / actions and reports 0
+  // for them. Take those three from the sources that actually own the data so a
+  // counter can never contradict the list rendered underneath it.
+  const kpis = useMemo(() => {
+    const base = quick?.kpis ?? data?.kpis;
+    if (!base) return undefined;
+    return {
+      ...base,
+      shipmentsInTransit: shipments.inTransitCount,
+      unreadMessages: data?.kpis?.unreadMessages ?? base.unreadMessages,
+      pendingActions: data?.requiredActions?.length ?? base.pendingActions,
+    };
+  }, [quick?.kpis, data?.kpis, data?.requiredActions, shipments.inTransitCount]);
+
   const timelineKpis = quick?.timelineKpis ?? data?.timelineKpis;
   const mode = quick?.mode ?? data?.mode ?? "standard";
   const kpiLoading = quickLoading && !quick;
@@ -73,32 +89,34 @@ export default function BuyerDashboardPage() {
           {/* Command center — 5 primary import KPIs (spec §7). */}
           <div className="space-y-4">
             <SectionLabel>{t("s43.dashboard.section.importOps", "Import operations")}</SectionLabel>
-            <ImportExecutionKpiRow kpis={kpis} timelineKpis={timelineKpis} loading={kpiLoading} max={5} />
+            <ImportExecutionKpiRow
+              kpis={kpis}
+              timelineKpis={timelineKpis}
+              activeImports={shipments.isLoading ? undefined : shipments.active.length}
+              loading={kpiLoading}
+              max={5}
+            />
           </div>
 
           {/* Attention required — prioritized real actions. */}
-          <div className="space-y-4">
-            <SectionLabel>{t("dash.buyer.section.priority", "Attention required")}</SectionLabel>
-            <ActionInbox actions={data?.requiredActions} loading={isLoading} />
-          </div>
+          <ActionInbox actions={data?.requiredActions} loading={isLoading} />
 
           {/* Active imports — open the Import Workspace directly. */}
-          <div className="space-y-4">
-            <SectionLabel>{t("s43.dashboard.section.activeImports", "Active imports")}</SectionLabel>
-            <ActiveImportsWidget />
-          </div>
+          <ActiveImportsWidget />
         </>
       ) : (
         <>
           <div className="space-y-4">
-            <SectionLabel>{t("dash.buyer.section.overview")}</SectionLabel>
-            <Link
-              to="/buyer/control-tower"
-              data-testid="buyer-control-tower-link"
-              className="inline-flex items-center gap-2 text-sm font-medium text-accent-900 hover:underline mb-2"
-            >
-              Open Import Control Tower →
-            </Link>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <SectionLabel>{t("dash.buyer.section.overview")}</SectionLabel>
+              <Link
+                to="/buyer/control-tower"
+                data-testid="buyer-control-tower-link"
+                className="shrink-0 text-sm font-medium text-accent-900 hover:underline"
+              >
+                {t("dash.buyer.openControlTower", "Open Control Tower →")}
+              </Link>
+            </div>
             <KpiRow kpis={kpis} loading={kpiLoading} />
             <TimelineKpiRow kpis={timelineKpis} loading={kpiLoading} />
             <BookingKpiRow kpis={kpis} loading={kpiLoading} />
@@ -106,15 +124,9 @@ export default function BuyerDashboardPage() {
 
           <TradePipelineSnippet topTrade={data?.activeTrades?.[0]} />
 
-          <div className="space-y-4">
-            <SectionLabel>{t("dash.buyer.section.priority")}</SectionLabel>
-            <ActionInbox actions={data?.requiredActions} loading={isLoading} />
-          </div>
+          <ActionInbox actions={data?.requiredActions} loading={isLoading} />
 
-          <div className="space-y-4">
-            <SectionLabel>{t("dash.buyer.section.trades")}</SectionLabel>
-            <ActiveTradesTable rows={data?.activeTrades} loading={isLoading} />
-          </div>
+          <ActiveTradesTable rows={data?.activeTrades} loading={isLoading} />
 
           <div className="space-y-4">
             <SectionLabel>{t("dash.buyer.section.operations")}</SectionLabel>

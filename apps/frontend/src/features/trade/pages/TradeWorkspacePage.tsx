@@ -157,7 +157,7 @@ export default function TradeWorkspacePage() {
         </Panel>
       )}
 
-      <Panel title="FreightIQ Estimate" testId="trade-freight-estimate-panel">
+      <Panel title="Freight estimate" testId="trade-freight-estimate-panel">
         {data.freightEstimate.current ? (
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-2">
@@ -200,7 +200,7 @@ export default function TradeWorkspacePage() {
         )}
       </Panel>
 
-      <Panel title="FreightIQ Booking Engine" testId="trade-freight-booking-panel">
+      <Panel title="Freight booking" testId="trade-freight-booking-panel">
         {data.freightBooking.forecast || data.freightBooking.bookingStatus ? (
           <div className="space-y-4">
             {data.freightBooking.bookingStatus && (
@@ -299,7 +299,7 @@ export default function TradeWorkspacePage() {
         </Panel>
 
         {/* Freight */}
-        <Panel title="FreightIQ" testId="trade-freight-panel">
+        <Panel title="Freight" testId="trade-freight-panel">
           {data.freight.length === 0 ? (
             <Empty text="No freight requests yet." />
           ) : (

@@ -48,7 +48,7 @@ export default function BulkCatalogCategoriesPage() {
               ← Back to container
             </Link>
           ) : (
-            <Link to="/buyer/bulk-container" className="text-xs text-zinc-500 hover:underline">← BulkContainer</Link>
+            <Link to="/buyer/bulk-container" className="text-xs text-zinc-500 hover:underline">← Bulk container</Link>
           )}
           <h1 className="font-display text-4xl font-semibold tracking-tight mt-1">Browse Bulk Catalog</h1>
           <p className="text-sm text-zinc-500 mt-1">

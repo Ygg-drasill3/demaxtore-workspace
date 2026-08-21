@@ -183,7 +183,7 @@ export const RFQ_SCRIPTS: Record<RfqState, RfqScript> = {
     primaryAction: "issue_supplier_po",
     primaryLabel: "Issue PO",
     promotedSecondaryActions: ["close_rfq_awards"],
-    fallbackPrimary: { label: "Open order workspace", href: "/workspace/order/{{orderId}}", tone: "secondary" },
+    fallbackPrimary: { label: "Open order", href: "/workspace/order/{{orderId}}", tone: "secondary" },
   },
 
   FULLY_AWARDED: {
@@ -195,7 +195,7 @@ export const RFQ_SCRIPTS: Record<RfqState, RfqScript> = {
     primaryAction: "issue_supplier_po",
     primaryLabel: "Issue PO",
     promotedSecondaryActions: ["close_rfq_awards"],
-    fallbackPrimary: { label: "Open order workspace", href: "/workspace/order/{{orderId}}", tone: "secondary" },
+    fallbackPrimary: { label: "Open order", href: "/workspace/order/{{orderId}}", tone: "secondary" },
   },
 
   SUPPLIER_SELECTED: {
@@ -241,7 +241,7 @@ export const RFQ_SCRIPTS: Record<RfqState, RfqScript> = {
     statL:  { label: "Total", value: "{{currency}} {{poAmount}}" },
     statR:  { label: "Next sprint", value: "Track shipment milestones" },
     primaryAction: null,
-    fallbackPrimary: { label: "Open order workspace", href: "/workspace/order/{{orderId}}", tone: "secondary" },
+    fallbackPrimary: { label: "Open order", href: "/workspace/order/{{orderId}}", tone: "secondary" },
   },
 
   CLOSED: {
@@ -251,7 +251,7 @@ export const RFQ_SCRIPTS: Record<RfqState, RfqScript> = {
     statL:  { label: "Outcome", value: "RFQ closed" },
     statR:  { label: "Status", value: "Complete" },
     primaryAction: null,
-    fallbackPrimary: { label: "Open order workspace", href: "/workspace/order/{{orderId}}", tone: "secondary" },
+    fallbackPrimary: { label: "Open order", href: "/workspace/order/{{orderId}}", tone: "secondary" },
   },
 
   CANCELLED: {

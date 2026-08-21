@@ -66,26 +66,26 @@ export const SUPPLIER_ONBOARDING = {
 } as const;
 
 export const LANDING_COPY = {
-  eyebrow: "B2B Sourcing & Import Operating Platform",
-  headline: "The Import Operating System for Companies Sourcing From Turkey.",
+  eyebrow: "B2B sourcing & import operations",
+  headline: "Import operations for companies sourcing from Turkey.",
   subhead:
-    "Manage RFQs, supplier quotations, CommodityBid™, purchase orders, inspections, freight and shipment tracking in one intelligent workspace.",
+    "Manage quote requests, supplier offers, purchase orders, inspections, freight and shipment tracking in one place.",
   pillars: [
     {
       title: "Structured sourcing",
-      body: "RFQ, CommodityBid, SmartContainer, and BulkContainer programmes with supplier governance built in.",
+      body: "RFQs, Commodity Bids, Mixed Container and Bulk Container with clear supplier handoffs.",
     },
     {
       title: "Award to execution",
-      body: "PO issuance, order workspaces, FreightIQ sailings, and shipment visibility without spreadsheet handoffs.",
+      body: "PO issuance, freight offers, booking and shipment visibility without spreadsheet handoffs.",
     },
     {
       title: "Operations control",
-      body: "Control Tower alerts for late acknowledgements, ETA drift, and document gaps — before customers escalate.",
+      body: "Alerts for late acknowledgements, ETA changes and document gaps — before customers escalate.",
     },
   ],
   proof: "Trusted workflow for importers, distributors, and DeMaxtore operations teams.",
-  ctaPrimary: "Sign in to workspace",
+  ctaPrimary: "Sign in",
   ctaSecondary: "See demo environment",
   demoNote: "Sandbox accounts available — ask your DeMaxtore contact or use seeded demo logins.",
 } as const;

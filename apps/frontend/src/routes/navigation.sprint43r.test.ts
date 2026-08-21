@@ -25,12 +25,13 @@ describe("Sprint 43R international buyer navigation", () => {
     expect(testIds).toContain("buyer-trade-documents");
   });
 
-  it("does not put Turkey customs / inland / landed-cost as primary nav", () => {
+  it("does not put Turkey customs / inland / landed-cost / freestanding freight as primary nav", () => {
     const testIds = BUYER_NAV_GROUPS_INTERNATIONAL.flatMap((g) => g.items).map((i) => i.testId);
     expect(testIds).not.toContain("buyer-customs");
     expect(testIds).not.toContain("buyer-inland");
     expect(testIds).not.toContain("buyer-landed-cost");
     expect(testIds).not.toContain("buyer-imports");
+    expect(testIds).not.toContain("buyer-freightiq");
   });
 
   it("quick actions prioritize Create Bid and New RFQ", () => {

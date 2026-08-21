@@ -80,7 +80,7 @@ export default function MixedContainerBuilderPage() {
         <Link to="/buyer/mixed-container/requests" className="text-xs text-zinc-500 hover:underline">← My Containers</Link>
         <span className="dmx-eyebrow text-zinc-500 block mt-2">Container Builder · {mc.externalRef}</span>
         <h1 className="font-display text-4xl font-semibold tracking-tight mt-1">Plan Your Container</h1>
-        <p className="text-sm text-zinc-500 mt-1">Planning workspace — not a shopping cart.</p>
+        <p className="text-sm text-zinc-500 mt-1">Add products by pallet, then request pricing.</p>
       </header>
 
       {submitted && (
@@ -114,7 +114,7 @@ export default function MixedContainerBuilderPage() {
 
       {["MC_EXECUTION_READY", "MC_EXECUTION_ACTIVE", "MC_EXECUTION_COMPLETE"].includes(mc.state) && (
         <div className="dmx-card p-5 bg-blue-50 border-blue-100">
-          <h2 className="font-medium">SmartContainer execution</h2>
+          <h2 className="font-medium">Container execution</h2>
           <p className="text-sm text-zinc-600 mt-1">Track order, freight, and shipment progress for your container.</p>
           <Link to={`/buyer/mixed-container/execution/${mc.id}`} className="inline-block mt-3">
             <Button variant="secondary" data-testid="mc-view-execution-builder">View Execution</Button>
@@ -129,7 +129,7 @@ export default function MixedContainerBuilderPage() {
           </p>
           <div className="flex gap-2">
             <Link to={`/buyer/mixed-container/catalog?containerId=${mc.id}`}>
-              <Button variant="secondary" data-testid="mc-continue-browsing">Continue Browsing</Button>
+              <Button variant="secondary" data-testid="mc-continue-browsing">Keep browsing</Button>
             </Link>
             <Button
               data-testid="mc-request-pricing"

@@ -12,7 +12,42 @@ import { useT } from "@/i18n/useT";
 import { toast } from "@/store/toast.store";
 import { cn } from "@/lib/utils";
 
-const STATE_FILTERS = ["ALL","RFQ_DRAFT","RFQ_SUBMITTED","SUPPLIERS_ASSIGNED","RFQ_OPEN","QUOTATIONS_CLOSED","UNDER_EVALUATION","SUPPLIER_SELECTED","PROFORMA_REQUESTED","PROFORMA_APPROVED","PO_ISSUED","CLOSED","CANCELLED","EXPIRED","CLOSED_NO_AWARD"];
+const STATE_BUCKETS = [
+  { id: "ALL", label: "All", states: null as string[] | null },
+  {
+    id: "NEEDS_YOU",
+    label: "Needs you",
+    states: [
+      "RFQ_OPEN",
+      "QUOTATIONS_CLOSED",
+      "UNDER_EVALUATION",
+      "SUPPLIER_SELECTED",
+      "PROFORMA_REQUESTED",
+      "PROFORMA_APPROVED",
+    ],
+  },
+  {
+    id: "ACTIVE",
+    label: "Active",
+    states: [
+      "RFQ_DRAFT",
+      "RFQ_SUBMITTED",
+      "SUPPLIERS_ASSIGNED",
+      "RFQ_OPEN",
+      "QUOTATIONS_CLOSED",
+      "UNDER_EVALUATION",
+      "SUPPLIER_SELECTED",
+      "PROFORMA_REQUESTED",
+      "PROFORMA_APPROVED",
+      "PO_ISSUED",
+    ],
+  },
+  {
+    id: "CLOSED",
+    label: "Closed",
+    states: ["CLOSED", "CANCELLED", "EXPIRED", "CLOSED_NO_AWARD"],
+  },
+] as const;
 
 function formatShortDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
@@ -46,19 +81,25 @@ export default function RfqListPage() {
   const isSupplier = user?.role === "SUPPLIER";
   const isSalesControl = user?.role === "SALES_CONTROL";
   const isAdmin = user?.role === "ADMIN";
-  const [state, setState] = useState<string>("ALL");
+  const [bucket, setBucket] = useState<(typeof STATE_BUCKETS)[number]["id"]>("ALL");
   const [view, setView] = useState<"active" | "trash">("active");
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<"newest"|"oldest"|"deadline">("newest");
-  const isFiltered = state !== "ALL" || !!q.trim();
+  const isFiltered = bucket !== "ALL" || !!q.trim();
   const listView = isAdmin ? view : "active";
   const { data, isLoading, isError, refetch } = useRfqList({
-    state: state === "ALL" ? undefined : state,
+    // Buckets are applied client-side so the customer never sees 15 FSM enums.
+    state: undefined,
     q: q || undefined,
     sort,
     view: listView,
   });
-  const rows: any[] = data?.items ?? data ?? [];
+  const allRows: any[] = data?.items ?? data ?? [];
+  const bucketDef = STATE_BUCKETS.find((b) => b.id === bucket);
+  const bucketStates: readonly string[] | null = bucketDef?.states ?? null;
+  const rows = bucketStates
+    ? allRows.filter((r) => bucketStates.includes(String(r.state)))
+    : allRows;
 
   const refreshLists = async () => {
     await Promise.all([
@@ -108,10 +149,23 @@ export default function RfqListPage() {
           <input data-testid="rfq-list-search" value={q} onChange={(e) => setQ(e.target.value)}
             placeholder={t("rfq.list.search")} className="h-10 w-full pl-9 pr-3 rounded-md border border-zinc-200 text-sm" />
         </div>
-        <select data-testid="rfq-list-state-filter" value={state} onChange={(e) => setState(e.target.value)}
-          className="h-10 px-3 rounded-md border border-zinc-200 text-sm">
-          {STATE_FILTERS.map(s => <option key={s} value={s}>{s === "ALL" ? t("common.all") : s.replace(/_/g," ")}</option>)}
-        </select>
+        <div className="flex flex-wrap gap-1.5" data-testid="rfq-list-state-filter">
+          {STATE_BUCKETS.map((b) => (
+            <button
+              key={b.id}
+              type="button"
+              onClick={() => setBucket(b.id)}
+              className={cn(
+                "h-10 px-3 rounded-md border text-sm font-medium transition-colors",
+                bucket === b.id
+                  ? "bg-ink-900 text-white border-ink-900"
+                  : "bg-white text-zinc-600 border-zinc-200 hover:border-zinc-300",
+              )}
+            >
+              {b.label}
+            </button>
+          ))}
+        </div>
         <select data-testid="rfq-list-sort" value={sort} onChange={(e) => setSort(e.target.value as any)}
           className="h-10 px-3 rounded-md border border-zinc-200 text-sm">
           <option value="newest">{t("rfq.list.sort.newest")}</option>
@@ -155,7 +209,7 @@ export default function RfqListPage() {
           }
           action={
             isFiltered ? (
-              <button type="button" className="dmx-btn-secondary text-sm" onClick={() => { setQ(""); setState("ALL"); }}>
+              <button type="button" className="dmx-btn-secondary text-sm" onClick={() => { setQ(""); setBucket("ALL"); }}>
                 {t("rfq.list.empty.clearFilters")}
               </button>
             ) : isBuyer ? (

@@ -18,6 +18,16 @@ type StepKey =
   | "SHIPMENT"
   | "DELIVERY";
 
+const STEP_LABEL: Record<StepKey, string> = {
+  SOURCING: "Sourcing",
+  ORDER: "Order",
+  INSPECTION: "Inspection",
+  FREIGHT: "Freight",
+  BOOKING: "Booking",
+  SHIPMENT: "Shipment",
+  DELIVERY: "Delivery",
+};
+
 type StepState = "done" | "active" | "pending" | "skipped";
 
 interface Props {
@@ -153,7 +163,7 @@ export function InternationalExecutionBridgePanel({
                     : "text-zinc-500"
             }
           >
-            <span aria-hidden>{mark(s.state)}</span> {s.key}
+            <span aria-hidden>{mark(s.state)}</span> {STEP_LABEL[s.key]}
           </li>
         ))}
       </ol>
@@ -192,9 +202,7 @@ export function InternationalExecutionBridgePanel({
             {ctx!.inspections.map((i, idx) => (
               <span key={i.id}>
                 {idx > 0 ? ", " : null}
-                <Link className="text-blue-600 hover:underline" to={`/workspace/inspection/${i.id}`}>
-                  {i.inspectionNumber}
-                </Link>
+                <span className="font-medium text-ink-900">{i.inspectionNumber}</span>
                 <span className="text-zinc-500">
                   {" "}
                   ({i.status}
@@ -213,7 +221,7 @@ export function InternationalExecutionBridgePanel({
             className="inline-flex items-center rounded-lg bg-accent-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-600"
             to={freightHref}
           >
-            {hasFreightStarted ? "Open FreightIQ" : "Request Freight"}
+            {hasFreightStarted ? "Open freight" : "Request freight"}
           </Link>
         )}
         {!hideInspectionCta && orderId && !inspectionPassed && (ctx?.inspections?.length ?? 0) === 0 && (
@@ -231,7 +239,7 @@ export function InternationalExecutionBridgePanel({
             className="text-sm text-blue-600 hover:underline self-center"
             to={purchaseOrderRoutes.orderWorkspace(orderId)}
           >
-            Open Order Workspace
+            Open order
           </Link>
         )}
       </div>

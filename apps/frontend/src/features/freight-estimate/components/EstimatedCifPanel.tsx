@@ -102,7 +102,7 @@ export function EstimatedCifPanel({ tradeId, compact = false, showRefresh = true
         <div>
           <h2 className="text-sm font-semibold text-ink-900">Estimated CIF Visibility</h2>
           {!compact && (
-            <p className="text-xs text-zinc-500 mt-0.5">Reference rate for decision support — final freight via FreightIQ.</p>
+            <p className="text-xs text-zinc-500 mt-0.5">Reference rate for decision support — final freight after you select an offer.</p>
           )}
         </div>
         <span

@@ -35,22 +35,22 @@ export function RelatedLogisticsPanel({ mode, entityId, shipmentId, title }: Pro
   const heading =
     title ??
     (mode === "purchase-order"
-      ? "Related Logistics"
+      ? "Linked shipments"
       : mode === "shipment"
-        ? "Related Commercial Entities"
-        : "Container Lineage");
+        ? "Linked orders"
+        : "Linked containers");
 
   return (
     <section data-testid="related-logistics" className="dmx-card p-4 space-y-3">
       <h2 className="font-medium">{heading}</h2>
       {isLoading && (
         <p className="text-sm text-zinc-500" data-testid="related-logistics-loading">
-          Loading related entities…
+          Loading linked items…
         </p>
       )}
       {isError && (
         <p className="text-sm text-zinc-500" data-testid="related-logistics-error">
-          Related entities unavailable.
+          Linked items unavailable.
         </p>
       )}
       {data && <RelatedBody data={data} mode={mode} />}
@@ -70,7 +70,7 @@ function RelatedBody({ data, mode }: { data: RelatedEntitiesDto; mode: Mode }) {
   if (empty) {
     return (
       <p className="text-sm text-zinc-500" data-testid="related-logistics-empty">
-        No linked logistics entities yet. Historical records without lineage stay empty (not fabricated).
+        No linked orders or shipments yet.
       </p>
     );
   }
@@ -82,7 +82,7 @@ function RelatedBody({ data, mode }: { data: RelatedEntitiesDto; mode: Mode }) {
           ctx.commodityBidWorkspaceId ||
           (ctx.inspections?.length ?? 0) > 0 ||
           (ctx.freightRequests?.length ?? 0) > 0) && (
-          <Group label="Source & quality" testId="related-source-context">
+          <Group label="Sourcing & quality" testId="related-source-context">
             {ctx.sourceType ? (
               <li data-testid="related-source-type">Source type: {ctx.sourceType}</li>
             ) : null}
@@ -109,14 +109,8 @@ function RelatedBody({ data, mode }: { data: RelatedEntitiesDto; mode: Mode }) {
               </li>
             ) : null}
             {(ctx.inspections ?? []).map((i) => (
-              <li key={i.id}>
-                <Link
-                  className="text-blue-600 hover:underline"
-                  data-testid={`related-inspection-${i.id}`}
-                  to={`/workspace/inspection/${i.id}`}
-                >
-                  {i.inspectionNumber}
-                </Link>
+              <li key={i.id} data-testid={`related-inspection-${i.id}`}>
+                <span className="font-medium text-ink-900">{i.inspectionNumber}</span>
                 <span className="text-zinc-500">
                   {" "}
                   · {i.status}
@@ -135,7 +129,7 @@ function RelatedBody({ data, mode }: { data: RelatedEntitiesDto; mode: Mode }) {
                       className="text-blue-600 hover:underline"
                       to={`/workspace/order/${ctx.orderWorkspaceId}#order-freightiq-section`}
                     >
-                      Open FreightIQ
+                      Open freight
                     </Link>
                   </>
                 ) : null}

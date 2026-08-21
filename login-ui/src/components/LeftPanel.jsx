@@ -6,12 +6,12 @@ import DashboardPreview from "./DashboardPreview";
 import GlobeGraphic from "./GlobeGraphic";
 
 const features = [
-  { icon: FileText, title: "RFQ\u2122", desc: "Create and manage requests", color: "bg-blue-600" },
-  { icon: Gavel, title: "CommodityBid\u2122", desc: "Reverse auctions, best offers", color: "bg-violet-600" },
+  { icon: FileText, title: "RFQs", desc: "Create and manage quote requests", color: "bg-blue-600" },
+  { icon: Gavel, title: "Commodity Bids", desc: "Reverse auctions, best offers", color: "bg-violet-600" },
   { icon: ClipboardList, title: "Purchase Orders", desc: "Confirm and manage orders", color: "bg-orange-500" },
-  { icon: Ship, title: "FreightIQ\u2122", desc: "Freight rates and booking", color: "bg-teal-500" },
-  { icon: ShieldCheck, title: "Inspection\u2122", desc: "Quality control, pre-shipment", color: "bg-rose-500" },
-  { icon: MapPin, title: "Live Shipment Tracking", desc: "Real-time visibility, ETA alerts", color: "bg-emerald-500" },
+  { icon: Ship, title: "Freight", desc: "Rates, offers and booking", color: "bg-teal-500" },
+  { icon: ShieldCheck, title: "Inspection", desc: "Quality control, pre-shipment", color: "bg-rose-500" },
+  { icon: MapPin, title: "Shipment tracking", desc: "Visibility and ETA alerts", color: "bg-emerald-500" },
 ];
 
 export default function LeftPanel() {
@@ -40,14 +40,14 @@ export default function LeftPanel() {
 
         <div className="relative max-w-md lg:max-w-[480px]">
           <h1 className="font-tiempos-headline hero-headline">
-            <span className="block">The Import Operating</span>
-            <span className="block">System for Companies</span>
-            <span className="block hero-headline-accent">Sourcing From Turkey.</span>
+            <span className="block">Import operations</span>
+            <span className="block">for companies</span>
+            <span className="block hero-headline-accent">sourcing from Turkey.</span>
           </h1>
           <p className="mt-6 text-slate-400 text-[15px] leading-[1.7] max-w-[460px]">
-            Manage RFQs, supplier quotations, CommodityBid™<br />
-            purchase orders, inspections, freight and shipment<br />
-            tracking in one intelligent workspace.
+            Manage quote requests, supplier offers, purchase orders,<br />
+            inspections, freight and shipment tracking<br />
+            in one place.
           </p>
         </div>
 

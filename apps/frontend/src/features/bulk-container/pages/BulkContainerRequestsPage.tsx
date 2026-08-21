@@ -18,11 +18,11 @@ export default function BulkContainerRequestsPage() {
     <div data-testid="bc-requests-page" data-guide="bc-requests" className="max-w-[1200px] mx-auto space-y-6 animate-fade-in">
       <header className="flex items-end justify-between flex-wrap gap-3">
         <div>
-          <Link to="/buyer/bulk-container" className="text-xs text-zinc-500 hover:underline">← BulkContainer</Link>
-          <h1 className="font-display text-4xl font-semibold tracking-tight mt-1">My Bulk Containers</h1>
+          <Link to="/buyer/bulk-container" className="text-xs text-zinc-500 hover:underline">← Bulk container</Link>
+          <h1 className="font-display text-4xl font-semibold tracking-tight mt-1">My bulk loads</h1>
         </div>
         <Link to="/buyer/bulk-container/catalog" className="dmx-btn-primary">
-          Build Bulk Container
+          Build bulk load
         </Link>
       </header>
 

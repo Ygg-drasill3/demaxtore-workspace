@@ -42,7 +42,7 @@ export function NotificationDrawer() {
           ))
         ) : items.length === 0 ? (
           <EmptyState icon={<BellRing className="h-5 w-5" />} title="You're all caught up"
-                      body="Workspace activity and FSM transitions you participate in will appear here." />
+                      body="Updates on quotes, orders, shipments and alerts appear here." />
         ) : (
           items.map((n) => (
             <div
@@ -60,7 +60,7 @@ export function NotificationDrawer() {
                 <div className="flex items-center gap-3 mt-1.5">
                   {n.link && (
                     <Link to={n.link} onClick={close} className="text-[11px] text-accent-900 font-medium hover:underline">
-                      Open workspace →
+                      View details →
                     </Link>
                   )}
                   {!n.read && (

@@ -26,11 +26,11 @@ export default function MixedContainerRequestsPage() {
     <div data-testid="mc-requests-page" data-guide="mc-requests" className="max-w-[1200px] mx-auto space-y-6 animate-fade-in">
       <header className="flex items-end justify-between flex-wrap gap-3">
         <div>
-          <Link to="/buyer/mixed-container" className="text-xs text-zinc-500 hover:underline">← Mixed Container</Link>
-          <h1 className="font-display text-4xl font-semibold tracking-tight mt-1">My Mixed Containers</h1>
+          <Link to="/buyer/mixed-container" className="text-xs text-zinc-500 hover:underline">← Mixed container</Link>
+          <h1 className="font-display text-4xl font-semibold tracking-tight mt-1">My containers</h1>
         </div>
         <Link to="/buyer/mixed-container/catalog" className="dmx-btn-primary" data-testid="mc-requests-new">
-          Build Mixed Container
+          Build container
         </Link>
       </header>
 

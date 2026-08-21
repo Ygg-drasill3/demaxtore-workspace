@@ -9,6 +9,7 @@ import { useState } from "react";
 import { toast } from "@/store/toast.store";
 import { useT } from "@/i18n/useT";
 import { useContainerSession } from "../lib/useContainerSession";
+import { displayRef } from "@/features/dashboard/lib/display-ref";
 
 export function SmartContainerSidebar({ containerId }: { containerId?: string }) {
   const { setContainerId } = useContainerSession();
@@ -29,10 +30,10 @@ export function SmartContainerSidebar({ containerId }: { containerId?: string })
       >
         <div className="flex items-center gap-2">
           <Package className="h-5 w-5 text-accent-900" />
-          <h2 className="font-medium">SmartContainer</h2>
+          <h2 className="font-medium">Your container</h2>
         </div>
         <p className="text-sm text-zinc-500">
-          Browse products and add them to start building your procurement plan.
+          Browse products and add them to start building.
         </p>
       </div>
     );
@@ -67,8 +68,8 @@ export function SmartContainerSidebar({ containerId }: { containerId?: string })
   return (
     <div data-testid="mc-sidebar" className="dmx-card p-5 space-y-4 lg:sticky lg:top-6">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="font-medium">SmartContainer</h2>
-        <span className="text-xs text-zinc-400">{mc.externalRef}</span>
+        <h2 className="font-medium">Your container</h2>
+        <span className="text-xs text-zinc-400">{displayRef(mc.externalRef)}</span>
       </div>
 
       <ContainerOrderNav
@@ -107,7 +108,7 @@ export function SmartContainerSidebar({ containerId }: { containerId?: string })
       {editable && (
         <Link to={`/buyer/mixed-container/requests/${mc.id}`}>
           <Button className="w-full" data-testid="mc-sidebar-review">
-            Review SmartContainer
+            Review container
           </Button>
         </Link>
       )}

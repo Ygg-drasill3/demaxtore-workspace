@@ -16,8 +16,7 @@ export function LiveAuctionsWidget({ rows, loading }: { rows?: LiveAuctionRow[];
 
   return (
     <section data-testid="cc-live-auctions" className="dmx-card p-5">
-      <span className="dmx-eyebrow text-zinc-500">{t("dash.eyebrow.commoditybid")}</span>
-      <h2 className="font-display text-xl font-semibold mt-0.5 mb-4">{t("dash.liveAuctions.title")}</h2>
+      <h2 className="font-display text-xl font-semibold mb-4">{t("dash.liveAuctions.title")}</h2>
       {loading ? (
         <p className="text-sm text-zinc-500">{t("dash.common.loadingAuctions")}</p>
       ) : !rows?.length ? (

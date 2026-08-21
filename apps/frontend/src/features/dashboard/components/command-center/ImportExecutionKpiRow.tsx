@@ -32,11 +32,17 @@ const TONE_STYLES = {
 export function ImportExecutionKpiRow({
   kpis,
   timelineKpis,
+  activeImports,
   loading,
   max,
 }: {
   kpis?: ImportExecutionKpis;
   timelineKpis?: TradeTimelineKpiDto;
+  /**
+   * Count taken from the same portfolio the Active imports list renders, so the
+   * tile and the list below it cannot disagree.
+   */
+  activeImports?: number;
   loading?: boolean;
   /** Turkey command center shows the 5 primary KPIs (spec §7). */
   max?: number;
@@ -45,7 +51,9 @@ export function ImportExecutionKpiRow({
 
   const resolveValue = (key: typeof KPIS[number]["key"]): number | null => {
     if (loading) return null;
-    if (key === "activeImports") return timelineKpis?.activeTrades ?? kpis?.activeOrders ?? null;
+    if (key === "activeImports") {
+      return activeImports ?? timelineKpis?.activeTrades ?? kpis?.activeOrders ?? null;
+    }
     if (key === "customsActive") return kpis?.customsActive ?? null;
     if (key === "deliveriesActive") return kpis?.deliveriesActive ?? null;
     const v = kpis?.[key as keyof CommandCenterKpis];
