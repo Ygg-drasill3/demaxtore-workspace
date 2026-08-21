@@ -48,7 +48,7 @@ export default function FreightIqTab({ orderId, orderState }: { orderId: string;
   });
 
   if (isLoading || !data) {
-    return <div data-testid="freightiq-loading" className="text-sm text-zinc-500">Loading FreightIQ…</div>;
+    return <div data-testid="freightiq-loading" className="text-sm text-zinc-500">Loading freight…</div>;
   }
 
   const isAdmin = user?.role === "ADMIN";
@@ -284,7 +284,7 @@ function IntakeForm({
         />
       </label>
       <label className="block">
-        FreightIQ margin (USD)
+        Margin (USD)
         <input
           data-testid="freightiq-intake-margin"
           type="number"

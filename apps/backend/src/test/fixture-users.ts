@@ -19,6 +19,8 @@ export const TEST_USER_EMAILS = {
   quality: "quality@demaxtore.test",
   buyerLegacy: "buyer@dema.test",
   supplierLegacy: "supplier@dema.test",
+  broker: "broker.smoke@demaxtore.local",
+  trucker: "trucker.smoke@demaxtore.local",
 } as const;
 
 const ORG_IDS = {
@@ -55,6 +57,8 @@ const FIXTURE_USERS: SeedUser[] = [
   { email: TEST_USER_EMAILS.quality, displayName: "Quality Inspector", role: Role.DOCUMENT_CONTROLLER, orgId: ORG_IDS.demaxtore, orgName: "DeMaxtore Operations", orgKind: "DEMAXTORE" },
   { email: TEST_USER_EMAILS.buyerLegacy, displayName: "Legacy Buyer", role: Role.BUYER, orgId: ORG_IDS.acme, orgName: "Acme Foods", orgKind: "BUYER_ORG" },
   { email: TEST_USER_EMAILS.supplierLegacy, displayName: "Legacy Supplier", role: Role.SUPPLIER, orgId: ORG_IDS.mfg, orgName: "Acme Manufacturing", orgKind: "SUPPLIER_ORG" },
+  { email: TEST_USER_EMAILS.broker, displayName: "Customs Broker Smoke", role: Role.CUSTOMS_BROKER, orgId: ORG_IDS.demaxtore, orgName: "DeMaxtore Operations", orgKind: "DEMAXTORE" },
+  { email: TEST_USER_EMAILS.trucker, displayName: "Trucker Smoke", role: Role.TRUCKER, orgId: ORG_IDS.demaxtore, orgName: "DeMaxtore Operations", orgKind: "DEMAXTORE" },
 ];
 
 export async function seedTestUsers(prisma: PrismaClient): Promise<void> {

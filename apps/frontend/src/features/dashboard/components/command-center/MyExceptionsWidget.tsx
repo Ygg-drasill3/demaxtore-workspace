@@ -29,10 +29,7 @@ export function MyExceptionsWidget() {
   return (
     <section data-testid="my-exceptions-widget" data-guide="dashboard-alerts" className="dmx-card overflow-hidden">
       <div className="border-b border-zinc-100 px-5 py-3 flex items-center justify-between bg-zinc-50/80">
-        <div>
-          <span className="dmx-eyebrow text-zinc-500">{t("dash.eyebrow.exceptionHub")}</span>
-          <h2 className="font-display text-lg font-semibold">{t("dash.exceptions.title")}</h2>
-        </div>
+        <h2 className="font-display text-lg font-semibold">{t("dash.exceptions.title")}</h2>
         <Link to="/alerts" data-testid="my-exceptions-view-all" className="text-xs font-medium text-accent-900 hover:underline">
           {t("dash.common.openArrow")}
         </Link>
@@ -68,13 +65,15 @@ export function MyExceptionsWidget() {
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className={cn("h-2 w-2 shrink-0 rounded-full", SEVERITY_DOT[e.severity])} />
-                    <span className="font-mono text-xs truncate">{e.exceptionRef}</span>
+                    <span className="text-sm font-medium truncate">{e.exceptionType}</span>
                   </div>
                   <AlertTriangle className="h-3 w-3 text-amber-600 shrink-0" />
                 </div>
-                <div className="mt-1 text-xs text-zinc-500 truncate">{e.exceptionType} · {e.tradeId}</div>
                 {e.requiredAction && (
                   <div className="mt-1 text-xs text-amber-800 truncate">{e.requiredAction}</div>
+                )}
+                {e.shipmentRef && (
+                  <div className="mt-1 text-xs text-zinc-500 truncate">{e.shipmentRef}</div>
                 )}
                 <Link
                   to={e.detailUrl}

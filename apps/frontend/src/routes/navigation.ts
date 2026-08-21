@@ -2,7 +2,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard, FileText, Package, Bell, Workflow, Mail, Radar, GraduationCap, Route,
-  ClipboardList, Ship, FileCheck, MessageSquare, Plus, Gavel, Inbox, Activity, AlertTriangle, Container, Scale, UserPlus, Users, Phone, Boxes,
+  ClipboardList, Ship, FileCheck, MessageSquare, Plus, Gavel, Inbox, Activity, AlertTriangle, Container, Scale, UserPlus, Users, Phone,
   ShieldCheck, Truck, Receipt, PackageSearch,
 } from "lucide-react";
 import type { Role } from "@dmx/contracts/auth";
@@ -37,83 +37,65 @@ function flat(groups: NavGroup[]): NavItem[] {
 
 // ─── Buyer — Import Operations first (Sprint 43 Turkey GTM) ─────────────────
 
+// Turkey Master Spec v1.0 §Navigation — aggressively simplified customer IA:
+// HOME / OPERATIONS / CONTROL (3 groups, 10 items). Sourcing (RFQ / CommodityBid /
+// CB Workspaces / Mixed & Bulk Container), Orders, Products, Purchase Orders,
+// Exceptions and Learning are intentionally NOT permanent sidebar items — they are
+// reached contextually (Start Import, Import Workspace, Dashboard attention). Backend
+// modules are preserved (hide ≠ delete) and remain available to International Buyer
+// and to any future Turkey sourcing entitlement.
 export const BUYER_NAV_GROUPS: NavGroup[] = [
   {
     id: "home", label: "Home", testId: "nav-group-home",
     items: [
       { to: "/buyer/dashboard", label: "Dashboard", icon: LayoutDashboard, testId: "buyer-dashboard", end: true },
-      { to: "/messages", label: "Workspace Inbox", icon: Inbox, testId: "buyer-inbox" },
+      { to: "/buyer/imports", label: "My Imports", icon: PackageSearch, testId: "buyer-imports" },
+      { to: "/messages", label: "Inbox", icon: Inbox, testId: "buyer-inbox" },
     ],
   },
   {
-    id: "import-ops", label: "Import Operations", testId: "nav-group-import-ops",
+    id: "operations", label: "Operations", testId: "nav-group-operations",
     items: [
-      { to: "/buyer/imports", label: "My Imports", icon: PackageSearch, testId: "buyer-imports" },
       { to: "/buyer/freightiq", label: "Freight", icon: Route, testId: "buyer-freightiq" },
       { to: "/buyer/shipments", label: "Shipments", icon: Ship, testId: "buyer-shipments" },
       { to: "/buyer/customs", label: "Customs", icon: ShieldCheck, testId: "buyer-customs" },
       { to: "/buyer/inland", label: "Deliveries", icon: Truck, testId: "buyer-inland" },
+    ],
+  },
+  {
+    id: "control", label: "Control", testId: "nav-group-control",
+    items: [
+      { to: "/buyer/control-tower", label: "Control Tower", icon: Radar, testId: "buyer-control-tower" },
+      { to: "/documents", label: "Documents", icon: FileCheck, testId: "buyer-documents" },
       { to: "/buyer/landed-cost", label: "Landed Cost", icon: Receipt, testId: "buyer-landed-cost" },
-      { to: "/buyer/purchase-orders", label: "Purchase Orders", icon: ClipboardList, testId: "buyer-purchase-orders" },
-      { to: "/buyer/products", label: "Products", icon: Boxes, testId: "buyer-products" },
-      { to: "/buyer/control-tower", label: "Import Control Tower", icon: Radar, testId: "buyer-control-tower" },
-      { to: "/exceptions", label: "Exceptions", icon: AlertTriangle, testId: "buyer-exceptions" },
-    ],
-  },
-  {
-    id: "sourcing", label: "Sourcing", testId: "nav-group-sourcing",
-    items: [
-      { to: "/buyer/rfq",          label: "RFQs",           icon: FileText, testId: "buyer-rfq" },
-      { to: "/buyer/commoditybid", label: "Commodity Bids", icon: Workflow, testId: "buyer-commoditybid" },
-      { to: "/buyer/commoditybid/list", label: "CB Workspaces", icon: Gavel, testId: "buyer-commoditybid-list" },
-      { to: "/buyer/mixed-container", label: "Mixed Container", icon: Container, testId: "buyer-mixed-container" },
-      { to: "/buyer/bulk-container", label: "Bulk Container", icon: Scale, testId: "buyer-bulk-container" },
-    ],
-  },
-  {
-    id: "execution-legacy", label: "Orders", testId: "nav-group-execution-legacy",
-    items: [
-      { to: "/buyer/orders", label: "Orders", icon: Package, testId: "buyer-orders" },
-    ],
-  },
-  {
-    id: "collaboration", label: "Collaboration", testId: "nav-group-collaboration",
-    items: [
-      { to: "/messages",  label: "Messages",      icon: MessageSquare, testId: "buyer-messages" },
-      { to: "/notifications",   label: "Notifications", icon: Bell,          testId: "buyer-notifications" },
-    ],
-  },
-  {
-    id: "documents", label: "Documents", testId: "nav-group-documents",
-    items: [
-      { to: "/documents",            label: "Documents",       icon: FileCheck, testId: "buyer-documents" },
-      { to: "/buyer/trade-documents", label: "Compliance",      icon: FileCheck, testId: "buyer-trade-documents" },
-    ],
-  },
-  {
-    id: "knowledge", label: "Knowledge", testId: "nav-group-knowledge",
-    items: [
-      { to: "/learning", label: "Learning Center", icon: GraduationCap, testId: "buyer-learning" },
     ],
   },
 ];
 
 export const BUYER_QUICK_ACTIONS: QuickAction[] = [
-  { label: "Get Freight Quote", to: "/buyer/freightiq/request", testId: "qa-freight-quote", icon: Route },
-  { label: "Start Import",      to: "/buyer/imports/new",       testId: "qa-start-import",  icon: Plus },
-  { label: "My Shipments",      to: "/buyer/shipments",         testId: "qa-view-shipments", icon: Ship },
-  { label: "Customs",           to: "/buyer/customs",           testId: "qa-customs",         icon: ShieldCheck },
-  { label: "Landed Cost",       to: "/buyer/landed-cost",       testId: "qa-landed-cost",     icon: Receipt },
-  { label: "New RFQ",           to: "/buyer/rfq/new",           testId: "qa-new-rfq",         icon: FileText },
+  { label: "Start Import",      to: "/buyer/imports/new",       testId: "qa-start-import",   icon: Plus },
+  { label: "Get Freight Quote", to: "/buyer/freightiq/request", testId: "qa-freight-quote",  icon: Route },
+  { label: "My Imports",        to: "/buyer/imports",           testId: "qa-view-imports",   icon: PackageSearch },
+  { label: "Customs",           to: "/buyer/customs",           testId: "qa-customs",        icon: ShieldCheck },
+  { label: "Landed Cost",       to: "/buyer/landed-cost",       testId: "qa-landed-cost",    icon: Receipt },
 ];
 
-/** Pre-Sprint-43 International Buyer navigation — sourcing-first. */
+// International Buyer navigation — sourcing-first, trimmed to one entry per job
+// to be done. Removed from the permanent sidebar (routes and backend modules are
+// untouched, and each stays reachable from its parent surface):
+//   CB Workspaces  → Commodity Bids list
+//   Products       → Purchase Orders / RFQ line items
+//   Orders         → Purchase Orders
+//   Control Tower  → dashboard "Open Import Control Tower" link
+//   Messages       → duplicate of Inbox (same /messages route)
+//   Notifications  → header bell
+//   Learning Center→ header help menu
 export const BUYER_NAV_GROUPS_INTERNATIONAL: NavGroup[] = [
   {
     id: "home", label: "Home", testId: "nav-group-home",
     items: [
       { to: "/buyer/dashboard", label: "Dashboard", icon: LayoutDashboard, testId: "buyer-dashboard", end: true },
-      { to: "/messages", label: "Workspace Inbox", icon: Inbox, testId: "buyer-inbox" },
+      { to: "/messages", label: "Inbox", icon: Inbox, testId: "buyer-inbox" },
     ],
   },
   {
@@ -121,7 +103,6 @@ export const BUYER_NAV_GROUPS_INTERNATIONAL: NavGroup[] = [
     items: [
       { to: "/buyer/rfq",          label: "RFQs",           icon: FileText, testId: "buyer-rfq" },
       { to: "/buyer/commoditybid", label: "Commodity Bids", icon: Workflow, testId: "buyer-commoditybid" },
-      { to: "/buyer/commoditybid/list", label: "CB Workspaces", icon: Gavel, testId: "buyer-commoditybid-list" },
       { to: "/buyer/mixed-container", label: "Mixed Container", icon: Container, testId: "buyer-mixed-container" },
       { to: "/buyer/bulk-container", label: "Bulk Container", icon: Scale, testId: "buyer-bulk-container" },
     ],
@@ -130,19 +111,8 @@ export const BUYER_NAV_GROUPS_INTERNATIONAL: NavGroup[] = [
     id: "execution", label: "Execution", testId: "nav-group-execution",
     items: [
       { to: "/buyer/purchase-orders", label: "Purchase Orders", icon: ClipboardList, testId: "buyer-purchase-orders" },
-      { to: "/buyer/products", label: "Products", icon: Boxes, testId: "buyer-products" },
-      { to: "/buyer/orders",          label: "Orders",          icon: Package,       testId: "buyer-orders" },
-      { to: "/buyer/freightiq",       label: "FreightIQ",       icon: Route,         testId: "buyer-freightiq" },
-      { to: "/buyer/shipments",      label: "My Shipments",    icon: Ship,          testId: "buyer-shipments" },
-      { to: "/buyer/control-tower",  label: "Import Control Tower", icon: Radar,    testId: "buyer-control-tower" },
+      { to: "/buyer/shipments",      label: "Shipments",       icon: Ship,          testId: "buyer-shipments" },
       { to: "/exceptions",           label: "Exceptions",      icon: AlertTriangle, testId: "buyer-exceptions" },
-    ],
-  },
-  {
-    id: "collaboration", label: "Collaboration", testId: "nav-group-collaboration",
-    items: [
-      { to: "/messages",  label: "Messages",      icon: MessageSquare, testId: "buyer-messages" },
-      { to: "/notifications",   label: "Notifications", icon: Bell,          testId: "buyer-notifications" },
     ],
   },
   {
@@ -150,12 +120,6 @@ export const BUYER_NAV_GROUPS_INTERNATIONAL: NavGroup[] = [
     items: [
       { to: "/documents",            label: "Documents",       icon: FileCheck, testId: "buyer-documents" },
       { to: "/buyer/trade-documents", label: "Compliance",      icon: FileCheck, testId: "buyer-trade-documents" },
-    ],
-  },
-  {
-    id: "knowledge", label: "Knowledge", testId: "nav-group-knowledge",
-    items: [
-      { to: "/learning", label: "Learning Center", icon: GraduationCap, testId: "buyer-learning" },
     ],
   },
 ];
@@ -210,7 +174,7 @@ export const SUPPLIER_NAV_GROUPS: NavGroup[] = [
     items: [
       { to: "/supplier/purchase-orders", label: "Purchase Orders", icon: ClipboardList, testId: "supplier-purchase-orders" },
       { to: "/supplier/orders",          label: "Orders",          icon: Package,       testId: "supplier-orders" },
-      { to: "/supplier/freightiq",       label: "FreightIQ",       icon: Route,         testId: "supplier-freightiq" },
+      { to: "/supplier/freightiq",       label: "Freight",         icon: Route,         testId: "supplier-freightiq" },
       { to: "/shipments/portfolio",  label: "My Shipments",    icon: Ship,          testId: "supplier-shipments" },
     ],
   },
@@ -243,58 +207,109 @@ export const SUPPLIER_QUICK_ACTIONS: QuickAction[] = [
   { label: "Upload Docs",    to: "/supplier/trade-documents", testId: "sqa-upload-docs",    icon: FileCheck },
 ];
 
-// ─── Admin — operations-first grouping ─────────────────────────────────────
-
+// ─── Admin — grouped control surface (progressive disclosure; all capabilities kept) ─
 export const ADMIN_NAV_GROUPS: NavGroup[] = [
   {
     id: "home", label: "Home", testId: "nav-group-home",
     items: [
       { to: "/admin/dashboard", label: "Command Center", icon: LayoutDashboard, testId: "admin-dashboard", end: true },
+      { to: "/operations",      label: "Operations Center", icon: Radar, testId: "admin-operations" },
+      { to: "/notifications",   label: "Notifications", icon: Bell, testId: "admin-notifications" },
+    ],
+  },
+  {
+    id: "sourcing-trade", label: "Sourcing & Trade", testId: "nav-group-admin-sourcing-trade",
+    items: [
+      { to: "/admin/rfq",          label: "RFQs",           icon: FileText,  testId: "admin-rfq" },
+      { to: "/admin/commoditybid", label: "Commodity Bids", icon: Workflow,  testId: "admin-commoditybid" },
+      { to: "/admin/freightiq",    label: "FreightIQ",      icon: Route,     testId: "admin-freightiq" },
+      { to: "/admin/orders",       label: "Orders",         icon: Package,   testId: "admin-orders" },
+    ],
+  },
+  {
+    id: "freight-ops", label: "Freight Ops", testId: "nav-group-admin-freight-ops",
+    items: [
+      { to: "/operations/freight",            label: "Freight ops",        icon: Package, testId: "admin-freight-ops" },
+      { to: "/operations/freight-intake",     label: "Freight intake",     icon: Route,   testId: "admin-freight-intake" },
+      { to: "/operations/reference-freight",  label: "Reference freight",  icon: Ship,    testId: "admin-reference-freight" },
+      { to: "/operations/freight-commercial", label: "Freight commercial", icon: Package, testId: "admin-freight-commercial" },
+    ],
+  },
+  {
+    id: "containers", label: "Containers", testId: "nav-group-admin-containers",
+    items: [
+      { to: "/admin/mixed-container",             label: "Mixed Containers", icon: Container, testId: "admin-mixed-container" },
+      { to: "/admin/mixed-container/allocations", label: "MC Allocations",   icon: Container, testId: "admin-mixed-container-allocations" },
+      { to: "/admin/mixed-container/catalog",     label: "MC Catalog",       icon: Container, testId: "admin-mixed-container-catalog" },
+      { to: "/admin/bulk-container",              label: "Bulk Containers",  icon: Scale,     testId: "admin-bulk-container" },
+      { to: "/admin/bulk-container/allocations",  label: "BC Allocations",   icon: Scale,     testId: "admin-bulk-container-allocations" },
+      { to: "/admin/bulk-container/catalog",      label: "BC Catalog",       icon: Scale,     testId: "admin-bulk-container-catalog" },
+    ],
+  },
+  {
+    id: "communications", label: "Communications", testId: "nav-group-admin-communications",
+    items: [
+      { to: "/admin/conversations",       label: "All Conversations", icon: MessageSquare, testId: "admin-conversations" },
+      { to: "/messages?channel=WHATSAPP", label: "WhatsApp Inbox",    icon: MessageSquare, testId: "admin-whatsapp-inbox" },
+    ],
+  },
+  {
+    id: "org-partners", label: "Org & Partners", testId: "nav-group-admin-org-partners",
+    items: [
+      { to: "/onboarding",                label: "Onboarding",         icon: Route, testId: "admin-onboarding" },
+      { to: "/operations/forwarders",     label: "Forwarders",         icon: Mail,  testId: "admin-forwarders" },
+      { to: "/operations/shippers",       label: "Shippers",           icon: Ship,  testId: "admin-shippers" },
       { to: "/admin/phone-verifications", label: "Phone verifications", icon: Phone, testId: "admin-phone-verifications" },
-      { to: "/sales/dashboard", label: "Sales Control", icon: Users, testId: "admin-sales-control" },
+      { to: "/sales/dashboard",           label: "Sales Control",      icon: Users, testId: "admin-sales-control" },
     ],
   },
   {
-    id: "operations", label: "Operations", testId: "nav-group-operations",
+    id: "insights-config", label: "Insights & Config", testId: "nav-group-admin-insights-config",
     items: [
-      { to: "/operations",                       label: "Operations center",  icon: Radar,           testId: "admin-operations" },
-      { to: "/operations/freight",               label: "Freight ops",        icon: Package,         testId: "admin-freight-ops" },
-      { to: "/operations/reference-freight",      label: "Reference freight",  icon: Ship,            testId: "admin-reference-freight" },
-      { to: "/operations/freight-commercial",    label: "Freight commercial", icon: Package,         testId: "admin-freight-commercial" },
-      { to: "/operations/executive",             label: "Executive",          icon: LayoutDashboard, testId: "admin-executive" },
-      { to: "/operations/growth",                label: "Growth",             icon: Workflow,        testId: "admin-growth" },
-      { to: "/operations/market-intelligence",   label: "Market intel",       icon: Radar,           testId: "admin-market-intelligence" },
-      { to: "/operations/system",                label: "System",             icon: LayoutDashboard, testId: "admin-system-ops" },
-      { to: "/onboarding",                       label: "Onboarding",         icon: Route,           testId: "admin-onboarding" },
-      { to: "/operations/forwarders",            label: "Forwarders",         icon: Mail,            testId: "admin-forwarders" },
-      { to: "/operations/shippers",              label: "Shippers",           icon: Ship,            testId: "admin-shippers" },
+      { to: "/operations/executive",           label: "Executive",   icon: LayoutDashboard, testId: "admin-executive" },
+      { to: "/operations/growth",              label: "Growth",      icon: Workflow,        testId: "admin-growth" },
+      { to: "/operations/market-intelligence", label: "Market intel", icon: Radar,          testId: "admin-market-intelligence" },
+      { to: "/operations/system",              label: "System",      icon: LayoutDashboard, testId: "admin-system-ops" },
+      { to: "/learning",                       label: "Learning Center", icon: GraduationCap, testId: "admin-learning" },
+    ],
+  },
+];
+
+// ─── DeMaxtore Ops — execution-first surface (focused subset of ops routes) ────
+export const OPS_NAV_GROUPS: NavGroup[] = [
+  {
+    id: "work", label: "Work", testId: "nav-group-ops-work",
+    items: [
+      { to: "/operations",          label: "Work Queue", icon: Radar,         testId: "ops-work-queue", end: true },
+      { to: "/shipments/portfolio", label: "Shipments",  icon: Ship,          testId: "ops-shipments" },
+      { to: "/exceptions",          label: "Exceptions", icon: AlertTriangle, testId: "ops-exceptions" },
     ],
   },
   {
-    id: "workspaces", label: "Workspaces", testId: "nav-group-workspaces",
+    id: "execution", label: "Execution", testId: "nav-group-ops-execution",
     items: [
-      { to: "/admin/rfq",          label: "RFQs",           icon: FileText,        testId: "admin-rfq" },
-      { to: "/admin/commoditybid", label: "Commodity Bids", icon: Workflow,        testId: "admin-commoditybid" },
-      { to: "/admin/freightiq",         label: "FreightIQ", icon: Route, testId: "admin-freightiq" },
-      { to: "/admin/conversations",     label: "All Conversations", icon: MessageSquare, testId: "admin-conversations" },
-      { to: "/messages?channel=WHATSAPP",    label: "WhatsApp Inbox",    icon: MessageSquare, testId: "admin-whatsapp-inbox" },
-      { to: "/operations/freight-intake", label: "Freight operations (ops)", icon: Route, testId: "admin-freight-intake" },
-      { to: "/admin/orders",       label: "Orders",         icon: Package,         testId: "admin-orders" },
-      { to: "/admin/mixed-container", label: "Mixed Containers", icon: Container, testId: "admin-mixed-container" },
-      { to: "/admin/mixed-container/allocations", label: "MC Allocations", icon: Container, testId: "admin-mixed-container-allocations" },
-      { to: "/admin/mixed-container/catalog", label: "MC Catalog", icon: Container, testId: "admin-mixed-container-catalog" },
-      { to: "/admin/bulk-container", label: "Bulk Containers", icon: Scale, testId: "admin-bulk-container" },
-      { to: "/admin/bulk-container/allocations", label: "BC Allocations", icon: Scale, testId: "admin-bulk-container-allocations" },
-      { to: "/admin/bulk-container/catalog", label: "BC Catalog", icon: Scale, testId: "admin-bulk-container-catalog" },
+      { to: "/operations/freight",           label: "Freight ops",       icon: Package, testId: "ops-freight" },
+      { to: "/operations/freight-intake",    label: "Freight intake",    icon: Route,   testId: "ops-freight-intake" },
+      { to: "/operations/reference-freight", label: "Reference freight", icon: Ship,    testId: "ops-reference-freight" },
+      { to: "/onboarding",                   label: "Onboarding",        icon: Route,   testId: "ops-onboarding" },
     ],
   },
   {
-    id: "collaboration", label: "Collaboration", testId: "nav-group-collaboration",
+    id: "coordination", label: "Coordination", testId: "nav-group-ops-coordination",
     items: [
-      { to: "/notifications", label: "Notifications", icon: Bell, testId: "admin-notifications" },
-      { to: "/learning",      label: "Learning Center", icon: GraduationCap, testId: "admin-learning" },
+      { to: "/documents",          label: "Documents",     icon: FileCheck,     testId: "ops-documents" },
+      { to: "/admin/conversations", label: "Conversations", icon: MessageSquare, testId: "ops-conversations" },
+      { to: "/notifications",      label: "Notifications", icon: Bell,          testId: "ops-notifications" },
     ],
   },
+];
+
+export const OPS_QUICK_ACTIONS: QuickAction[] = [
+  { label: "Work Queue",  to: "/operations",          testId: "opsqa-work-queue", icon: Radar },
+  { label: "Freight Ops", to: "/operations/freight",  testId: "opsqa-freight",    icon: Package },
+  { label: "Exceptions",  to: "/exceptions",          testId: "opsqa-exceptions", icon: AlertTriangle },
+  { label: "Shipments",   to: "/shipments/portfolio", testId: "opsqa-shipments",  icon: Ship },
+  { label: "Documents",   to: "/documents",           testId: "opsqa-documents",  icon: FileCheck },
 ];
 
 export const SALES_CONTROL_NAV_GROUPS: NavGroup[] = [
@@ -329,10 +344,10 @@ export const NAV_GROUPS_BY_ROLE: Record<Role, NavGroup[]> = {
   ADMIN:              ADMIN_NAV_GROUPS,
   SALES_CONTROL:      SALES_CONTROL_NAV_GROUPS,
   SUPER_ADMIN:        ADMIN_NAV_GROUPS,
-  OPS_MANAGER:        ADMIN_NAV_GROUPS,
-  LOGISTICS_OPERATOR: ADMIN_NAV_GROUPS,
-  FINANCE_OPERATOR:   ADMIN_NAV_GROUPS,
-  DOCUMENT_CONTROLLER: ADMIN_NAV_GROUPS,
+  OPS_MANAGER:        OPS_NAV_GROUPS,
+  LOGISTICS_OPERATOR: OPS_NAV_GROUPS,
+  FINANCE_OPERATOR:   OPS_NAV_GROUPS,
+  DOCUMENT_CONTROLLER: OPS_NAV_GROUPS,
   ORIGIN_AGENT:        [{ id: "partner", label: "Shipments", testId: "nav-group-origin-agent", items: [
     { to: "/partner", label: "My Shipments", icon: Ship, testId: "nav-partner-shipments" },
   ]}],
@@ -367,10 +382,15 @@ export const ADMIN_QUICK_ACTIONS: QuickAction[] = [
 ];
 
 export const QUICK_ACTIONS_BY_ROLE: Partial<Record<Role, QuickAction[]>> = {
-  BUYER:         BUYER_QUICK_ACTIONS_INTERNATIONAL,
-  SUPPLIER:      SUPPLIER_QUICK_ACTIONS,
-  ADMIN:         ADMIN_QUICK_ACTIONS,
-  SALES_CONTROL: SALES_CONTROL_QUICK_ACTIONS,
+  BUYER:              BUYER_QUICK_ACTIONS_INTERNATIONAL,
+  SUPPLIER:           SUPPLIER_QUICK_ACTIONS,
+  ADMIN:              ADMIN_QUICK_ACTIONS,
+  SUPER_ADMIN:        ADMIN_QUICK_ACTIONS,
+  OPS_MANAGER:        OPS_QUICK_ACTIONS,
+  LOGISTICS_OPERATOR: OPS_QUICK_ACTIONS,
+  FINANCE_OPERATOR:   OPS_QUICK_ACTIONS,
+  DOCUMENT_CONTROLLER: OPS_QUICK_ACTIONS,
+  SALES_CONTROL:      SALES_CONTROL_QUICK_ACTIONS,
 };
 
 /** Flat nav for backward-compatible consumers (E2E, tests). */
@@ -380,10 +400,10 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
   ADMIN:              flat(ADMIN_NAV_GROUPS),
   SALES_CONTROL:      flat(SALES_CONTROL_NAV_GROUPS),
   SUPER_ADMIN:        flat(ADMIN_NAV_GROUPS),
-  OPS_MANAGER:        flat(ADMIN_NAV_GROUPS),
-  LOGISTICS_OPERATOR: flat(ADMIN_NAV_GROUPS),
-  FINANCE_OPERATOR:   flat(ADMIN_NAV_GROUPS),
-  DOCUMENT_CONTROLLER: flat(ADMIN_NAV_GROUPS),
+  OPS_MANAGER:        flat(OPS_NAV_GROUPS),
+  LOGISTICS_OPERATOR: flat(OPS_NAV_GROUPS),
+  FINANCE_OPERATOR:   flat(OPS_NAV_GROUPS),
+  DOCUMENT_CONTROLLER: flat(OPS_NAV_GROUPS),
   ORIGIN_AGENT:       flat(NAV_GROUPS_BY_ROLE.ORIGIN_AGENT),
   TRUCKER:            flat(NAV_GROUPS_BY_ROLE.TRUCKER),
   CUSTOMS_BROKER:     flat(NAV_GROUPS_BY_ROLE.CUSTOMS_BROKER),

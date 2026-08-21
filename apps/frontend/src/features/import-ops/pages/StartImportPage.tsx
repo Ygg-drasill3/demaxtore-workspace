@@ -26,7 +26,19 @@ export default function StartImportPage() {
         </p>
       </header>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-3">
+        <EntryCard
+          testId="start-import-existing-po"
+          icon={ClipboardList}
+          title={t("s43.import.existingPoTitle", "From an existing order")}
+          description={t(
+            "s43.import.existingPoDesc",
+            "Start an import from a purchase order you already created, then request freight and customs.",
+          )}
+          cta={t("s43.import.existingPoCta", "Choose purchase order")}
+          to="/buyer/purchase-orders"
+          primary
+        />
         <EntryCard
           testId="start-import-direct-po"
           icon={ClipboardList}

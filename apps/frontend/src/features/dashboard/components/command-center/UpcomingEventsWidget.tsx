@@ -7,8 +7,7 @@ export function UpcomingEventsWidget({ events, loading }: { events?: UpcomingEve
 
   return (
     <section data-testid="cc-upcoming-events" className="dmx-card p-5">
-      <span className="dmx-eyebrow text-zinc-500">{t("dash.eyebrow.timeline")}</span>
-      <h2 className="font-display text-xl font-semibold mt-0.5 mb-4">{t("dash.events.title")}</h2>
+      <h2 className="font-display text-xl font-semibold mb-4">{t("dash.events.title")}</h2>
       {loading ? (
         <p className="text-sm text-zinc-500">{t("dash.common.loadingEvents")}</p>
       ) : !events?.length ? (

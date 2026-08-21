@@ -1,5 +1,8 @@
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { Receipt } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { humanizeStatus } from "@/lib/humanize-status";
 import { landedCostApi } from "../lib/landed-cost.api";
 
 export default function LandedCostListPage() {
@@ -8,13 +11,14 @@ export default function LandedCostListPage() {
     queryFn: landedCostApi.list,
   });
 
+  const items = data?.items ?? [];
+
   return (
     <div className="mx-auto max-w-6xl space-y-4 p-4 md:p-6" data-testid="landed-cost-list-page">
       <header>
-        <p className="text-xs uppercase tracking-wide text-zinc-500">Import Economics</p>
-        <h1 className="text-2xl font-semibold text-zinc-900">Landed Cost</h1>
+        <h1 className="text-2xl font-semibold text-zinc-900">Landed cost</h1>
         <p className="text-sm text-zinc-600">
-          Customer transaction cost rollup — estimated vs actual. Unknown costs are never shown as zero.
+          Product, freight, customs and delivery costs — estimated vs actual. Missing costs stay blank, never zero.
         </p>
       </header>
 
@@ -28,49 +32,53 @@ export default function LandedCostListPage() {
         </p>
       )}
 
-      <div className="overflow-x-auto rounded-xl border border-paper-200 bg-white">
-        <table className="min-w-full text-sm" data-testid="landed-cost-table">
-          <thead className="bg-paper-50 text-left text-xs uppercase tracking-wide text-zinc-500">
-            <tr>
-              <th className="px-3 py-2">Shipment</th>
-              <th className="px-3 py-2">Label</th>
-              <th className="px-3 py-2">Status</th>
-              <th className="px-3 py-2">Currency</th>
-              <th className="px-3 py-2">Known subtotal</th>
-              <th className="px-3 py-2">Total</th>
-              <th className="px-3 py-2">Missing</th>
-              <th className="px-3 py-2">Updated</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(data?.items ?? []).map((c) => (
-              <tr key={c.id} className="border-t border-paper-100">
-                <td className="px-3 py-2 font-medium">
-                  <Link className="text-blue-600 hover:underline" to={`/buyer/landed-cost/${c.id}`}>
-                    {(c.shipmentWorkspaceId ?? c.scopeId).slice(0, 8)}
+      {!isLoading && items.length === 0 ? (
+        <EmptyState
+          testId="landed-cost-empty"
+          icon={<Receipt className="h-5 w-5" />}
+          title="No landed costs yet"
+          body="Landed cost appears once freight or customs costs are recorded on an import."
+          action={
+            <Link to="/buyer/imports" className="dmx-btn-primary text-sm">
+              Open My Imports
+            </Link>
+          }
+        />
+      ) : (
+        <ul className="space-y-3" data-testid="landed-cost-table">
+          {items.map((c) => {
+            const title = c.displayLabel?.trim() || "Landed cost";
+            return (
+              <li key={c.id} className="dmx-card p-4" data-testid={`landed-cost-row-${c.id}`}>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-medium text-ink-900 truncate">{title}</p>
+                    <p className="text-xs text-zinc-500 mt-0.5">
+                      {humanizeStatus(c.status)} · {c.calculationCurrency}
+                      {c.missingComponentCount > 0
+                        ? ` · ${c.missingComponentCount} cost${c.missingComponentCount === 1 ? "" : "s"} still missing`
+                        : ""}
+                    </p>
+                    <p className="text-sm text-ink-800 mt-2 tabular-nums">
+                      Known: {c.knownSubtotal.toLocaleString()} {c.calculationCurrency}
+                      {c.totalLandedCost != null
+                        ? ` · Total: ${c.totalLandedCost.toLocaleString()} ${c.calculationCurrency}`
+                        : " · Total pending"}
+                    </p>
+                  </div>
+                  <Link
+                    className="dmx-btn-primary text-xs shrink-0"
+                    to={`/buyer/landed-cost/${c.id}`}
+                    data-testid={`landed-cost-open-${c.id}`}
+                  >
+                    Open costs →
                   </Link>
-                </td>
-                <td className="px-3 py-2 text-xs">{c.displayLabel}</td>
-                <td className="px-3 py-2">{c.status}</td>
-                <td className="px-3 py-2">{c.calculationCurrency}</td>
-                <td className="px-3 py-2 tabular-nums">{c.knownSubtotal.toLocaleString()}</td>
-                <td className="px-3 py-2 tabular-nums">
-                  {c.totalLandedCost != null ? c.totalLandedCost.toLocaleString() : "—"}
-                </td>
-                <td className="px-3 py-2">{c.missingComponentCount}</td>
-                <td className="px-3 py-2 text-xs">{new Date(c.calculatedAt).toLocaleString()}</td>
-              </tr>
-            ))}
-            {(data?.items ?? []).length === 0 && !isLoading && (
-              <tr>
-                <td colSpan={8} className="px-3 py-8 text-center text-sm text-zinc-500">
-                  No landed cost calculations yet. Open a shipment and calculate.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }

@@ -24,8 +24,7 @@ export default function MixedContainerHomePage() {
   return (
     <div data-testid="mc-home-page" className="max-w-[1200px] mx-auto space-y-8 animate-fade-in">
       <header>
-        <span className="dmx-eyebrow text-zinc-500">Buyer · Mixed Container</span>
-        <h1 className="font-display text-4xl font-semibold tracking-tight mt-1">{t("mc.home.title")}</h1>
+        <h1 className="font-display text-4xl font-semibold tracking-tight">{t("mc.home.title")}</h1>
         <p className="text-sm text-zinc-600 mt-3 max-w-2xl leading-relaxed">
           {t("mc.home.subtitle")}
         </p>
@@ -33,27 +32,27 @@ export default function MixedContainerHomePage() {
 
       <div className="flex flex-wrap gap-3">
         <Link to="/buyer/mixed-container/catalog" data-testid="mc-build-container-cta">
-          <Button size="lg"><Plus className="h-4 w-4" /> Build Mixed Container</Button>
+          <Button size="lg"><Plus className="h-4 w-4" /> {t("mc.home.build", "Build container")}</Button>
         </Link>
         <Link to="/buyer/mixed-container/requests" data-testid="mc-view-containers-cta">
-          <Button variant="secondary" size="lg"><List className="h-4 w-4" /> View My Containers</Button>
+          <Button variant="secondary" size="lg"><List className="h-4 w-4" /> {t("mc.home.viewMine", "My containers")}</Button>
         </Link>
       </div>
 
       <RecentRequestsPanel
-        title="Recent mixed containers"
+        title={t("mc.home.recent", "Recent containers")}
         rows={recentRows}
         isLoading={isLoading}
-        emptyHint="No containers yet. Start by building your first mixed container."
+        emptyHint={t("mc.home.empty", "No containers yet. Start by building your first one.")}
         viewAllHref="/buyer/mixed-container/requests"
         testId="mc-home-recent"
       />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {[
-          { title: "Discover products", desc: "Browse categories and add products by pallet count." },
-          { title: "Plan your container", desc: "Fill meter, estimated value, partial containers allowed." },
-          { title: "Request live pricing", desc: "DeMaxtore sources suppliers — response in 24–48 hours." },
+          { title: t("mc.home.step1", "Pick products"), desc: t("mc.home.step1.desc", "Browse categories and add products by pallet count.") },
+          { title: t("mc.home.step2", "Fill the container"), desc: t("mc.home.step2.desc", "See fill level and estimated value as you add lines.") },
+          { title: t("mc.home.step3", "Request pricing"), desc: t("mc.home.step3.desc", "DeMaxtore sources suppliers — typically 24–48 hours.") },
         ].map((s) => (
           <div key={s.title} className="dmx-card p-5">
             <Package className="h-5 w-5 text-accent-900 mb-2" />

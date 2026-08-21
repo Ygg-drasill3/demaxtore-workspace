@@ -26,7 +26,7 @@ export function RfqSpawnedOrdersPanel({ workspaceId }: { workspaceId: string }) 
         <div className="dmx-eyebrow text-zinc-500">Order created</div>
         <h2 className="text-lg font-semibold text-ink-900 mt-1">Track your order</h2>
         <p className="text-sm text-zinc-600 mt-1">
-          Your purchase order spawned an order workspace. Open it to follow production and shipment milestones.
+          Your purchase order created an order. Open it to follow production and shipment.
         </p>
       </div>
       <ul className="divide-y divide-zinc-100">

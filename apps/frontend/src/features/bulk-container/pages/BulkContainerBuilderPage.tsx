@@ -86,17 +86,16 @@ export default function BulkContainerBuilderPage() {
       {bc ? (
     <div data-testid="bc-builder-page" className="max-w-[1200px] mx-auto space-y-6 animate-fade-in">
       <header>
-        <Link to="/buyer/bulk-container/requests" className="text-xs text-zinc-500 hover:underline">← My Requests</Link>
-        <span className="dmx-eyebrow text-zinc-500 block mt-2">Container Builder · {bc.externalRef}</span>
-        <h1 className="font-display text-4xl font-semibold tracking-tight mt-1">Plan Your Bulk Container</h1>
+        <Link to="/buyer/bulk-container/requests" className="text-xs text-zinc-500 hover:underline">← My requests</Link>
+        <h1 className="font-display text-4xl font-semibold tracking-tight mt-2">Plan your bulk load</h1>
         <p className="text-sm text-zinc-500 mt-1">
-          {stateLabel} · Planning workspace — not a shopping cart.
+          {stateLabel} · Add lines by metric ton, then request pricing.
         </p>
       </header>
 
       {submitted && (
         <div data-testid="bc-request-submitted" className="dmx-card p-5 bg-green-50 border-green-200">
-          <h2 className="font-medium text-green-900">Your procurement request has been submitted</h2>
+          <h2 className="font-medium text-green-900">Request submitted</h2>
           <p className="text-sm text-green-800 mt-1">
             DeMaxtore operations will source suppliers for your specification lines.
           </p>
@@ -106,19 +105,18 @@ export default function BulkContainerBuilderPage() {
       {editable && (
         <div className="dmx-card p-5 bg-blue-50 border-blue-100 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-blue-900 max-w-xl">
-            Add specification lines by metric ton, then submit your procurement request.
-            Partial containers below 20 MT are allowed with a warning.
+            Add specification lines by metric ton, then submit. Loads under 20 MT are allowed with a warning.
           </p>
           <div className="flex gap-2">
             <Link to={`/buyer/bulk-container/catalog?containerId=${bc.id}`}>
-              <Button variant="secondary">Continue Browsing</Button>
+              <Button variant="secondary">Keep browsing</Button>
             </Link>
             <Button
               data-testid="bc-submit-request"
               disabled={bc.lines.length === 0 || submitting}
               onClick={() => void submitRequest()}
             >
-              Submit Procurement Request
+              Submit request
             </Button>
           </div>
         </div>

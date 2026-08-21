@@ -1,17 +1,21 @@
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { AlertTriangle, ArrowRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useT } from "@/i18n/useT";
-import { shipmentPortfolioApi } from "@/features/shipment/lib/shipment-portfolio.api";
+import { useDashboardShipments } from "../../hooks/useDashboardShipments";
+import { displayName, displayRef } from "../../lib/display-ref";
+
+const STATUS_STYLES: Record<string, string> = {
+  "On Track": "bg-emerald-50 text-emerald-800",
+  "At Risk": "bg-amber-50 text-amber-800",
+  Delayed: "bg-red-50 text-red-800",
+};
 
 /** Sprint 43 — dashboard snippet of active imports (top 3 shipments). */
 export function ActiveImportsWidget() {
   const { t } = useT();
-  const { data, isLoading } = useQuery({
-    queryKey: ["shipment-portfolio", "dashboard-imports"],
-    queryFn: () => shipmentPortfolioApi.getPortfolio({ limit: 3 }),
-  });
-
-  const items = data?.items ?? [];
+  const { active, isLoading } = useDashboardShipments();
+  const items = active.slice(0, 3);
 
   return (
     <section className="dmx-card p-0 overflow-hidden" data-testid="active-imports-widget">
@@ -37,14 +41,38 @@ export function ActiveImportsWidget() {
             {items.map((s) => (
               <li key={s.shipmentId}>
                 <Link
-                  to={`/workspace/shipment/${s.shipmentId}`}
+                  to={`/buyer/imports/${s.shipmentId}`}
                   className="block rounded-lg border border-paper-100 px-3 py-2.5 hover:border-paper-200 hover:bg-paper-50/80"
                   data-testid={`active-imports-widget-${s.shipmentId}`}
                 >
-                  <p className="text-sm font-medium text-ink-900">{s.shipmentNumber}</p>
-                  <p className="text-xs text-zinc-500 mt-0.5">
-                    {s.origin} → {s.destination} · {s.fsmState.replace(/_/g, " ")}
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-medium text-ink-900 truncate">
+                      {displayName(s.supplierName, displayRef(s.shipmentNumber))}
+                    </p>
+                    <span
+                      className={cn(
+                        "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase",
+                        STATUS_STYLES[s.status] ?? "bg-paper-100 text-zinc-600",
+                      )}
+                    >
+                      {s.status}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-zinc-600">
+                    {s.origin} → {s.destination} · {s.currentMilestone}
+                    {s.eta ? ` · ${t("dash.common.eta", "ETA")} ${new Date(s.eta).toLocaleDateString()}` : ""}
                   </p>
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1 text-xs font-medium text-accent-900">
+                      {t("s43.widget.openImport", "Open import")} <ArrowRight className="h-3 w-3" />
+                    </span>
+                    {s.openAlertCount > 0 && (
+                      <span className="inline-flex items-center gap-1 text-[11px] text-amber-800">
+                        <AlertTriangle className="h-3 w-3" />
+                        {t("dash.common.alertCount", "{count} to resolve", { count: s.openAlertCount })}
+                      </span>
+                    )}
+                  </div>
                 </Link>
               </li>
             ))}

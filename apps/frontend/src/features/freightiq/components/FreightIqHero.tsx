@@ -37,7 +37,7 @@ export function FreightIqHero({ pol, pod, summary, orderRef }: Props) {
       <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-accent-600/20 blur-3xl" />
       <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/50">FreightIQ</span>
+          <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/50">Freight</span>
           <h3 className="font-display text-2xl font-semibold tracking-tight mt-1">{pol} → {pod}</h3>
           {orderRef && <p className="text-xs text-white/60 mt-1 font-mono">#{orderRef}</p>}
         </div>

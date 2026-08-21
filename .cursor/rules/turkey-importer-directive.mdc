@@ -1,0 +1,105 @@
+---
+description: Authoritative implementation directive for DeMaxtore Turkey Importer. Always apply when working on this codebase.
+alwaysApply: true
+---
+
+# AUTHORITATIVE IMPLEMENTATION DIRECTIVE
+
+This document is the authoritative product specification for the **DeMaxtore Turkey Importer** product.
+
+Previous Turkey Importer sprint documents, screenshots and implementations are **historical implementation evidence**, not the authoritative product definition.
+
+---
+
+## Phase 1: Analysis Before Any Code
+
+**Do not start by coding.**
+
+Phase 1 must be repository discovery and a written gap analysis. Produce:
+
+1. Current architecture map
+2. Reusable capability inventory
+3. Turkey legacy/leak inventory
+4. International protected-surface inventory
+5. Target architecture
+6. Implementation plan
+7. Migration plan
+8. Test plan
+9. Risk register
+
+**Stop after the analysis and wait for approval before implementation.**
+
+---
+
+## Core Architecture Rules
+
+### Two Separate Products — Shared Engine
+
+DeMaxtore has two buyer products:
+
+- **International Buyer** — sourcing/trade product (RFQ, CommodityBid, CB Workspaces, Mixed Container, Bulk Container, Supplier workflows, Inspection, Products, PO, Timeline, Shipment Tracking, Exceptions, Documents)
+- **Turkey Importer** — import operating system (Import → Freight → Booking → Shipment → Tracking → Customs → Inland Delivery → POD → Landed Cost)
+
+> Shared engine ≠ shared customer experience.
+
+### INTERNATIONAL BUYER IS A PROTECTED PRODUCT
+
+No Turkey Importer implementation may modify or regress:
+- International Dashboard, Sourcing navigation, RFQ, CommodityBid, CB Workspaces
+- Mixed Container, Bulk Container, Supplier workflows, Inspection, Products
+- Purchase Orders, Timeline, Shipment Tracking, Alerts/Exceptions, Documents
+- Any existing international trade workflows
+
+### Buyer Segmentation — Organisation Level Only
+
+Use `buyerOperatingModel` on the `Organisation` model:
+- `INTERNATIONAL` (default)
+- `TURKEY_IMPORTER`
+
+**NEVER use** for segmentation: email address, user UUID, organisation name, fixture name, demo account, shipment destination alone, browser locale, country detection.
+
+### Internal Margin Protection
+
+Buyer must never see: internal carrier buy rate, broker internal rate, trucker internal cost, DeMaxtore margin, markup strategy, internal notes — not even in API payloads.
+
+### Tenant Isolation
+
+Backend authorization is mandatory. UI hiding is not security. Organisation A must never access Organisation B's imports, shipments, documents, customs cases, costs, messages, or exceptions.
+
+---
+
+## Existing Code Policy
+
+This is **not a backend rewrite project**. Before any change, classify every component:
+
+| Class | Meaning |
+|---|---|
+| `REUSE AS-IS` | Working, keep |
+| `REUSE WITH ADAPTER` | Working engine, adapt surface |
+| `TURKEY UI REBUILD` | Rebuild Turkey UX only |
+| `INTERNATIONAL ONLY` | Do not touch |
+| `LEGACY / REMOVE AFTER VALIDATION` | Remove only after Turkey E2E passes |
+| `SHARED ENGINE` | Used by both products |
+
+**Working capability must not be deleted just because it was written in an old sprint.**
+
+---
+
+## Turkey Frontend Rebuild Policy
+
+New Turkey implementation must:
+- Use the shared engine
+- NOT modify the International product
+- Be based on organisation segmentation
+- Use Turkey-specific information architecture
+- NOT replace International chrome via generic `Role.BUYER` conditions
+
+`hide ≠ delete` — sourcing capabilities stay in the backend for future commercial activation.
+
+---
+
+## Migration Strategy (Ordered)
+
+1. Production backup → 2. Git immutable tag → 3. Database backup → 4. Turkey capability inventory → 5. International baseline screenshots/tests → 6. Turkey Master Specification freeze → 7. Clean Turkey product shell → 8. Existing engine adapters → 9. Turkey journeys → 10. Turkey E2E testing → 11. International regression → 12. Security/tenant regression → 13. Production deployment → 14. Production acceptance → 15. Legacy cleanup
+
+**Old Turkey implementation must not be deleted until the replacement passes E2E acceptance, International non-regression, tenant-isolation tests, and production acceptance.**

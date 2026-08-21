@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronRight, Route, Ship } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -8,6 +8,8 @@ import { useAuth } from "@/store/auth.store";
 import { toast } from "@/store/toast.store";
 import { cn } from "@/lib/utils";
 import { formatWorkspaceRef } from "@/lib/workspace-ref";
+import { humanizeStatus } from "@/lib/humanize-status";
+import { isTurkeyImporterOperatingModel } from "@dmx/contracts/buyer-operating-model";
 import type { FreightPortfolioItem } from "@dmx/contracts/freightiq";
 import { freightiqApi } from "../lib/freightiq.api";
 import { FreightOfferListCard, type OfferHighlight } from "../components/FreightOfferListCard";
@@ -38,10 +40,10 @@ export default function FreightIqEmbedPage() {
         </span>
         <div className="min-w-0">
           <h1 className="font-display text-lg font-semibold tracking-tight text-ink-900">
-            Freight offers
+            Freight
           </h1>
           <p className="text-xs text-zinc-500 mt-0.5 leading-relaxed">
-            Only routes with forwarder offers. Open one, compare, and select.
+            Compare offers and select one to continue booking.
           </p>
         </div>
       </div>
@@ -64,16 +66,19 @@ function highlightFor(
 }
 
 function statusLabel(item: FreightPortfolioItem): string {
-  if (item.execution?.state) return item.execution.state.replace(/_/g, " ");
+  if (item.execution?.state) return humanizeStatus(item.execution.state);
   if (item.selection) return "Offer selected";
   if (item.request.status === "CONVERTED_TO_SHIPMENT") return "Booking in progress";
   if (item.request.status === "QUOTED") return "Offers ready";
-  return item.request.status.replace(/_/g, " ");
+  return humanizeStatus(item.request.status);
 }
 
 function AccountFreightOfferHub() {
   const { t } = useT();
   const user = useAuth((s) => s.user);
+  const [params] = useSearchParams();
+  const scopedOrderId = params.get("orderId")?.trim() || null;
+  const turkey = isTurkeyImporterOperatingModel(user?.buyerOperatingModel);
   const qc = useQueryClient();
   const canSelect = user?.role === "BUYER";
   const [openOrderId, setOpenOrderId] = useState<string | null>(null);
@@ -84,10 +89,11 @@ function AccountFreightOfferHub() {
     queryFn: () => freightiqApi.myPortfolio(),
   });
 
-  const items = useMemo(
-    () => (data?.items ?? []).filter((i) => i.offers.length > 0),
-    [data?.items],
-  );
+  const items = useMemo(() => {
+    const withOffers = (data?.items ?? []).filter((i) => i.offers.length > 0);
+    if (!scopedOrderId) return withOffers;
+    return withOffers.filter((i) => i.orderId === scopedOrderId);
+  }, [data?.items, scopedOrderId]);
   const itemIdsKey = items.map((i) => i.orderId).join(",");
 
   useEffect(() => {
@@ -130,9 +136,50 @@ function AccountFreightOfferHub() {
       errorMessage={t("freightiq.embed.ssoFailed", "Could not load freight offers.")}
     >
       <div className="max-w-3xl mx-auto p-4 space-y-3" data-testid="freightiq-native-hub">
+        {scopedOrderId && (
+          <Link
+            to={`/workspace/order/${scopedOrderId}#order-freightiq-section`}
+            className="text-xs text-zinc-500 hover:text-ink-900 hover:underline"
+            data-testid="freightiq-hub-back-order"
+          >
+            ← Back to order
+          </Link>
+        )}
         {!items.length ? (
-          <div className="rounded-xl border border-dashed border-zinc-200 bg-white px-6 py-10 text-center text-sm text-zinc-500">
-            No freight offers yet. When a forwarder quotes your route, it will appear here.
+          <div
+            className="rounded-xl border border-dashed border-zinc-200 bg-white px-6 py-10 text-center space-y-4"
+            data-testid="freightiq-hub-empty"
+          >
+            <p className="text-sm text-zinc-600">
+              {scopedOrderId
+                ? "No freight offers for this order yet. Request freight from the order to continue."
+                : "No freight offers yet. Request a quote and offers will appear here when ready."}
+            </p>
+            {scopedOrderId ? (
+              <Link
+                to={`/workspace/order/${scopedOrderId}#order-freightiq-section`}
+                className="dmx-btn-primary inline-flex text-sm"
+                data-testid="freightiq-hub-open-order-cta"
+              >
+                Open order freight →
+              </Link>
+            ) : turkey ? (
+              <Link
+                to="/buyer/freightiq/request"
+                className="dmx-btn-primary inline-flex text-sm"
+                data-testid="freightiq-hub-request-cta"
+              >
+                Request freight quote →
+              </Link>
+            ) : (
+              <Link
+                to="/buyer/rfq"
+                className="dmx-btn-primary inline-flex text-sm"
+                data-testid="freightiq-hub-rfq-cta"
+              >
+                Continue from quote request →
+              </Link>
+            )}
           </div>
         ) : (
           <>
@@ -215,7 +262,7 @@ function AccountFreightOfferHub() {
                             className="text-xs font-medium text-accent-900 hover:underline"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            Order workspace →
+                            Booking details →
                           </Link>
                         </div>
 
@@ -239,7 +286,7 @@ function AccountFreightOfferHub() {
 
                         {selectedId && (
                           <p className="text-xs text-emerald-700">
-                            Offer selected. Continue in the order workspace for booking steps.
+                            Offer selected. Continue with booking details above.
                           </p>
                         )}
                       </div>

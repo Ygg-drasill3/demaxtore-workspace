@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useT } from "@/i18n/useT";
 import type { CommunicationRow } from "../../lib/buyer-command-center";
+import { displayRef } from "../../lib/display-ref";
 
 export function CommunicationCenter({ rows, loading }: { rows?: CommunicationRow[]; loading?: boolean }) {
   const { t } = useT();
@@ -10,8 +11,7 @@ export function CommunicationCenter({ rows, loading }: { rows?: CommunicationRow
     <section data-testid="cc-messages" className="dmx-card p-5">
       <div className="flex justify-between items-start gap-2 mb-4">
         <div>
-          <span className="dmx-eyebrow text-zinc-500">{t("dash.eyebrow.collaboration")}</span>
-          <h2 className="font-display text-xl font-semibold mt-0.5">{t("dash.communication.title")}</h2>
+          <h2 className="font-display text-xl font-semibold">{t("dash.communication.title")}</h2>
         </div>
         {unread > 0 && (
           <span data-testid="cc-messages-unread" className="text-xs bg-amber-100 text-amber-900 px-2 py-1 rounded-full">
@@ -28,7 +28,7 @@ export function CommunicationCenter({ rows, loading }: { rows?: CommunicationRow
           {rows.slice(0, 5).map((m) => (
             <li key={m.workspaceId} data-testid="cc-message-row" className="p-3 rounded-lg border border-zinc-100">
               <div className="flex justify-between gap-2">
-                <span className="font-mono text-xs">{m.workspaceRef}</span>
+                <span className="font-mono text-xs">{displayRef(m.workspaceRef)}</span>
                 <span className="text-[10px] uppercase text-zinc-400">{m.workspaceType}</span>
               </div>
               <p className="text-sm text-zinc-700 mt-1 truncate">{m.lastMessage}</p>

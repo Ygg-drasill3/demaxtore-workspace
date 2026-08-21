@@ -32,30 +32,43 @@ const TONE_STYLES = {
 export function ImportExecutionKpiRow({
   kpis,
   timelineKpis,
+  activeImports,
   loading,
+  max,
 }: {
   kpis?: ImportExecutionKpis;
   timelineKpis?: TradeTimelineKpiDto;
+  /**
+   * Count taken from the same portfolio the Active imports list renders, so the
+   * tile and the list below it cannot disagree.
+   */
+  activeImports?: number;
   loading?: boolean;
+  /** Turkey command center shows the 5 primary KPIs (spec §7). */
+  max?: number;
 }) {
   const { t } = useT();
 
   const resolveValue = (key: typeof KPIS[number]["key"]): number | null => {
     if (loading) return null;
-    if (key === "activeImports") return timelineKpis?.activeTrades ?? kpis?.activeOrders ?? null;
+    if (key === "activeImports") {
+      return activeImports ?? timelineKpis?.activeTrades ?? kpis?.activeOrders ?? null;
+    }
     if (key === "customsActive") return kpis?.customsActive ?? null;
     if (key === "deliveriesActive") return kpis?.deliveriesActive ?? null;
     const v = kpis?.[key as keyof CommandCenterKpis];
     return typeof v === "number" ? v : null;
   };
 
+  const visibleKpis = typeof max === "number" ? KPIS.slice(0, max) : KPIS;
+
   return (
     <section
       data-testid="cc-import-kpi-row"
       data-guide="dashboard-import-kpis"
-      className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3"
+      className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3"
     >
-      {KPIS.map(({ key, labelKey, fallback, to, icon: Icon, testId, tone }) => {
+      {visibleKpis.map(({ key, labelKey, fallback, to, icon: Icon, testId, tone }) => {
         const raw = resolveValue(key);
         const display = loading || raw === null ? "—" : raw;
         const hasValue = !loading && raw !== null && raw > 0;

@@ -18,7 +18,7 @@ export function CapacityMeter({
   return (
     <div data-testid="bc-capacity-meter">
       <div className="flex justify-between text-xs text-zinc-500 mb-1">
-        <span>BulkContainer Fill</span>
+        <span>Fill level</span>
         <span data-testid="bc-fill-percent">{fillPercent}%</span>
       </div>
       <div className="h-3 bg-zinc-100 rounded-full overflow-hidden">

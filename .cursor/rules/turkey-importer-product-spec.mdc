@@ -1,0 +1,181 @@
+---
+description: Turkey Importer product scope, journeys, UI principles and Definition of Done. Reference for all feature work.
+alwaysApply: true
+---
+
+# DeMaxtore Turkey Importer — Master Product Scope v1.0
+
+**Document status:** Authoritative Product Specification  
+**Product:** DeMaxtore Turkey Importer / Import Operating System  
+**Target market:** Companies doing imports into Turkey  
+**Core model:** Freight + Customs + Import Operating System  
+**Architecture principle:** Shared logistics engine, separate Turkey Importer customer experience
+
+---
+
+## Product Purpose
+
+> One Import. One Journey. One Operational Record.
+
+The Turkey Importer connects a full import transaction:
+
+**PO / Product context → Freight → Booking → Shipment → Container Visibility → Customs → Inland Delivery → POD → Landed Cost**
+
+The customer must not be forced to reconcile operational data from separate systems themselves.
+
+---
+
+## Turkey Importer Navigation (Primary Sidebar)
+
+```
+HOME
+  Dashboard
+  Workspace Inbox
+
+IMPORT OPERATIONS
+  My Imports
+  Freight
+  Shipments
+  Customs
+  Deliveries
+  Landed Cost
+  Purchase Orders
+  Products
+  Import Control Tower
+  Exceptions
+
+DOCUMENTS
+  Documents
+  Compliance
+
+COLLABORATION
+  Messages
+  Notifications
+```
+
+Sourcing features (RFQ, Commodity Bids, CB Workspaces, Mixed Container, Bulk Container) must **not** appear in the default Turkey Importer primary sidebar.
+
+---
+
+## Core Product Modules
+
+### Dashboard
+Hero: import operations. Primary CTAs: **Get Freight Quote** / **Start Import**.  
+Primary metrics: Active Imports, In Transit, In Customs, Action Required, In Delivery, Freight Pending.  
+**No** Active Trades / In Production / RFQ actions in primary Turkey experience.
+
+### Priority Actions / Attention Required
+Each attention item must carry: WHAT, WHY, OWNER, ACTION, STATUS, RESOLUTION.  
+Ownership shown must match ownership data the system actually tracks. No fake automation.
+
+### Start Import — Minimum entry models
+- **A** — Existing Purchase Order
+- **B** — Direct Import (no sourcing required)
+- **C** — Freight-first
+
+Turkey Importer users must NOT be required to go through RFQ or CommodityBid to start an import.
+
+### My Imports
+Each import card shows: import ID, supplier, origin/destination, shipment, current stage, ETA, freight/customs/delivery status, exception state, landed cost state, next action.  
+One click into import workspace.
+
+### Freight
+State progression visible to user: Quote Requested → Offer Available → Selected → Booking Pending → Booking Confirmed → Shipment Created.
+
+### Shipment Workspace
+Single context view: shipment summary, container info, origin/destination, carrier/vessel, booking, tracking, ETA, timeline, documents, customs, inland delivery, POD, landed cost, exceptions.  
+User must not search for the same shipment across multiple modules.
+
+### Tracking Architecture
+Provider must be behind an adapter abstraction — no hard-coded single provider.  
+Tracking data becomes operational context (feeds Timeline, Exception, Control Tower).  
+Graceful degradation when provider unavailable.
+
+### Timeline
+Cross-domain milestone view: Booking Confirmed → Container Gate In → Vessel Departed → ETA Updated → Vessel Arrived → Discharged → Customs Started → Customs Cleared → Ready for Pickup → Inland Delivery → Delivered → POD Confirmed.
+
+### Exceptions
+Severity: Info / Low / Medium / High / Critical.  
+Lifecycle: OPEN → IN PROGRESS → RESOLVED.
+
+Examples: ETA change, delay, stale tracking, missing document, customs readiness issue, customs action, inland delivery issue, POD missing, operational deadline.
+
+### Control Tower
+Answers: "Which imports need attention today?"  
+Minimum: Active Imports, Need Attention, Customs Actions, Document Issues, Delivery Actions.  
+Shares the same operational reality as the Exception system — no separate demo data.
+
+### Documents
+Operational component, not a file depot. Linked to import / PO / shipment / customs case / delivery.  
+Document readiness calculable (e.g. B/L: MISSING → Customs: NOT READY).
+
+### Customs
+Buyer sees: customs case status, document readiness, broker status, customs milestones, clearance result.  
+CTA: "Request DeMaxtore Customs" on eligible shipment. If case exists: "Open Customs".
+
+**Shipment-level Turkey eligibility** (Turkey destination) is separate from **organisation-level operating model**.
+
+### Broker Workspace
+Broker has own execution surface: assigned customs cases, documents, readiness, requested information, customs progression, clearance status.  
+Buyer must not see broker's internal margin / commercially sensitive data.
+
+### Inland Delivery
+CUSTOMS CLEARED → READY FOR PICKUP → TRUCKER ASSIGNED → INLAND DELIVERY → DELIVERED → POD.  
+Visible on the same Import Journey.
+
+### Trucker Workspace
+Trucker: assigned deliveries, pickup, delivery status, delivery completion, POD.  
+Buyer must not see internal carrier cost.
+
+### POD
+Linked to delivery / shipment / import / documents / timeline.  
+DELIVERED → POD UPLOADED → POD CONFIRMED.
+
+### Landed Cost
+Components: product cost, freight, surcharges, insurance, customs-related costs, duties, taxes, broker costs, port/local charges, inland delivery, other eligible costs.  
+Estimated vs. actual must be distinguished. No invented values.
+
+---
+
+## Roles
+- **Buyer** — importer customer
+- **DeMaxtore Ops** — coordinates operation
+- **Broker** — customs execution
+- **Trucker** — inland delivery execution
+- **Supplier** — source/document/order collaboration where needed
+
+---
+
+## UI/UX Principles
+
+**No dead ends** — every customer-facing CTA must have a working flow behind it.
+
+**Truthful UI** — system must not claim capabilities that are not implemented (e.g. live AIS tracking when only manual data exists). Simulated/manual data must be clearly distinguished.
+
+**Customer language** — My Imports, Freight, Shipments, Customs, Deliveries, Documents, Landed Cost, Control Tower, Exceptions. Internal domain terminology must not leak to customer UI.
+
+---
+
+## E2E Golden Paths (Required)
+
+**Import Golden Path:** PO → Start Import → Freight Quote → Offer → Booking → Shipment → Tracking/Timeline → Documents → Customs → Customs Cleared → Inland Delivery → Delivered → POD → Landed Cost
+
+**Exception Golden Path:** ETA change → tracking event → timeline update → exception created → Control Tower Need Attention → owner/action context → resolved → audit trail
+
+**Document → Customs:** Missing doc → customs NOT READY → doc provided → readiness updated → customs proceeds
+
+**Customs → Delivery:** Customs Cleared → Ready for Pickup → Trucker → Pickup → Delivery → POD
+
+**Landed Cost:** freight + customs-eligible costs + inland → landed cost calculation; no internal margin leak
+
+**International Non-Regression:** International login → Dashboard → RFQ → CommodityBid → sourcing nav → PO → Inspection → Documents → Timeline → Shipment Tracking → Exceptions — all working, no Turkey copy/navigation leakage
+
+---
+
+## Definition of Done
+
+Turkey Importer is complete only when ALL of the following pass:
+
+Turkey Product Isolation · International Non-Regression · Turkey Dashboard · My Imports · Start Import · Freight · Booking · Shipment Workspace · Tracking Architecture · Timeline · Documents · Exceptions · Control Tower · Customs · Broker Execution · Inland Delivery · Trucker Execution · POD · Landed Cost · Cross-System Lineage · Tenant Isolation · Internal Margin Protection · Production UI Acceptance · Unexpected 5xx: 0 · P0: 0
+
+> **Turkey PASS requires International Buyer to be unbroken.**

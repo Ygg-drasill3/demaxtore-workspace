@@ -1,0 +1,43 @@
+---
+description: Turkey Importer UX simplicity — reduce customer cognitive load. Always apply on UI/IA work.
+alwaysApply: true
+---
+
+# Turkey Importer — UX Simplicity Rule
+
+Customers must not feel they are learning software architecture.
+
+## First 10 seconds
+
+On login, the buyer must immediately answer:
+
+1. What are my active imports?
+2. What needs my attention today?
+3. What is my next single action?
+
+## Information architecture
+
+- Prefer few primary entries: Dashboard, My Imports, Documents, Messages.
+- Freight, Customs, Delivery, Landed Cost, Exceptions open from the **import journey**, not as competing top-level products.
+- Sourcing (RFQ, CommodityBid, MC, BC) must not appear in default Turkey primary nav.
+
+## Language
+
+Use customer words only: My Imports, Freight, Shipments, Customs, Deliveries, Documents, Landed Cost, Control Tower, Exceptions.
+
+Do not leak: workspace, lineage, FSM, orchestration, module, entitlement (unless ops/admin).
+
+## Density
+
+- One next action per import card / attention item.
+- No decorative CTAs. No dead ends.
+- If a screen cannot answer "why does the customer need this here?", hide it, merge it, or move it into the import workspace.
+
+## Complexity debt checklist (every UI change)
+
+Before shipping a Turkey UI change, confirm:
+
+- [ ] Fewer decisions than before (or equal with clearer hierarchy)
+- [ ] No new jargon in customer chrome
+- [ ] International Buyer chrome unchanged
+- [ ] Truthful UI (no fake live tracking / fake automation)

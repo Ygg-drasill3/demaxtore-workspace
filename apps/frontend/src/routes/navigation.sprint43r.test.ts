@@ -25,12 +25,13 @@ describe("Sprint 43R international buyer navigation", () => {
     expect(testIds).toContain("buyer-trade-documents");
   });
 
-  it("does not put Turkey customs / inland / landed-cost as primary nav", () => {
+  it("does not put Turkey customs / inland / landed-cost / freestanding freight as primary nav", () => {
     const testIds = BUYER_NAV_GROUPS_INTERNATIONAL.flatMap((g) => g.items).map((i) => i.testId);
     expect(testIds).not.toContain("buyer-customs");
     expect(testIds).not.toContain("buyer-inland");
     expect(testIds).not.toContain("buyer-landed-cost");
     expect(testIds).not.toContain("buyer-imports");
+    expect(testIds).not.toContain("buyer-freightiq");
   });
 
   it("quick actions prioritize Create Bid and New RFQ", () => {
@@ -47,8 +48,9 @@ describe("Sprint 43R international buyer navigation", () => {
 
   it("selects Turkey nav only for explicit TURKEY_IMPORTER", () => {
     const groups = navGroupsForRole("BUYER", "TURKEY_IMPORTER");
-    expect(groups.some((g) => g.id === "import-ops")).toBe(true);
-    expect(quickActionsForRole("BUYER", "TURKEY_IMPORTER")[0]?.testId).toBe("qa-freight-quote");
+    expect(groups.map((g) => g.id)).toEqual(["home", "operations", "control"]);
+    expect(groups.some((g) => g.id === "sourcing")).toBe(false);
+    expect(quickActionsForRole("BUYER", "TURKEY_IMPORTER")[0]?.testId).toBe("qa-start-import");
   });
 
   it("default flat BUYER nav is International (existing customers)", () => {

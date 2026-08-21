@@ -53,7 +53,7 @@ export default function BulkContainerCoordinationPage() {
       {data.executionReady && (
         <div data-testid="bc-buyer-execution-ready" className="dmx-card p-5 bg-green-50 border-green-200">
           <h2 className="font-medium text-green-900">Execution Ready</h2>
-          <p className="text-sm text-green-800 mt-1">All supplier payments confirmed. Your BulkContainer is ready for execution.</p>
+          <p className="text-sm text-green-800 mt-1">All supplier payments confirmed. Your bulk load is ready for execution.</p>
           <Link to={`/buyer/bulk-container/execution/${id}`} className="inline-block mt-3 text-sm text-accent-900 underline" data-testid="bc-view-execution">View Execution Dashboard</Link>
         </div>
       )}

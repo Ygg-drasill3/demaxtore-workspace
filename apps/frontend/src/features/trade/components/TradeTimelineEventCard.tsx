@@ -64,7 +64,6 @@ export function TradeTimelineEventCard({ event }: TradeTimelineEventCardProps) {
             <time dateTime={event.occurredAt}>
               {new Date(event.occurredAt).toLocaleString()}
             </time>
-            <span data-testid={`trade-timeline-source-${event.id}`}>{event.sourceModule}</span>
           </div>
         </div>
       </div>

@@ -7,13 +7,13 @@ import WorldMapVisual from "./WorldMapVisual";
 
 const navItems = [
   { icon: Home, label: "Overview", active: true },
-  { icon: FileText, label: "RFQ\u2122" },
-  { icon: Gavel, label: "CommodityBid\u2122" },
+  { icon: FileText, label: "RFQs" },
+  { icon: Gavel, label: "Commodity Bids" },
   { icon: ClipboardList, label: "Purchase Orders" },
-  { icon: Ship, label: "FreightIQ\u2122" },
-  { icon: ShieldCheck, label: "Inspection\u2122" },
-  { icon: MapPin, label: "Live Tracking\u2122" },
-  { icon: FolderClosed, label: "Document Hub" },
+  { icon: Ship, label: "Freight" },
+  { icon: ShieldCheck, label: "Inspection" },
+  { icon: MapPin, label: "Tracking" },
+  { icon: FolderClosed, label: "Documents" },
   { icon: Bell, label: "Alerts" },
 ];
 

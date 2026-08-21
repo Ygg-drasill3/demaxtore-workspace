@@ -1,14 +1,14 @@
 import { Link } from "react-router-dom";
 import { useT } from "@/i18n/useT";
 import type { DocumentStatusRow } from "../../lib/buyer-command-center";
+import { displayRef } from "../../lib/display-ref";
 
 export function DocumentStatusWidget({ rows, loading }: { rows?: DocumentStatusRow[]; loading?: boolean }) {
   const { t } = useT();
 
   return (
     <section data-testid="cc-documents" className="dmx-card p-5">
-      <span className="dmx-eyebrow text-zinc-500">{t("dash.eyebrow.compliance")}</span>
-      <h2 className="font-display text-xl font-semibold mt-0.5 mb-4">{t("dash.documents.title")}</h2>
+      <h2 className="font-display text-xl font-semibold mb-4">{t("dash.documents.title")}</h2>
       {loading ? (
         <p className="text-sm text-zinc-500">{t("dash.common.loadingDocuments")}</p>
       ) : !rows?.length ? (
@@ -18,7 +18,7 @@ export function DocumentStatusWidget({ rows, loading }: { rows?: DocumentStatusR
           {rows.slice(0, 6).map((d) => (
             <li key={d.workspaceId} data-testid="cc-doc-row" className="p-3 rounded-lg border border-zinc-100">
               <div className="flex justify-between gap-2 text-sm">
-                <span className="font-mono text-xs">{d.workspaceRef}</span>
+                <span className="font-mono text-xs">{displayRef(d.workspaceRef)}</span>
                 <span className={`text-xs ${d.complianceStatus === "READY_FOR_SHIPMENT" ? "text-emerald-700" : "text-zinc-600"}`}>
                   {d.complianceStatus.replace(/_/g, " ")}
                 </span>

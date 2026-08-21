@@ -570,7 +570,7 @@ function nextActionFor(type: string, state: string): string {
     if (state === "FREIGHT_REQUESTED") return "Select freight";
     if (state.startsWith("PRODUCTION")) return "Track production";
   }
-  return "Open workspace";
+  return "View details";
 }
 
 function buildLiveAuctions(

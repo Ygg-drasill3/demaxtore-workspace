@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, ArrowRight } from "lucide-react";
 import { useT } from "@/i18n/useT";
-import { shipmentPortfolioApi } from "@/features/shipment/lib/shipment-portfolio.api";
+import { useDashboardShipments } from "../../hooks/useDashboardShipments";
+import { displayName, displayRef } from "../../lib/display-ref";
 
 const STATUS_DOT: Record<string, string> = {
   "On Track": "bg-emerald-500",
@@ -14,20 +14,12 @@ const STATUS_DOT: Record<string, string> = {
 
 export function MyShipmentsWidget() {
   const { t } = useT();
-  const { data, isLoading } = useQuery({
-    queryKey: ["my-shipments-widget"],
-    queryFn: () => shipmentPortfolioApi.getPortfolio({ limit: 5, offset: 0 }),
-  });
-
-  const active = (data?.items ?? []).filter((s) => s.status !== "Delivered" && s.status !== "Cancelled");
+  const { active, isLoading } = useDashboardShipments();
 
   return (
     <section data-testid="my-shipments-widget" className="dmx-card overflow-hidden">
       <div className="border-b border-zinc-100 px-5 py-3 flex items-center justify-between bg-zinc-50/80">
-        <div>
-          <span className="dmx-eyebrow text-zinc-500">{t("dash.eyebrow.execution")}</span>
-          <h2 className="font-display text-lg font-semibold">{t("dash.shipments.title")}</h2>
-        </div>
+        <h2 className="font-display text-lg font-semibold">{t("dash.shipments.title")}</h2>
         <Link to="/shipments/portfolio" data-testid="my-shipments-view-all" className="text-xs font-medium text-accent-900 hover:underline">
           {t("dash.common.openArrow")}
         </Link>
@@ -44,7 +36,9 @@ export function MyShipmentsWidget() {
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className={`h-2 w-2 shrink-0 rounded-full ${STATUS_DOT[s.status] ?? "bg-zinc-300"}`} />
-                    <span className="font-mono text-xs truncate">{s.shipmentNumber}</span>
+                    <span className="text-sm font-medium text-ink-900 truncate">
+                      {displayName(s.supplierName, displayRef(s.shipmentNumber))}
+                    </span>
                   </div>
                   {s.openAlertCount > 0 && (
                     <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-800">
@@ -54,8 +48,8 @@ export function MyShipmentsWidget() {
                   )}
                 </div>
                 <div className="mt-1 text-xs text-zinc-500 truncate">
-                  {s.tradeId} · {s.currentMilestone}
-                  {s.eta ? ` · ETA ${new Date(s.eta).toLocaleDateString()}` : ""}
+                  {s.origin} → {s.destination} · {s.currentMilestone}
+                  {s.eta ? ` · ${t("dash.common.eta", "ETA")} ${new Date(s.eta).toLocaleDateString()}` : ""}
                 </div>
                 <Link
                   to={s.tradeWorkspaceUrl}

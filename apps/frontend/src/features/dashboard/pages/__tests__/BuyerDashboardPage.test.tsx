@@ -77,11 +77,11 @@ describe("<BuyerDashboardPage />", () => {
   it("restores International onboarding (RFQ → award → PO)", async () => {
     renderWithProviders(<BuyerDashboardPage />, { route: "/buyer/dashboard" });
     const toggle = screen.getByTestId("cc-onboarding-toggle");
-    expect(toggle).toHaveTextContent(/sourcing command center|first import trade|guided checklist/i);
+    expect(toggle).toHaveTextContent(/sourcing dashboard|first import|guided checklist|short checklist/i);
     toggle.click();
     const welcome = await screen.findByTestId("buyer-onboarding-welcome");
-    expect(welcome).toHaveTextContent(/sourcing command center/i);
-    expect(welcome).toHaveTextContent(/Create RFQ/i);
+    expect(welcome).toHaveTextContent(/sourcing dashboard/i);
+    expect(welcome).toHaveTextContent(/Create quote request/i);
     expect(welcome).not.toHaveTextContent(/freight and customs operations/i);
     expect(screen.getByTestId("buyer-onboarding-cta")).toHaveAttribute("href", "/buyer/rfq/new");
   });
